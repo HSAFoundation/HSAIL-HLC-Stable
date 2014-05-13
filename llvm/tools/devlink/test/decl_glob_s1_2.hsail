@@ -1,0 +1,4 @@
+version 1:0:small,full;
+
+global_s32 &var_1 = 1;
+global_s32 &var_4_unused = 4;

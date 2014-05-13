@@ -1,0 +1,44 @@
+version 1:0:small,full;
+
+extern function &foo_1()();
+function &foo_2_unused()();
+extern function &foo_3()();
+function &foo_6()();
+
+function &foo_7_unused()()
+{
+	ret;
+};
+
+function &foo_6()()
+{
+	ret;
+};
+
+function &foo_8_unused()()
+{
+	ret;
+};
+
+kernel &main_kernel()
+{
+	{
+		call	&foo_1 () ();
+	}
+	{
+		call	&foo_3 () ();
+	}
+	{
+		call	&foo_6 () ();
+	}
+};
+
+function &foo_5_unused()()
+{
+	ret;
+};
+
+function &foo_3()()
+{
+	ret;
+};

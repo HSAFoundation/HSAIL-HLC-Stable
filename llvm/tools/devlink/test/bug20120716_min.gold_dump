@@ -1,0 +1,54 @@
+
+D@4 DirectiveVersion(7) size=20
+	c_code=I@4; major=1; minor=0; machine=BrigESmall(0); profile=BrigEFull(0); ftz=BrigENosftz(1); 
+
+D@24 DirectiveFunction(0) size=40
+	c_code=I@4; s_name="&__amd_amp_Fcos_f32"; inParamCount=0; d_firstScopedDirective=D@64; operationCount=0; d_nextDirective=D@64; attribute=BrigNone(2); fbarCount=0; outParamCount=0; d_firstInParam=D@0; 
+
+D@64 DirectiveKernel(1) size=40
+	c_code=I@4; s_name="&__OpenCL_test_libm1_kernel"; inParamCount=0; d_firstScopedDirective=D@104; operationCount=2; d_nextDirective=D@120; attribute=BrigNone(2); fbarCount=0; outParamCount=0; d_firstInParam=D@0; 
+
+D@104 ArgStart(17) size=8
+	c_code=I@4; 
+
+D@112 ArgEnd(18) size=8
+	c_code=I@36; 
+
+D@120 DirectiveVersion(7) size=20
+	c_code=I@68; major=1; minor=0; machine=BrigESmall(0); profile=BrigEFull(0); ftz=BrigENosftz(1); 
+
+D@140 DirectiveFunction(0) size=40
+	c_code=I@68; s_name="&__amd_amp_Fcos_f32"; inParamCount=0; d_firstScopedDirective=D@180; operationCount=2; d_nextDirective=D@192; attribute=BrigNone(2); fbarCount=0; outParamCount=0; d_firstInParam=D@0; 
+
+D@180 DirectiveLabel(5) size=12
+	c_code=I@100; s_name="@BB5_2"; 
+
+I@4 InstBase(0) size=32
+	opcode=BrigCall(101); type=Brigb32(14); packing=BrigNoPacking(0); o_operands[0]=O@4; o_operands[1]=O@36; o_operands[2]=O@28; o_operands[3]=O@48; o_operands[4]=O@0; 
+
+I@36 InstBase(0) size=32
+	opcode=BrigRet(98); type=Brigb32(14); packing=BrigNoPacking(0); o_operands[0]=O@0; o_operands[1]=O@0; o_operands[2]=O@0; o_operands[3]=O@0; o_operands[4]=O@0; 
+
+I@68 InstBase(0) size=32
+	opcode=BrigCbr(83); type=Brigb32(14); packing=BrigNoPacking(0); o_operands[0]=O@4; o_operands[1]=O@60; o_operands[2]=O@72; o_operands[3]=O@0; o_operands[4]=O@0; 
+
+I@100 InstBase(0) size=32
+	opcode=BrigRet(98); type=Brigb32(14); packing=BrigNoPacking(0); o_operands[0]=O@0; o_operands[1]=O@0; o_operands[2]=O@0; o_operands[3]=O@0; o_operands[4]=O@0; 
+
+O@4 OperandImmed(2) size=24
+	type=Brigb32(14); value=0; 
+
+O@28 OperandFunctionRef(13) size=8
+	fn=D@140; 
+
+O@36 OperandArgumentList(9) size=12
+	elementCount=0; o_args={  }; 
+
+O@48 OperandArgumentList(9) size=12
+	elementCount=0; o_args={  }; 
+
+O@60 OperandReg(1) size=12
+	type=Brigb1(11); name="$c0"; 
+
+O@72 OperandLabelRef(6) size=8
+	labeldirective=D@180; 

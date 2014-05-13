@@ -1,0 +1,1 @@
+/usr/bin/c++    -fPIC -fvisibility-inlines-hidden    CMakeFiles/FileCheck.dir/FileCheck.cpp.o  -o ../../bin/FileCheck -rdynamic -ldl -lpthread ../../lib/libLLVMSupport.a -lpthread -ldl -lpthread 

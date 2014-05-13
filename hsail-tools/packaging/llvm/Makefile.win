@@ -1,0 +1,57 @@
+
+WIN_MAIN_NAME = LLVM.lib
+
+BUILD_DIR:=../build/$(TARGET)
+
+OBJ_DIR1 := $(BUILD_DIR)/OBJS1
+OBJ_DIR2 := $(BUILD_DIR)/OBJS2
+
+MAIN := $(BUILD_DIR)/$(WIN_MAIN_NAME)
+
+SRCS1 := $(wildcard ./Object/*.cpp)  
+SRCS2 := $(wildcard ./Support/*.cpp) 
+
+PURE_SRCS1 := $(notdir $(SRCS1)) 
+PURE_SRCS2 := $(notdir $(SRCS2)) 
+
+OBJS1 := $(addprefix $(OBJ_DIR1)/,$(PURE_SRCS1:.cpp=.o))
+OBJS2 := $(addprefix $(OBJ_DIR2)/,$(PURE_SRCS2:.cpp=.o))
+
+VPATH = Object Support
+
+INCLUDES  = -I.. -I. 
+
+include ../Makefile.win.inc
+
+all: $(MAIN)
+
+
+$(MAIN): $(OBJS1) $(OBJS2)
+	@cmd /c echo Linking $(WIN_MAIN_NAME) ...
+	$(WIN_LIB) $(WIN_LIBFLAGS) $(OBJS1) $(OBJS2) /out:"$@"
+	
+
+$(OBJ_DIR1)/%.o : Object/%.cpp
+	@cmd /c echo "$< -> $@"
+	$(WIN_CC) $(CFLAGS) $(CC_DEBUG_DEFINES) $(INCLUDES) /Fo$@  $<
+
+$(OBJ_DIR2)/%.o : Support/%.cpp
+	@cmd /c echo "$< -> $@"
+	$(WIN_CC) $(CFLAGS) $(CC_DEBUG_DEFINES) $(INCLUDES) /Fo$@  $<
+
+$(OBJS1) : | $(OBJ_DIR1)
+
+$(OBJS2) : | $(OBJ_DIR2)
+
+$(OBJ_DIR1): 
+	cmd /c "md $(subst /,\,$@) || echo ok"
+
+$(OBJ_DIR2): 
+	cmd /c "md $(subst /,\,$@) || echo ok"
+
+.PHONY: clean all
+
+clean: 
+	rm -rf $(OBJ_DIR1) $(OBJ_DIR2) $(MAIN)
+
+

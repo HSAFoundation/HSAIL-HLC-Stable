@@ -1,0 +1,16 @@
+version 1:0:$small;
+file 1 "debug";
+file 2 "hsa_dwarf_debug";
+
+kernel &kernel_1()
+{
+	ret;
+};
+version 1:0:$small;
+file 1 "debug";
+file 2 "hsa_dwarf_debug";
+
+kernel &kernel_2()
+{
+	ret;
+};

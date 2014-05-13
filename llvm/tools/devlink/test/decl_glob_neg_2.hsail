@@ -1,0 +1,23 @@
+version 1:0:small,full;
+
+const global_s32 &var_1 = 1;
+align 8 global_s32 &var_3 = 3;
+global_s32 &arr_1[] = {1,2,3,4};
+
+global_s32 &var_2 = 2;
+
+function &foo_1(arg_f32 %r)(arg_u32 %n, align 8 arg_u8 %last[])
+{
+	ret;
+};
+
+function &foo_2(arg_f32 %r)(arg_u32 %n, align 8 arg_u8 %last[])
+{
+	ret;
+};
+
+function &foo_3(arg_f32 %r)(arg_u32 %n, align 4 arg_u8 %last[3])
+{
+	ret;
+};
+

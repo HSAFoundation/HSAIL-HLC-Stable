@@ -1,0 +1,55 @@
+
+
+WIN_MAIN_NAME = HSAILasm.exe
+
+BUILD_DIR:=../build/$(TARGET)
+
+OBJ_DIR := $(BUILD_DIR)/OBJS
+
+MAIN := $(BUILD_DIR)/$(WIN_MAIN_NAME)
+MAIN_PDB := $(subst .exe,.pdb,$(MAIN)) 
+
+SRCS := $(wildcard ./*.cpp)
+
+OBJS := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(notdir $(SRCS))) 
+
+INCLUDES  = -I .. -I $(OBJ_DIR)  -I .   -I ../libHSAIL
+
+LIBLLVM=$(BUILD_DIR)/LLVM.lib
+LIBHSAIL=$(BUILD_DIR)/LIBHSAIL.lib
+WIN_PREBUILD_LIBS = $(LIBLLVM)  $(LIBHSAIL)
+
+include ../Makefile.win.inc
+
+all: $(MAIN)
+
+
+$(MAIN): $(OBJS) $(LIBLLVM) $(LIBHSAIL)
+	@cmd /c echo Linking $(MAIN_NAME) ...
+	$(WIN_LINK) $(WIN_LDFLAGS) $(OBJS) /pdb:"$(MAIN_PDB)" /out:"$@"
+	
+
+$(OBJ_DIR)/%.o : %.cpp
+	@cmd /c echo "$< -> $@"
+	$(WIN_CC) $(CFLAGS) $(CC_DEBUG_DEFINES) $(INCLUDES) /Fo$@   $<
+
+$(OBJS): | $(OBJ_DIR)
+
+
+$(OBJ_DIR): 
+	cmd /c "md $(subst /,\,$@) || echo ok"
+
+$(LIBLLVM):
+	@cmd /c echo Please build llvm.lib first
+
+$(LIBHSAIL):
+	@cmd /c echo Please build libhsail.lib first
+
+
+.PHONY: clean all
+
+
+clean: 
+	rm -rf $(OBJ_DIR) $(MAIN)
+
+

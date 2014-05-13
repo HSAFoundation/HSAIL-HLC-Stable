@@ -1,0 +1,63 @@
+ASM_DEPTH = $(COMPONENT_DEPTH)/..
+LIBHSAIL_DEPTH = $(COMPONENT_DEPTH)/../libHSAIL
+
+include $(ASM_DEPTH)/asmdefs
+
+#
+## Targets
+#
+EXE_TARGET = HSAILTestGen
+DIST_BIN_TARGETS = $(EXE_TARGET)$(EXE_EXT)
+
+MYPERL=$(DK_ROOT)/perl/5.16.1/bin/perl -I "$(DK_ROOT)/perl/5.16.1/lib"
+
+#
+## C files
+#
+vpath %.cpp $(COMPONENT_DEPTH)
+
+ifdef ATI_OS_LINUX
+    GCXXOPTS := $(filter-out -fno-exceptions,$(GCXXOPTS))
+endif
+
+CPPFILES := $(notdir $(wildcard $(COMPONENT_DEPTH)/*.cpp))
+
+CPPFLAGS += -Wno-reorder -Wno-deprecated
+
+PRE_TARGETS = $(GENFILES)
+
+GENFILES = \
+	$(BUILD_DIR)/HSAILTestGen_gen.hpp
+
+GENINPUTS = $(LIBHSAIL_DEPTH)/HDLProcessor.pl \
+	$(LIBHSAIL_DEPTH)/HSAILBrigInstr.hdl
+
+LCINCS = $(INCSWITCH) $(COMPONENT_DEPTH) \
+         $(INCSWITCH) $(ASM_DEPTH)/libHSAIL \
+         $(INCSWITCH) $(ASM_DEPTH)/libHSAIL/$(FULL_BUILD_DIR)
+
+$(BUILD_DIR)/generate-stamp: $(GENINPUTS)
+	@$(MAKENOISE) "Generating TestGen source files ..."
+	$(VNOISE)$(MKDIR) $(dir $@)
+	$(VNOISE)$(RM) -f $@.tmp && $(TOUCH) $@.tmp
+	$(NONOISE)$(MYPERL) $(LIBHSAIL_DEPTH)/HDLProcessor.pl -target=testgen < $(LIBHSAIL_DEPTH)/HSAILBrigInstr.hdl > $(BUILD_DIR)/HSAILTestGen_gen.hpp
+	$(VNOISE)$(MV) -f $@.tmp $@
+
+$(GENFILES): $(BUILD_DIR)/generate-stamp
+
+#
+## Libraries
+#
+LLLIBS := $(strip $(call uniq, \
+		  $(ASMHSAILLIB) \
+		  $(LLVMSupportLIBS) \
+		  $(LLVMObjectLIBS) ))
+
+ifdef ATI_OS_LINUX
+    LLOPTS = $(LIBSTDCXX) -lpthread -ldl -lm
+else
+    LLOPTS = /subsystem:console
+endif
+
+include $(ASM_DEPTH)/asmrules
+

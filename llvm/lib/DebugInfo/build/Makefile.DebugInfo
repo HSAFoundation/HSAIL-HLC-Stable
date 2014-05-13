@@ -1,0 +1,19 @@
+include $(LLVM_DEPTH)/llvmdefs
+
+#
+## Targets
+#
+LIB_TARGET = LLVMDebugInfo
+
+#
+## C files
+#
+vpath %.cpp $(COMPONENT_DEPTH)
+
+CPPFILES := $(notdir $(wildcard $(COMPONENT_DEPTH)/*.cpp))
+
+ifdef ATI_OS_LINUX
+    GCXXOPTS := $(filter-out -fno-exceptions,$(GCXXOPTS))
+endif
+
+include $(LLVM_DEPTH)/llvmrules

@@ -1,0 +1,36 @@
+version 1:0:small,full;
+
+static function &foo_1()();
+static function &foo_2_unused()();
+static function &foo_3()();
+
+static function &foo_7_unused()()
+{
+	ret;
+};
+
+static function &foo_1()()
+{
+	ret;
+};
+
+static function &foo_8_unused()()
+{
+	ret;
+};
+
+kernel &kernel_1()
+{
+	{ call	&foo_1 () (); }
+	{ call	&foo_3 () (); }
+};
+
+static function &foo_5_unused()()
+{
+	ret;
+};
+
+static function &foo_3()()
+{
+	ret;
+};

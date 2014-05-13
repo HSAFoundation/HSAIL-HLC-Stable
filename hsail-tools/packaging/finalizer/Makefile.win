@@ -1,0 +1,136 @@
+
+WIN_MAIN_NAME = finalizer.exe
+
+BUILD_DIR:=../build/$(TARGET)
+
+OBJ_DIR := $(BUILD_DIR)/finalizer_obj
+
+MAIN := $(BUILD_DIR)/$(WIN_MAIN_NAME)
+MAIN_PDB := $(subst .exe,.pdb,$(MAIN)) 
+
+
+CXXFILES := \
+    Arena.cpp \
+    bitfield.cpp \
+    CompilerBase.cpp \
+    CompilerExternal.cpp \
+    Diagnose.cpp \
+    DList.cpp \
+    HwUtils.cpp \
+    SHUtils.cpp \
+    vector.cpp \
+    SCAssembler.cpp \
+    SCInst.cpp \
+    SCRegAlloc.cpp \
+    SCWaveCF.cpp \
+    SCPeephole.cpp \
+    SCPatterns.cpp \
+    Patterns.cpp \
+    SCCFG.cpp \
+    SCDominator.cpp \
+    SCGCM.cpp \
+    SCValueNumber.cpp \
+    SCIDV.cpp \
+    SCOSR.cpp \
+    SCUnroll.cpp \
+    SCInstScheduler.cpp \
+    SCInterference.cpp \
+    SCRefineMemory.cpp \
+    SCOpInfo.cpp \
+    SCMathEng.cpp \
+    SCShaderInfo.cpp \
+    SCTargetInfo.cpp \
+    SCCopyVS.cpp \
+    SCSymbol.cpp \
+    SCSymbolTable.cpp \
+    SCSSA.cpp \
+    SCStructureAnalyzer.cpp \
+    BrigIR.cpp \
+    FSASymbol.cpp \
+    FSAILtoIR.cpp \
+    ILDisassembler.cpp \
+    ILParser.cpp \
+    ILTables.cpp \
+    SHDisassembler.cpp \
+    SiHwShaders.cpp \
+    R1000Disassembler.cpp \
+    SCInterface.cpp \
+    main.cpp
+
+CFILES := \
+	sp3-asic.c \
+	sp3-dispatch.c \
+	sp3-eval.c \
+	sp3-gc.c \
+	sp3-int.c \
+	sp3-lex.c \
+	sp3-lib.c \
+	sp3-native.c \
+	sp3-parse.c \
+	sp3-vm.c \
+	sp3-si-asic.c \
+	sp3-ci-asic.c \
+	sp3-si-dis.c \
+	sp3-ci-dis.c \
+	sp3-si-gen.c \
+	sp3-ci-gen.c \
+	sp3-si-inst-info.c \
+	sp3-ci-inst-info.c \
+	sp3-si-regs.c \
+	sp3-ci-regs.c \
+	sp3-si-tables.c \
+	sp3-ci-tables.c
+
+CXXOBJS := $(patsubst %.cpp,$(OBJ_DIR)/%.cpp.o,$(notdir $(CXXFILES))) 
+COBJS := $(patsubst %.c,$(OBJ_DIR)/%.c.o,$(notdir $(CFILES)))
+
+VPATH = R1000 R1000/si R1000/ci pout
+
+INCLUDES  = -I .. -I $(OBJ_DIR)  -I .   -I ../libHSAIL -I R1000 -I R1000/si -I R1000/ci -I R1000/udx
+
+
+LIBLLVM=$(BUILD_DIR)/LLVM.lib
+LIBHSAIL=$(BUILD_DIR)/LIBHSAIL.lib
+WIN_PREBUILD_LIBS = $(LIBLLVM)  $(LIBHSAIL)
+
+include ../Makefile.win.inc
+
+WIN_CC_DEFINES += /D "R1100_BUILD" /D "R1000_BUILD" /DFINALIZER_LIB_BUILD /D "SC_DUMP_SHADERS" /D "BRIG_ENABLE" /D "SP3_STATIC_LIB"
+
+all: $(MAIN)
+
+
+$(MAIN): $(COBJS) $(CXXOBJS) $(LIBLLVM) $(LIBHSAIL)
+	@cmd /c echo Linking $(MAIN_NAME) ...
+	$(WIN_LINK) $(WIN_LDFLAGS) $(COBJS) $(CXXOBJS) /pdb:"$(MAIN_PDB)" /out:"$@"
+	
+
+$(OBJ_DIR)/%.c.o : %.c
+	@cmd /c echo "$< -> $@"
+	$(WIN_CC) $(CFLAGS) $(CC_DEBUG_DEFINES) $(INCLUDES) /Fo$@   $<
+
+$(OBJ_DIR)/%.cpp.o : %.cpp
+	@cmd /c echo "$< -> $@"
+	$(WIN_CC) $(CFLAGS) $(CC_DEBUG_DEFINES) $(INCLUDES) /Fo$@   $<
+
+$(COBJS): | $(OBJ_DIR)
+
+$(CXXOBJS): | $(OBJ_DIR)
+
+$(OBJ_DIR): 
+	cmd /c "md $(subst /,\,$@) || echo ok"
+
+$(LIBLLVM):
+	@cmd /c echo Please build llvm.lib first
+
+$(LIBHSAIL):
+	@cmd /c echo Please build libhsail.lib first
+
+
+.PHONY: clean all
+
+
+clean: 
+	rm -rf $(OBJ_DIR) $(MAIN)
+
+

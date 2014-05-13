@@ -1,0 +1,27 @@
+Parser:
+Parsing...
+Info: Module map:
+      End:64 Begin:4, version 1:0:$full,$small,$nosftz; file: unopt_1.brig
+      End:124 Begin:64, version 1:0:$full,$small,$nosftz; file: unopt_2.brig
+DeDuper:
+  .strtab
+    Orig:    4 Dupe:   13.
+    Orig:    9 Dupe:   18.
+DeDeader:
+  .code
+  .directives
+  .debug
+  .operands
+  .strtab (size = 22)
+    13 (size = 5): '&foo' 26 66 6f 6f 00
+    18 (size = 4): '$s1' 24 73 31 00
+  .code
+    Input (bytes) = 68 Final (bytes) = 68.
+  .operands
+    Input (bytes) = 76 Final (bytes) = 76.
+  .directives
+    Input (bytes) = 124 Final (bytes) = 124.
+  .strings
+    Input (bytes) = 22 Final (bytes) = 13.
+  .debug
+    Input (bytes) = 4 Final (bytes) = 4.

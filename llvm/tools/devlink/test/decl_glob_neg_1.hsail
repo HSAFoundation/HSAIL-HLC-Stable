@@ -1,0 +1,46 @@
+version 1:0:small,full;
+
+extern global_s32 &var_1;
+extern global_s32 &arr_1[3];
+extern global_s32 &var_2;
+extern global_s32 &var_3;
+extern global_s32 &arr_2[]; // flex decl
+extern const global_s32 &arr_3[]; // flex decl
+extern global_s32 &arr_4[]; // flex decl
+extern const global_s32 &arr_5[]; // flex decl
+
+extern function &foo_1(arg_f32 %r)(arg_u32 %n, align 8 arg_u8 %last[]);
+extern function &foo_2(arg_f32 %r)(arg_u32 %n, align 8 arg_u8 %last[]);
+extern function &foo_3(arg_f32 %r)(arg_u32 %n, align 8 arg_u8 %last[]);
+
+kernel &main_kernel()
+{
+	ld_global_s32 $s1,[&var_1];
+	ld_global_s32 $s1,[&var_2];
+	ld_global_s32 $s1,[&var_3];
+	ld_global_s32 $s1,[&arr_1][0];
+	ld_global_s32 $s1,[&arr_2][0];
+	ld_global_s32 $s1,[&arr_3][0];
+	ld_global_s32 $s1,[&arr_4][0];
+	ld_global_s32 $s1,[&arr_5][0];
+	{
+		arg_f32 %r;
+		arg_u32 %n;
+		align 8 arg_u8 %last[5];
+		call &foo_1 (%r)(%n,%last);
+	}
+	{
+		arg_f32 %r;
+		arg_u32 %n;
+		align 8 arg_u8 %last[5];
+		call &foo_2 (%r)(%n,%last);
+	}
+	{
+		arg_f32 %r;
+		arg_u32 %n;
+		align 8 arg_u8 %last[5];
+		call &foo_3 (%r)(%n,%last);
+	}
+	ret;
+};
+

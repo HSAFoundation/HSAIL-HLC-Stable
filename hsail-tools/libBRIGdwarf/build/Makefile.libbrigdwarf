@@ -1,0 +1,34 @@
+# -*- mode: makefile; -*-
+ASM_DEPTH = $(COMPONENT_DEPTH)/..
+
+include $(COMPONENT_DEPTH)/libbrigdwarfdefs
+
+NEED_EXCEPTIONS = 1
+
+#
+## Targets
+#
+DIST_INCLUDE_TARGETS = hsa_dwarf.h
+LIB_TARGET = libBRIGdwarf
+
+vpath %.cpp $(COMPONENT_DEPTH)
+
+CPPFILES := $(notdir $(wildcard $(COMPONENT_DEPTH)/*.cpp))
+
+LCINCS = $(INCSWITCH) "$(COMPONENT_DEPTH)/libdwarf/src" \
+         $(INCSWITCH) "$(ASM_DEPTH)" \
+         $(INCSWITCH) "$(ASM_DEPTH)/libHSAIL" \
+         $(INCSWITCH) "$(ASM_DEPTH)/libHSAIL/$(FULL_BUILD_DIR)" \
+         $(INCSWITCH) "$(OPENCL_DEPTH)/compiler/lib/loaders/elf/utils/libelf" \
+         $(INCSWITCH) "$(OPENCL_DEPTH)/compiler/lib/loaders/elf/utils/common"
+
+ifdef ATI_OS_WINDOWS
+LCINCS += $(INCSWITCH) "$(OPENCL_DEPTH)/compiler/lib/loaders/elf/utils/common/win32"
+
+# silences msvc complaint about using std::copy without "Visual C++ checked iteratorsf"
+#
+GCXXOPTS += -D_SCL_SECURE_NO_WARNINGS
+
+endif
+
+include $(OPENCL_DEPTH)/openclrules

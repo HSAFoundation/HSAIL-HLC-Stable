@@ -1,0 +1,1 @@
+/usr/bin/c++    -fPIC -fvisibility-inlines-hidden    CMakeFiles/llvm-dis.dir/llvm-dis.cpp.o  -o ../../bin/llvm-dis -rdynamic ../../lib/libLLVMBitReader.a ../../lib/libLLVMAnalysis.a ../../lib/libLLVMTarget.a ../../lib/libLLVMCore.a ../../lib/libLLVMMC.a ../../lib/libLLVMObject.a ../../lib/libLLVMSupport.a -ldl -lpthread 

@@ -1,0 +1,3 @@
+Error: Multiple definitions with conflicting names found:
+...'&kernel_1', kernel of type '()' defined in 'kernel_neg_1.brig'.
+...'&kernel_1', kernel of type '()' defined in 'kernel_neg_2.brig'.

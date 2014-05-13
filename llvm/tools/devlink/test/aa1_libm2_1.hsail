@@ -1,0 +1,32 @@
+version 1:0:small;
+
+function &__amd_amp_Fcos_f32(arg_f32 %ret_val) (arg_f32 %arg_val0);
+
+kernel &__OpenCL_test_libm1_kernel(kernarg_u32 %arg_val0, kernarg_u32 %arg_val1)
+{
+	spill_u32 %stack[1];
+@__OpenCL_test_libm1_kernel_entry:
+// BB#0:                                // %entry
+	workitemaid	$s1, 0 ;		// $s1 = WIID
+	shl_u32	        $s0, $s1, 2 ;		// $s0 = 4*WIID	
+	st_spill_u32	$s0, [%stack][0] ;      // stack[0] = 4*WIID
+	ld_kernarg_u32	$s1, [%arg_val0] ; 	// $s1 = arg_val0
+	add_u32	        $s1, $s0, $s1 ;		// $s1 = arg_val0 + 4*WIID
+	ld_global_f32	$s2, [$s1] ;		// $s2 = *(float*)(arg_val0 + 4*WIID)
+	{
+		arg_f32 	%par_val;
+		st_arg_f32 	$s2, [%par_val];	// par_val = *(float*)(arg_val0 + 4*WIID)
+		arg_f32 %ret_val;
+		call	&__amd_amp_Fcos_f32 (%ret_val) (%par_val);
+		ld_arg_f32      $s2, [%ret_val];	// $s2 = cos(par_val)
+	}	
+	ld_spill_u32    $s0, [%stack][0] ;	// $s0 = 4*WIID
+	ld_kernarg_u32	$s3, [%arg_val1] ;	// $s3 = arg_val1
+	add_u32		$s3, $s0, $s3 ;		// $s3 = arg_val1 + 4*WIID
+	st_global_f32	$s2, [$s3] ;		// *(float*)(arg_val1 + 4*WIID) = cos(par_val)
+	ret ;
+};
+
+
+
+

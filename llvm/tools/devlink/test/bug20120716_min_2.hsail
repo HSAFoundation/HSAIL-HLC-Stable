@@ -1,0 +1,15 @@
+version 1:0:small;
+
+function &__amd_amp_Fceil_f32(arg_f32 %ret_val) (
+	arg_f32 %arg_val0)
+{
+	ret ;
+};
+
+function &__amd_amp_Fcos_f32()()
+{
+	cbr	$c0, @BB5_2 ;
+@BB5_2:
+	ret ;
+};
+

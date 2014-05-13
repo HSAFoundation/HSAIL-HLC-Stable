@@ -1,0 +1,171 @@
+
+
+
+
+
+LNX_MAIN_NAME = finalizer
+
+
+BUILD_DIR:=../build/$(TARGET)
+
+OBJ_DIR := $(BUILD_DIR)/finalizer_obj
+
+MAIN := $(BUILD_DIR)/$(LNX_MAIN_NAME)
+
+CXXFILES := \
+    Arena.cpp \
+    bitfield.cpp \
+    CompilerBase.cpp \
+    CompilerExternal.cpp \
+    Diagnose.cpp \
+    DList.cpp \
+    HwUtils.cpp \
+    SHUtils.cpp \
+    vector.cpp \
+    SCAssembler.cpp \
+    SCInst.cpp \
+    SCRegAlloc.cpp \
+    SCWaveCF.cpp \
+    SCPeephole.cpp \
+    SCPatterns.cpp \
+    Patterns.cpp \
+    SCCFG.cpp \
+    SCDominator.cpp \
+    SCGCM.cpp \
+    SCValueNumber.cpp \
+    SCIDV.cpp \
+    SCOSR.cpp \
+    SCUnroll.cpp \
+    SCInstScheduler.cpp \
+    SCInterference.cpp \
+    SCRefineMemory.cpp \
+    SCOpInfo.cpp \
+    SCMathEng.cpp \
+    SCShaderInfo.cpp \
+    SCTargetInfo.cpp \
+    SCCopyVS.cpp \
+    SCSymbol.cpp \
+    SCSymbolTable.cpp \
+    SCSSA.cpp \
+    SCStructureAnalyzer.cpp \
+    BrigIR.cpp \
+    FSASymbol.cpp \
+    FSAILtoIR.cpp \
+    ILDisassembler.cpp \
+    ILParser.cpp \
+    ILTables.cpp \
+    SHDisassembler.cpp \
+    SiHwShaders.cpp \
+    R1000Disassembler.cpp \
+    SCInterface.cpp \
+    main.cpp
+
+CFILES := \
+	sp3-asic.c \
+	sp3-dispatch.c \
+	sp3-eval.c \
+	sp3-gc.c \
+	sp3-int.c \
+	sp3-lex.c \
+	sp3-lib.c \
+	sp3-native.c \
+	sp3-parse.c \
+	sp3-vm.c \
+	sp3-si-asic.c \
+	sp3-ci-asic.c \
+	sp3-si-dis.c \
+	sp3-ci-dis.c \
+	sp3-si-gen.c \
+	sp3-ci-gen.c \
+	sp3-si-inst-info.c \
+	sp3-ci-inst-info.c \
+	sp3-si-regs.c \
+	sp3-ci-regs.c \
+	sp3-si-tables.c \
+	sp3-ci-tables.c
+
+CXXOBJS := $(patsubst %.cpp,$(OBJ_DIR)/%.cpp.o,$(notdir $(CXXFILES))) 
+COBJS := $(patsubst %.c,$(OBJ_DIR)/%.c.o,$(notdir $(CFILES)))
+
+VPATH = R1000 R1000/si R1000/ci pout
+
+INCLUDES  = -I. -I $(OBJ_DIR) -I.. -I../libHSAIL -I R1000 -I R1000/si -I R1000/ci -I R1000/udx
+
+LNX_CC_DEFINES = -DLINUX -DUNIX_OS -DqLittleEndian -D ATI_OS_LINUX   -D ATI_COMP_GCC  -D__STDC_LIMIT_MACROS -D__STDC_CONSTANT_MACROS 
+
+ifeq ("$(ARCH)","x64")
+ARCH_CFLAGS = -m64    -D__x86_64__ -D__AMD64__ -D ATI_ARCH_X86 -D ATI_BITS_64 -D ATI_ENDIAN_LITTLE -D LITTLEENDIAN_CPU
+else
+ARCH_CFLAGS = -m32    -D__i386__               -D ATI_ARCH_X86 -D ATI_BITS_32 -D ATI_ENDIAN_LITTLE -D LITTLEENDIAN_CPU -march=i686 -msse2
+endif
+
+ifeq ("$(FLAVOUR)","DEBUG")
+FLAVOUR_FLAGS= -ggdb -D_DEBUG
+else
+FLAVOUR_FLAGS=       -D_NDEBUG
+endif
+
+LNX_COMMON_CFLAGS = -Wno-reorder -Wno-unused -Werror  -fPIC -pipe  -fmerge-all-constants -fno-tree-vectorize 
+
+CFLAGS = $(LNX_COMMON_CFLAGS) $(ARCH_CFLAGS) $(FLAVOUR_FLAGS) $(LNX_CC_DEFINES)
+
+LIBLLVM=$(BUILD_DIR)/LIBLLVM.a
+LIBHSAIL=$(BUILD_DIR)/LIBHSAIL.a
+LNX_PREBUILD_LIBS =  $(LIBHSAIL)  $(LIBLLVM)
+LNX_SYSTEM_LIBS = -lstdc++ -lpthread -ldl -lm $(ARCH_CFLAGS)
+LNX_DISABLE_LD_WARNINGS =
+LNX_LDFLAGS  = $(CFLAGS)
+
+
+
+LNX_CC = gcc
+LNX_CXX = g++
+LNX_LINK = g++
+
+LNX_COMMON_CFLAGS += -DR1100_BUILD -DR1000_BUILD -DFINALIZER_LIB_BUILD -DSC_DUMP_SHADERS -DBRIG_ENABLE -DSP3_STATIC_LIB
+
+all: $(MAIN)
+
+$(MAIN): $(COBJS) $(CXXOBJS) $(LIBLLVM) $(LIBHSAIL)
+	@echo Linking $(MAIN_NAME) ...
+	$(LNX_LINK) $(LNX_LDFLAGS) $(COBJS) $(CXXOBJS) $(LNX_SYSTEM_LIBS) $(LNX_PREBUILD_LIBS) -o $@
+	
+
+$(OBJ_DIR)/%.c.o : %.c
+	@echo "$< -> $@"
+	$(LNX_CC) $(CFLAGS) $(CC_DEBUG_DEFINES) $(INCLUDES) -o $@ -c $<
+
+$(OBJ_DIR)/%.cpp.o : %.cpp
+	@echo "$< -> $@"
+	$(LNX_CXX) $(CFLAGS) $(CC_DEBUG_DEFINES) $(INCLUDES) -o $@ -c $<
+
+$(COBJS): | $(OBJ_DIR)
+
+$(CXXOBJS): | $(OBJ_DIR)
+
+$(OBJ_DIR): 
+	mkdir -p $@
+
+$(LIBLLVM):
+	@echo Please build llvm.lib first
+
+$(LIBHSAIL):
+	@echo Please build libhsail.lib first
+
+
+
+#$(MAIN): $(OBJS)
+#	echo Linking $(MAIN_NAME) ...
+#	$(LNX_LINK) $(LDFLAGS) $(OBJS) $(LNX_SYSTEM_LIBS) $(LNX_PREBUILD_LIBS) -o $@
+#	
+# 
+#$(OBJ_DIR)/%.o : %.cpp  $(OBJ_DIR)
+#	echo "$< -> $@"
+#	$(LNX_CC) $(CFLAGS) $(INCLUDES) -o $@ -c $<
+
+.PHONY: clean all
+
+clean: 
+	rm -rf $(BUILD_DIR)
+
+

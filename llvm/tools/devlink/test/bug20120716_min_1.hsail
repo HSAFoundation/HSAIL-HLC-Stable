@@ -1,0 +1,13 @@
+version 1:0:small;
+
+function &__amd_amp_Fcos_f32()();
+
+kernel &__OpenCL_test_libm1_kernel()
+{
+	{ call            &__amd_amp_Fcos_f32()(); }
+	ret ;
+};
+
+
+
+

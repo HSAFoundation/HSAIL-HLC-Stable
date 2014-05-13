@@ -1,0 +1,40 @@
+version 1:0:$small;
+
+static function &foo_1()();
+
+static function &foo_3()();
+
+static function &foo_1()()
+{
+	ret;
+};
+
+kernel &kernel_1()
+{
+	{
+	call	&foo_1 () ();
+	}
+	{
+	call	&foo_3 () ();
+	}
+};
+
+static function &foo_3()()
+{
+	ret;
+};
+version 1:0:$small;
+
+static function &foo_3()();
+
+kernel &kernel_2()
+{
+	{
+	call	&foo_3 () ();
+	}
+};
+
+static function &foo_3()()
+{
+	ret;
+};

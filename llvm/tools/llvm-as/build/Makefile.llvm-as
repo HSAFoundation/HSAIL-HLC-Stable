@@ -1,0 +1,27 @@
+include $(LLVM_DEPTH)/llvmdefs
+
+#
+## Targets
+#
+EXE_TARGET = llvm-as
+DIST_BIN_TARGETS = $(EXE_TARGET)$(EXE_EXT)
+
+#
+## C files
+#
+vpath %.cpp $(COMPONENT_DEPTH)
+
+CPPFILES := $(notdir $(wildcard $(COMPONENT_DEPTH)/*.cpp))
+
+#
+## Libraries
+#
+LLLIBS := $(strip $(call uniq,$(LLVMAsmParserLIBS) $(LLVMBitWriterLIBS)))
+
+ifdef ATI_OS_LINUX
+    LLOPTS = $(LIBSTDCXX) -lpthread -ldl -lm
+else
+    LLOPTS = /subsystem:console
+endif
+
+include $(LLVM_DEPTH)/llvmrules

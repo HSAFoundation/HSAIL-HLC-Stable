@@ -1,0 +1,2 @@
+/usr/bin/ar cr ../../../libLLVMX86AsmParser.a  CMakeFiles/LLVMX86AsmParser.dir/X86AsmLexer.cpp.o CMakeFiles/LLVMX86AsmParser.dir/X86AsmParser.cpp.o
+/usr/bin/ranlib ../../../libLLVMX86AsmParser.a

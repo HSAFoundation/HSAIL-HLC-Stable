@@ -1,0 +1,2 @@
+/usr/bin/ar cr ../../../libLLVMAMDILMacroDB.a  CMakeFiles/LLVMAMDILMacroDB.dir/macrodata.cpp.o
+/usr/bin/ranlib ../../../libLLVMAMDILMacroDB.a

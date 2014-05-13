@@ -1,0 +1,346 @@
+Determining if the include file dl.h exists failed with the following output:
+Change Dir: /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp
+
+Run Build Command:/usr/bin/gmake "cmTryCompileExec/fast"
+/usr/bin/gmake -f CMakeFiles/cmTryCompileExec.dir/build.make CMakeFiles/cmTryCompileExec.dir/build
+gmake[1]: Entering directory `/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp'
+/usr/bin/cmake -E cmake_progress_report /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CMakeFiles 1
+Building C object CMakeFiles/cmTryCompileExec.dir/CheckIncludeFile.c.o
+/usr/bin/gcc    -o CMakeFiles/cmTryCompileExec.dir/CheckIncludeFile.c.o   -c /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckIncludeFile.c:1:16: fatal error: dl.h: No such file or directory
+compilation terminated.
+gmake[1]: *** [CMakeFiles/cmTryCompileExec.dir/CheckIncludeFile.c.o] Error 1
+gmake[1]: Leaving directory `/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp'
+gmake: *** [cmTryCompileExec/fast] Error 2
+
+
+Determining if the include file dld.h exists failed with the following output:
+Change Dir: /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp
+
+Run Build Command:/usr/bin/gmake "cmTryCompileExec/fast"
+/usr/bin/gmake -f CMakeFiles/cmTryCompileExec.dir/build.make CMakeFiles/cmTryCompileExec.dir/build
+gmake[1]: Entering directory `/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp'
+/usr/bin/cmake -E cmake_progress_report /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CMakeFiles 1
+Building C object CMakeFiles/cmTryCompileExec.dir/CheckIncludeFile.c.o
+/usr/bin/gcc    -o CMakeFiles/cmTryCompileExec.dir/CheckIncludeFile.c.o   -c /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckIncludeFile.c:1:17: fatal error: dld.h: No such file or directory
+compilation terminated.
+gmake[1]: *** [CMakeFiles/cmTryCompileExec.dir/CheckIncludeFile.c.o] Error 1
+gmake[1]: Leaving directory `/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp'
+gmake: *** [cmTryCompileExec/fast] Error 2
+
+
+Determining if the include file malloc/malloc.h exists failed with the following output:
+Change Dir: /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp
+
+Run Build Command:/usr/bin/gmake "cmTryCompileExec/fast"
+/usr/bin/gmake -f CMakeFiles/cmTryCompileExec.dir/build.make CMakeFiles/cmTryCompileExec.dir/build
+gmake[1]: Entering directory `/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp'
+/usr/bin/cmake -E cmake_progress_report /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CMakeFiles 1
+Building C object CMakeFiles/cmTryCompileExec.dir/CheckIncludeFile.c.o
+/usr/bin/gcc    -o CMakeFiles/cmTryCompileExec.dir/CheckIncludeFile.c.o   -c /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckIncludeFile.c:1:27: fatal error: malloc/malloc.h: No such file or directory
+compilation terminated.
+gmake[1]: *** [CMakeFiles/cmTryCompileExec.dir/CheckIncludeFile.c.o] Error 1
+gmake[1]: Leaving directory `/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp'
+gmake: *** [cmTryCompileExec/fast] Error 2
+
+
+Determining if the include file ndir.h exists failed with the following output:
+Change Dir: /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp
+
+Run Build Command:/usr/bin/gmake "cmTryCompileExec/fast"
+/usr/bin/gmake -f CMakeFiles/cmTryCompileExec.dir/build.make CMakeFiles/cmTryCompileExec.dir/build
+gmake[1]: Entering directory `/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp'
+/usr/bin/cmake -E cmake_progress_report /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CMakeFiles 1
+Building C object CMakeFiles/cmTryCompileExec.dir/CheckIncludeFile.c.o
+/usr/bin/gcc    -o CMakeFiles/cmTryCompileExec.dir/CheckIncludeFile.c.o   -c /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckIncludeFile.c:1:18: fatal error: ndir.h: No such file or directory
+compilation terminated.
+gmake[1]: *** [CMakeFiles/cmTryCompileExec.dir/CheckIncludeFile.c.o] Error 1
+gmake[1]: Leaving directory `/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp'
+gmake: *** [cmTryCompileExec/fast] Error 2
+
+
+Determining if the include file sys/dl.h exists failed with the following output:
+Change Dir: /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp
+
+Run Build Command:/usr/bin/gmake "cmTryCompileExec/fast"
+/usr/bin/gmake -f CMakeFiles/cmTryCompileExec.dir/build.make CMakeFiles/cmTryCompileExec.dir/build
+gmake[1]: Entering directory `/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp'
+/usr/bin/cmake -E cmake_progress_report /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CMakeFiles 1
+Building C object CMakeFiles/cmTryCompileExec.dir/CheckIncludeFile.c.o
+/usr/bin/gcc    -o CMakeFiles/cmTryCompileExec.dir/CheckIncludeFile.c.o   -c /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckIncludeFile.c:1:20: fatal error: sys/dl.h: No such file or directory
+compilation terminated.
+gmake[1]: *** [CMakeFiles/cmTryCompileExec.dir/CheckIncludeFile.c.o] Error 1
+gmake[1]: Leaving directory `/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp'
+gmake: *** [cmTryCompileExec/fast] Error 2
+
+
+Determining if the include file sys/ndir.h exists failed with the following output:
+Change Dir: /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp
+
+Run Build Command:/usr/bin/gmake "cmTryCompileExec/fast"
+/usr/bin/gmake -f CMakeFiles/cmTryCompileExec.dir/build.make CMakeFiles/cmTryCompileExec.dir/build
+gmake[1]: Entering directory `/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp'
+/usr/bin/cmake -E cmake_progress_report /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CMakeFiles 1
+Building C object CMakeFiles/cmTryCompileExec.dir/CheckIncludeFile.c.o
+/usr/bin/gcc    -o CMakeFiles/cmTryCompileExec.dir/CheckIncludeFile.c.o   -c /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckIncludeFile.c:1:22: fatal error: sys/ndir.h: No such file or directory
+compilation terminated.
+gmake[1]: *** [CMakeFiles/cmTryCompileExec.dir/CheckIncludeFile.c.o] Error 1
+gmake[1]: Leaving directory `/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp'
+gmake: *** [cmTryCompileExec/fast] Error 2
+
+
+Determining if the include file valgrind/valgrind.h exists failed with the following output:
+Change Dir: /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp
+
+Run Build Command:/usr/bin/gmake "cmTryCompileExec/fast"
+/usr/bin/gmake -f CMakeFiles/cmTryCompileExec.dir/build.make CMakeFiles/cmTryCompileExec.dir/build
+gmake[1]: Entering directory `/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp'
+/usr/bin/cmake -E cmake_progress_report /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CMakeFiles 1
+Building C object CMakeFiles/cmTryCompileExec.dir/CheckIncludeFile.c.o
+/usr/bin/gcc    -o CMakeFiles/cmTryCompileExec.dir/CheckIncludeFile.c.o   -c /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckIncludeFile.c:1:31: fatal error: valgrind/valgrind.h: No such file or directory
+compilation terminated.
+gmake[1]: *** [CMakeFiles/cmTryCompileExec.dir/CheckIncludeFile.c.o] Error 1
+gmake[1]: Leaving directory `/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp'
+gmake: *** [cmTryCompileExec/fast] Error 2
+
+
+Determining if the include file windows.h exists failed with the following output:
+Change Dir: /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp
+
+Run Build Command:/usr/bin/gmake "cmTryCompileExec/fast"
+/usr/bin/gmake -f CMakeFiles/cmTryCompileExec.dir/build.make CMakeFiles/cmTryCompileExec.dir/build
+gmake[1]: Entering directory `/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp'
+/usr/bin/cmake -E cmake_progress_report /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CMakeFiles 1
+Building C object CMakeFiles/cmTryCompileExec.dir/CheckIncludeFile.c.o
+/usr/bin/gcc    -o CMakeFiles/cmTryCompileExec.dir/CheckIncludeFile.c.o   -c /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckIncludeFile.c:1:21: fatal error: windows.h: No such file or directory
+compilation terminated.
+gmake[1]: *** [CMakeFiles/cmTryCompileExec.dir/CheckIncludeFile.c.o] Error 1
+gmake[1]: Leaving directory `/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp'
+gmake: *** [cmTryCompileExec/fast] Error 2
+
+
+Determining if the include file mach/mach.h exists failed with the following output:
+Change Dir: /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp
+
+Run Build Command:/usr/bin/gmake "cmTryCompileExec/fast"
+/usr/bin/gmake -f CMakeFiles/cmTryCompileExec.dir/build.make CMakeFiles/cmTryCompileExec.dir/build
+gmake[1]: Entering directory `/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp'
+/usr/bin/cmake -E cmake_progress_report /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CMakeFiles 1
+Building C object CMakeFiles/cmTryCompileExec.dir/CheckIncludeFile.c.o
+/usr/bin/gcc    -o CMakeFiles/cmTryCompileExec.dir/CheckIncludeFile.c.o   -c /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckIncludeFile.c:1:23: fatal error: mach/mach.h: No such file or directory
+compilation terminated.
+gmake[1]: *** [CMakeFiles/cmTryCompileExec.dir/CheckIncludeFile.c.o] Error 1
+gmake[1]: Leaving directory `/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp'
+gmake: *** [cmTryCompileExec/fast] Error 2
+
+
+Determining if the include file mach-o/dyld.h exists failed with the following output:
+Change Dir: /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp
+
+Run Build Command:/usr/bin/gmake "cmTryCompileExec/fast"
+/usr/bin/gmake -f CMakeFiles/cmTryCompileExec.dir/build.make CMakeFiles/cmTryCompileExec.dir/build
+gmake[1]: Entering directory `/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp'
+/usr/bin/cmake -E cmake_progress_report /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CMakeFiles 1
+Building C object CMakeFiles/cmTryCompileExec.dir/CheckIncludeFile.c.o
+/usr/bin/gcc    -o CMakeFiles/cmTryCompileExec.dir/CheckIncludeFile.c.o   -c /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckIncludeFile.c:1:25: fatal error: mach-o/dyld.h: No such file or directory
+compilation terminated.
+gmake[1]: *** [CMakeFiles/cmTryCompileExec.dir/CheckIncludeFile.c.o] Error 1
+gmake[1]: Leaving directory `/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp'
+gmake: *** [cmTryCompileExec/fast] Error 2
+
+
+Determining if the arc4random exist failed with the following output:
+Change Dir: /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp
+
+Run Build Command:/usr/bin/gmake "cmTryCompileExec/fast"
+/usr/bin/gmake -f CMakeFiles/cmTryCompileExec.dir/build.make CMakeFiles/cmTryCompileExec.dir/build
+gmake[1]: Entering directory `/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp'
+/usr/bin/cmake -E cmake_progress_report /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CMakeFiles 1
+Building C object CMakeFiles/cmTryCompileExec.dir/CheckSymbolExists.c.o
+/usr/bin/gcc    -o CMakeFiles/cmTryCompileExec.dir/CheckSymbolExists.c.o   -c /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckSymbolExists.c: In function ‘main’:
+/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckSymbolExists.c:8:25: error: ‘arc4random’ undeclared (first use in this function)
+/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckSymbolExists.c:8:25: note: each undeclared identifier is reported only once for each function it appears in
+gmake[1]: *** [CMakeFiles/cmTryCompileExec.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory `/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp'
+gmake: *** [cmTryCompileExec/fast] Error 2
+
+File /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stdlib.h>
+
+void cmakeRequireSymbol(int dummy,...){(void)dummy;}
+int main()
+{
+#ifndef arc4random
+  cmakeRequireSymbol(0,&arc4random);
+#endif
+  return 0;
+}
+
+Determining if the isinf exist failed with the following output:
+Change Dir: /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp
+
+Run Build Command:/usr/bin/gmake "cmTryCompileExec/fast"
+/usr/bin/gmake -f CMakeFiles/cmTryCompileExec.dir/build.make CMakeFiles/cmTryCompileExec.dir/build
+gmake[1]: Entering directory `/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp'
+/usr/bin/cmake -E cmake_progress_report /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CMakeFiles 1
+Building C object CMakeFiles/cmTryCompileExec.dir/CheckSymbolExists.c.o
+/usr/bin/gcc    -o CMakeFiles/cmTryCompileExec.dir/CheckSymbolExists.c.o   -c /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckSymbolExists.c:2:17: fatal error: cmath: No such file or directory
+compilation terminated.
+gmake[1]: *** [CMakeFiles/cmTryCompileExec.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory `/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp'
+gmake: *** [cmTryCompileExec/fast] Error 2
+
+File /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <cmath>
+
+void cmakeRequireSymbol(int dummy,...){(void)dummy;}
+int main()
+{
+#ifndef isinf
+  cmakeRequireSymbol(0,&isinf);
+#endif
+  return 0;
+}
+
+Determining if the finite exist failed with the following output:
+Change Dir: /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp
+
+Run Build Command:/usr/bin/gmake "cmTryCompileExec/fast"
+/usr/bin/gmake -f CMakeFiles/cmTryCompileExec.dir/build.make CMakeFiles/cmTryCompileExec.dir/build
+gmake[1]: Entering directory `/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp'
+/usr/bin/cmake -E cmake_progress_report /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CMakeFiles 1
+Building C object CMakeFiles/cmTryCompileExec.dir/CheckSymbolExists.c.o
+/usr/bin/gcc    -o CMakeFiles/cmTryCompileExec.dir/CheckSymbolExists.c.o   -c /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckSymbolExists.c:2:20: fatal error: ieeefp.h: No such file or directory
+compilation terminated.
+gmake[1]: *** [CMakeFiles/cmTryCompileExec.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory `/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp'
+gmake: *** [cmTryCompileExec/fast] Error 2
+
+File /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <ieeefp.h>
+
+void cmakeRequireSymbol(int dummy,...){(void)dummy;}
+int main()
+{
+#ifndef finite
+  cmakeRequireSymbol(0,&finite);
+#endif
+  return 0;
+}
+
+Determining if the isnan exist failed with the following output:
+Change Dir: /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp
+
+Run Build Command:/usr/bin/gmake "cmTryCompileExec/fast"
+/usr/bin/gmake -f CMakeFiles/cmTryCompileExec.dir/build.make CMakeFiles/cmTryCompileExec.dir/build
+gmake[1]: Entering directory `/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp'
+/usr/bin/cmake -E cmake_progress_report /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CMakeFiles 1
+Building C object CMakeFiles/cmTryCompileExec.dir/CheckSymbolExists.c.o
+/usr/bin/gcc    -o CMakeFiles/cmTryCompileExec.dir/CheckSymbolExists.c.o   -c /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckSymbolExists.c:2:17: fatal error: cmath: No such file or directory
+compilation terminated.
+gmake[1]: *** [CMakeFiles/cmTryCompileExec.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory `/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp'
+gmake: *** [cmTryCompileExec/fast] Error 2
+
+File /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <cmath>
+
+void cmakeRequireSymbol(int dummy,...){(void)dummy;}
+int main()
+{
+#ifndef isnan
+  cmakeRequireSymbol(0,&isnan);
+#endif
+  return 0;
+}
+
+Determining if the malloc_zone_statistics exist failed with the following output:
+Change Dir: /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp
+
+Run Build Command:/usr/bin/gmake "cmTryCompileExec/fast"
+/usr/bin/gmake -f CMakeFiles/cmTryCompileExec.dir/build.make CMakeFiles/cmTryCompileExec.dir/build
+gmake[1]: Entering directory `/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp'
+/usr/bin/cmake -E cmake_progress_report /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CMakeFiles 1
+Building C object CMakeFiles/cmTryCompileExec.dir/CheckSymbolExists.c.o
+/usr/bin/gcc    -o CMakeFiles/cmTryCompileExec.dir/CheckSymbolExists.c.o   -c /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckSymbolExists.c:2:27: fatal error: malloc/malloc.h: No such file or directory
+compilation terminated.
+gmake[1]: *** [CMakeFiles/cmTryCompileExec.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory `/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp'
+gmake: *** [cmTryCompileExec/fast] Error 2
+
+File /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <malloc/malloc.h>
+
+void cmakeRequireSymbol(int dummy,...){(void)dummy;}
+int main()
+{
+#ifndef malloc_zone_statistics
+  cmakeRequireSymbol(0,&malloc_zone_statistics);
+#endif
+  return 0;
+}
+
+Determining if the strerror_s exist failed with the following output:
+Change Dir: /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp
+
+Run Build Command:/usr/bin/gmake "cmTryCompileExec/fast"
+/usr/bin/gmake -f CMakeFiles/cmTryCompileExec.dir/build.make CMakeFiles/cmTryCompileExec.dir/build
+gmake[1]: Entering directory `/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp'
+/usr/bin/cmake -E cmake_progress_report /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CMakeFiles 1
+Building C object CMakeFiles/cmTryCompileExec.dir/CheckSymbolExists.c.o
+/usr/bin/gcc    -o CMakeFiles/cmTryCompileExec.dir/CheckSymbolExists.c.o   -c /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckSymbolExists.c: In function ‘main’:
+/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckSymbolExists.c:8:25: error: ‘strerror_s’ undeclared (first use in this function)
+/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckSymbolExists.c:8:25: note: each undeclared identifier is reported only once for each function it appears in
+gmake[1]: *** [CMakeFiles/cmTryCompileExec.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory `/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp'
+gmake: *** [cmTryCompileExec/fast] Error 2
+
+File /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <string.h>
+
+void cmakeRequireSymbol(int dummy,...){(void)dummy;}
+int main()
+{
+#ifndef strerror_s
+  cmakeRequireSymbol(0,&strerror_s);
+#endif
+  return 0;
+}
+
+Performing C++ SOURCE FILE Test SUPPORTS_COVERED_SWITCH_DEFAULT_FLAG failed with the following output:
+Change Dir: /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp
+
+Run Build Command:/usr/bin/gmake "cmTryCompileExec/fast"
+/usr/bin/gmake -f CMakeFiles/cmTryCompileExec.dir/build.make CMakeFiles/cmTryCompileExec.dir/build
+gmake[1]: Entering directory `/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp'
+/usr/bin/cmake -E cmake_progress_report /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/CMakeFiles 1
+Building CXX object CMakeFiles/cmTryCompileExec.dir/src.cxx.o
+/usr/bin/c++    -fPIC -fvisibility-inlines-hidden  -DSUPPORTS_COVERED_SWITCH_DEFAULT_FLAG   -Werror -Wcovered-switch-default -o CMakeFiles/cmTryCompileExec.dir/src.cxx.o -c /home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp/src.cxx
+cc1plus: error: unrecognized command line option ‘-Wcovered-switch-default’
+gmake[1]: *** [CMakeFiles/cmTryCompileExec.dir/src.cxx.o] Error 1
+gmake[1]: Leaving directory `/home/sraghave/drivers/opencl/compiler/llvm/build/CMakeFiles/CMakeTmp'
+gmake: *** [cmTryCompileExec/fast] Error 2
+
+Source file was:
+int main() { return 0;}

@@ -1,0 +1,19 @@
+#!/bin/bash
+PATH=:/home/sraghave/BenTest/bin:$PATH
+#echo "path  $PATH"
+#echo "`which llc`"
+for  oclf in *.cl
+do
+#oclf="basic_10.cl"
+fname=`echo "$oclf" | cut -d'.' -f1`
+echo " Compiling $oclf "
+clc  --support_all_extension --opencl=1.2 -o results-conformance/$fname.fe.ll $oclf
+llvm-as  -o results-conformance/$fname.bc results-conformance/$fname.fe.ll
+llvm-link  -prelink-opt -o results-conformance/$fname.linked.bc results-conformance/$fname.bc  -l /home/sraghave/BenTest/bin/builtins-hsail.bc -l /home/sraghave/BenTest/bin/builtins-hsail-amd-ci.bc -l /home/sraghave/BenTest/bin/builtins-gcn.bc
+opt  -O3 results-conformance/$fname.linked.bc -o results-conformance/$fname.opt.bc
+llvm-dis  -o results-conformance/$fname.opt.ll results-conformance/$fname.opt.bc
+llc  -O2 -march=hsail-64 -o results-conformance/$fname.brig  results-conformance/$fname.opt.bc
+HSAILasm  -disassemble -o results-conformance/$fname.hsail  results-conformance/$fname.brig
+#Dev  -int_disassembler -ns -Q -Bonaire -d -brig  results-conformance/$fname.brig 
+done
+

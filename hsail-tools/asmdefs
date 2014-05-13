@@ -1,0 +1,20 @@
+OPENCL_DEPTH := $(ASM_DEPTH)/../..
+
+include $(OPENCL_DEPTH)/opencldefs
+
+LLVM_DEPTH := $(OPENCL_DEPTH)/compiler/$(LLVM_DIR_NAME)
+
+ifdef GONE_TO_BUILD_DIR
+include $(LLVM_DEPTH)/llvmdefs
+endif
+
+include $(ASM_DEPTH)/asmlibs
+
+ifdef ATI_OS_WINDOWS
+
+    SUPPRESSED_WARNINGS = -wd4244 -wd4267
+
+    GCOPTS += $(SUPPRESSED_WARNINGS)
+    GCXXOPTS += $(SUPPRESSED_WARNINGS)
+
+endif

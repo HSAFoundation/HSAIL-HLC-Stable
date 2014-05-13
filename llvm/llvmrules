@@ -1,0 +1,8 @@
+ifdef GONE_TO_BUILD_DIR
+ifdef ATI_OS_LINUX
+*$(OBJ_EXT): $(LLVM_DEPTH)/llvmdefs $(LLVM_DEPTH)/llvmrules
+endif
+endif
+
+include $(OPENCL_DEPTH)/openclrules
+

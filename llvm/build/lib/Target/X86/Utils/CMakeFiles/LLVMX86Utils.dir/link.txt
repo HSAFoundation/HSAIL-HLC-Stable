@@ -1,0 +1,2 @@
+/usr/bin/ar cr ../../../libLLVMX86Utils.a  CMakeFiles/LLVMX86Utils.dir/X86ShuffleDecode.cpp.o
+/usr/bin/ranlib ../../../libLLVMX86Utils.a

@@ -1,0 +1,48 @@
+
+
+
+
+
+WIN_MAIN_NAME = tblgen.exe
+
+BUILD_DIR:=../../build/$(TARGET)
+
+OBJ_DIR := $(BUILD_DIR)/OBJS
+
+MAIN := $(BUILD_DIR)/$(WIN_MAIN_NAME)
+MAIN_PDB := $(subst .exe,.pdb,$(MAIN)) 
+
+SRCS := $(wildcard ./*.cpp)
+
+OBJS := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(notdir $(SRCS))) 
+
+INCLUDES  = /I ../.. /I ./CodeGen /I.. /I. 
+
+include ../../Makefile.win.inc
+
+WIN_PREBUILD_LIBS = $(BUILD_DIR)/LLVM.lib
+
+all: $(MAIN)
+
+
+$(MAIN): $(OBJS)
+	@cmd /c echo Linking $(MAIN_NAME) ...
+	$(WIN_LINK) $(WIN_LDFLAGS) $(OBJS) /pdb:"$(MAIN_PDB)" /out:"$@"
+	
+
+$(OBJ_DIR)/%.o : %.cpp
+	@cmd /c echo "$< -> $@"
+	$(WIN_CC) $(CFLAGS) $(CC_DEBUG_DEFINES) $(INCLUDES) /Fo$@   $<
+
+$(OBJS) : | $(OBJ_DIR)
+
+
+$(OBJ_DIR): 
+	cmd /c "md $(subst /,\,$@) || echo ok"
+
+.PHONY: clean all
+
+clean: 
+	rm -rf $(OBJ_DIR) $(MAIN)
+
+

@@ -1,0 +1,2 @@
+/usr/bin/ar cr ../libLLVMArchive.a  CMakeFiles/LLVMArchive.dir/Archive.cpp.o CMakeFiles/LLVMArchive.dir/ArchiveReader.cpp.o CMakeFiles/LLVMArchive.dir/ArchiveWriter.cpp.o
+/usr/bin/ranlib ../libLLVMArchive.a

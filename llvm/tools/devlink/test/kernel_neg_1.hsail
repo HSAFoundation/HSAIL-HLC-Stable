@@ -1,0 +1,6 @@
+version 1:0:small,full;
+
+kernel &kernel_1()
+{
+	ret;
+};

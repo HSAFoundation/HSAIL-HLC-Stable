@@ -1,0 +1,14 @@
+version 1:0:small,full;
+
+function &foo_1()();
+
+function &foo_2()()
+{
+	{ call &foo_1()(); }
+};
+
+
+function &foo_1()()
+{
+	ret;
+};

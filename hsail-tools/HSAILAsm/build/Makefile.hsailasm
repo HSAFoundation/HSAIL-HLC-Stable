@@ -1,0 +1,45 @@
+ASM_DEPTH = $(COMPONENT_DEPTH)/..
+include $(ASM_DEPTH)/asmdefs
+
+NEED_EXCEPTIONS = 1
+
+#
+## Targets
+#
+EXE_TARGET = HSAILasm
+DIST_BIN_TARGETS = $(EXE_TARGET)$(EXE_EXT)
+
+#
+## C files
+#
+vpath %.cpp $(COMPONENT_DEPTH)
+
+CPPFILES := $(notdir $(wildcard $(COMPONENT_DEPTH)/*.cpp))
+
+CPPFLAGS += -Wno-reorder
+
+
+LCINCS = $(INCSWITCH) $(COMPONENT_DEPTH) \
+         $(INCSWITCH) $(ASM_DEPTH)/libHSAIL \
+         $(INCSWITCH) $(ASM_DEPTH)/libHSAIL/$(FULL_BUILD_DIR) \
+         $(INCSWITCH) "$(ASM_DEPTH)/libBRIGdwarf"
+
+#
+## Libraries
+#
+LLLIBS := $(strip $(call uniq, \
+		  $(ASMHSAILLIB) \
+		  $(LLVMTableGenLIBS)\
+		  $(LLVMSupportLIBS) \
+		  $(LLVMObjectLIBS) \
+		  $(ASMBRIGDWARFLIB) \
+		  $(ASMDWARFLIB) \
+		  $(OPENCL_DEPTH)/compiler/lib/loaders/elf/utils/libelf/$(FULL_BUILD_DIR)/libelf$(LIB_EXT) ))
+
+ifdef ATI_OS_LINUX
+    LLOPTS = $(LIBSTDCXX) -lpthread -ldl -lm
+else
+    LLOPTS = /subsystem:console
+endif
+
+include $(ASM_DEPTH)/asmrules

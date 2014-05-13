@@ -1,0 +1,26 @@
+version 1:0:small;
+
+function &foo()();
+function &foo2()();
+
+extern global_s32 &gVar;
+extern global_s32 &gVar2;
+
+kernel &main_kernel()
+{
+	ld_global_s32 $s1,[&gVar];
+	ld_global_s32 $s1,[&gVar2];
+
+	{
+		call &foo;
+	}
+	{
+		call &foo2;
+	}	
+};
+
+static function &foo3()()
+{
+	ret;
+};
+

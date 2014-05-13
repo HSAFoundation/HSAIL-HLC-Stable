@@ -1,0 +1,49 @@
+ASM_DEPTH = $(OPENCL_DEPTH)/compiler/hsail-tools
+include $(ASM_DEPTH)/asmdefs
+
+ifdef ATI_OS_WINDOWS
+    GCPPFLAGS += $(DEFSWITCH) _SCL_SECURE_NO_WARNINGS
+    GCPPFLAGS += $(DEFSWITCH) _SCL_SECURE_NO_DEPRECATE
+
+    # Modify default warning suppression coming from 
+    # common make definitions (in GCOPTS and GCXXOPTS).
+    # Enable all warnings.
+    WARNING_CONTROL_OPTS  = -Wall 
+
+    GCOPTS += $(WARNING_CONTROL_OPTS)
+    GCXXOPTS += $(WARNING_CONTROL_OPTS)
+
+    GCDEFS := $(filter-out /DDEBUG,$(GCDEFS))
+    GCXXDEFS := $(filter-out /DDEBUG,$(GCXXDEFS))
+endif
+
+#
+## Targets
+#
+EXE_TARGET = fatobj
+DIST_BIN_TARGETS = $(EXE_TARGET)$(EXE_EXT)
+
+#
+## C files
+#
+vpath %.cpp $(COMPONENT_DEPTH)
+
+CPPFILES := $(notdir $(wildcard $(COMPONENT_DEPTH)/*.cpp))
+
+LCINCS  = $(INCSWITCH) $(COMPONENT_DEPTH) 
+
+
+#
+## Libraries
+#
+LLLIBS := $(strip $(call uniq, \
+		  $(LLVMObjectLIBS) \
+		  $(ASMHSAILLIB) ))
+
+ifdef ATI_OS_LINUX
+    LLOPTS = $(LIBSTDCXX) -lpthread -ldl -lm
+else
+    LLOPTS = /subsystem:console
+endif
+
+include $(ASM_DEPTH)/asmrules

@@ -1,0 +1,1 @@
+/usr/bin/c++  -fPIC  -fPIC -fvisibility-inlines-hidden   -shared -Wl,-soname,LLVMHello.so -o CMakeFiles/CMakeRelink.dir/LLVMHello.so CMakeFiles/LLVMHello.dir/Hello.cpp.o -ldl -lpthread 

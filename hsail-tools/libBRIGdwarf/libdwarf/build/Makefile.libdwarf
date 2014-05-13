@@ -1,0 +1,27 @@
+# -*- mode: makefile; -*-
+ASM_DEPTH = $(COMPONENT_DEPTH)/../..
+include $(COMPONENT_DEPTH)/libdwarfdefs
+
+#
+## Targets
+#
+LIB_TARGET = libdwarf
+
+vpath %.c $(COMPONENT_DEPTH)/src
+
+CFILES := $(notdir $(wildcard $(COMPONENT_DEPTH)/src/*.c))
+
+
+LCINCS += $(INCSWITCH) "$(COMPONENT_DEPTH)/src" \
+          $(INCSWITCH) "$(OPENCL_DEPTH)/compiler/lib/loaders/elf/utils/libelf" \
+          $(INCSWITCH) "$(OPENCL_DEPTH)/compiler/lib/loaders/elf/utils/common"
+
+ifdef ATI_OS_WINDOWS
+LCINCS += $(INCSWITCH) "$(OPENCL_DEPTH)/compiler/lib/loaders/elf/utils/common/win32"
+endif
+
+ifdef ATI_OS_LINUX
+GCOPTS := $(filter-out -Werror,$(GCOPTS))
+endif
+
+include $(OPENCL_DEPTH)/openclrules

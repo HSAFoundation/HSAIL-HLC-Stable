@@ -1,0 +1,59 @@
+version 1:0:$small;
+
+function &foo_11()();
+
+kernel &main_kernel()
+{
+	{
+	call	&foo_11 () ();
+	}
+};
+
+function &foo_7()()
+{
+	ret;
+};
+
+function &foo_8()()
+{
+	{
+	call	&foo_7 () ();
+	}
+};
+
+function &foo_9()()
+{
+	{
+	call	&foo_8 () ();
+	}
+};
+
+function &foo_10()()
+{
+	{
+	call	&foo_9 () ();
+	}
+};
+
+function &foo_11()()
+{
+	{
+	call	&foo_10 () ();
+	}
+};
+
+function &foo_13r()();
+
+function &foo_12r()()
+{
+	{
+	call	&foo_13r () ();
+	}
+};
+
+function &foo_13r()()
+{
+	{
+	call	&foo_12r () ();
+	}
+};

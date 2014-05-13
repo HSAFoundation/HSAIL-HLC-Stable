@@ -1,0 +1,9 @@
+version 1:0:small,full;
+
+file 1 "debug";
+file 2 "hsa_dwarf_debug";
+
+kernel &kernel_2()
+{
+	ret;
+};

@@ -1,0 +1,30 @@
+include $(LLVM_DEPTH)/llvmdefs
+
+#
+## Targets
+#
+EXE_TARGET = llvm-nm
+DIST_BIN_TARGETS = $(EXE_TARGET)$(EXE_EXT)
+
+#
+## C files
+#
+vpath %.cpp $(COMPONENT_DEPTH)
+
+CPPFILES := $(notdir $(wildcard $(COMPONENT_DEPTH)/*.cpp))
+
+#
+## Libraries
+#
+LLLIBS := $(strip $(call uniq, \
+	 $(LLVMBitReaderLIBS) $(LLVMArchiveLIBS) \
+	 $(LLVMObjectLIBS) ))
+
+ifdef ATI_OS_LINUX
+    LLOPTS = $(LIBSTDCXX) -lpthread -ldl -lm
+else
+    LLOPTS = /STACK:8388608 /subsystem:console
+endif
+
+include $(LLVM_DEPTH)/llvmrules
+

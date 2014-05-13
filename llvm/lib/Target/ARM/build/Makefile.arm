@@ -1,0 +1,116 @@
+include $(LLVM_DEPTH)/llvmdefs
+
+ifdef ATI_ARCH_ARM
+
+#
+## Targets
+#
+LIB_TARGET = LLVMARMCodeGen
+
+#
+## C files
+#
+vpath %.cpp                             \
+	$(COMPONENT_DEPTH)              \
+	$(COMPONENT_DEPTH)/MCTargetDesc \
+	$(COMPONENT_DEPTH)/AsmParser    \
+	$(COMPONENT_DEPTH)/TargetInfo   \
+	$(COMPONENT_DEPTH)/InstPrinter
+
+CPPFILES :=                                                          \
+	$(notdir $(wildcard $(COMPONENT_DEPTH)/*.cpp))               \
+	$(notdir $(wildcard $(COMPONENT_DEPTH)/MCTargetDesc/*.cpp))  \
+	$(notdir $(wildcard $(COMPONENT_DEPTH)/AsmParser/*.cpp))     \
+	$(notdir $(wildcard $(COMPONENT_DEPTH)/TargetInfo/*.cpp))    \
+	$(notdir $(wildcard $(COMPONENT_DEPTH)/InstPrinter/*.cpp))
+
+#
+## C include paths
+#
+LCINCS += $(INCSWITCH) "$(COMPONENT_DEPTH)"
+LCINCS += $(INCSWITCH) "$(COMPONENT_DEPTH)/MCTargetDesc"
+LCINCS += $(INCSWITCH) "$(COMPONENT_DEPTH)/AsmParser"
+LCINCS += $(INCSWITCH) "$(COMPONENT_DEPTH)/TargetInfo"
+LCINCS += $(INCSWITCH) "$(COMPONENT_DEPTH)/InstPrinter"
+
+#
+# Generated files as PRE_TARGETS
+#
+TDFiles := $(COMPONENT_DEPTH)/*.td
+
+BASETDFILE = $(COMPONENT_DEPTH)/ARM.td
+
+GENFILES = \
+    $(BUILD_DIR)/ARMGenRegisterInfo.inc \
+    $(BUILD_DIR)/ARMGenInstrInfo.inc \
+    $(BUILD_DIR)/ARMGenAsmWriter.inc \
+    $(BUILD_DIR)/ARMGenAsmMatcher.inc \
+    $(BUILD_DIR)/ARMGenDAGISel.inc \
+    $(BUILD_DIR)/ARMGenSubtargetInfo.inc \
+    $(BUILD_DIR)/ARMGenCodeEmitter.inc \
+    $(BUILD_DIR)/ARMGenCallingConv.inc \
+    $(BUILD_DIR)/ARMGenFastISel.inc \
+    $(BUILD_DIR)/ARMGenMCCodeEmitter.inc \
+    $(BUILD_DIR)/ARMGenMCPseudoLowering.inc
+
+PRE_TARGETS = $(GENFILES)
+LDIRT = $(GENFILES)
+
+$(BUILD_DIR)/ARMGenRegisterInfo.inc: $(TDFiles) $(TBLGEN)
+	@$(MAKENOISE) "Generating $(notdir $@) ..."
+	$(VNOISE)$(MKDIR) $(dir $@)
+	$(NONOISE)$(QEMU)$(TableGen) -gen-register-info -o $@ $(BASETDFILE)
+
+$(BUILD_DIR)/ARMGenInstrInfo.inc: $(TDFiles) $(TBLGEN)
+	@$(MAKENOISE) "Generating $(notdir $@) ..."
+	$(VNOISE)$(MKDIR) $(dir $@)
+	$(NONOISE)$(QEMU)$(TableGen) -gen-instr-info -o $@ $(BASETDFILE)
+
+$(BUILD_DIR)/ARMGenAsmWriter.inc: $(TDFiles) $(TBLGEN)
+	@$(MAKENOISE) "Generating $(notdir $@) ..."
+	$(VNOISE)$(MKDIR) $(dir $@)
+	$(NONOISE)$(QEMU)$(TableGen) -gen-asm-writer -o $@ $(BASETDFILE)
+
+$(BUILD_DIR)/ARMGenAsmMatcher.inc: $(TDFiles) $(TBLGEN)
+	@$(MAKENOISE) "Generating $(notdir $@) ..."
+	$(VNOISE)$(MKDIR) $(dir $@)
+	$(NONOISE)$(QEMU)$(TableGen) -gen-asm-matcher -o $@ $(BASETDFILE)
+
+$(BUILD_DIR)/ARMGenDAGISel.inc: $(TDFiles) $(TBLGEN)
+	@$(MAKENOISE) "Generating $(notdir $@) ..."
+	$(VNOISE)$(MKDIR) $(dir $@)
+	$(NONOISE)$(QEMU)$(TableGen) -gen-dag-isel -o $@ $(BASETDFILE)
+
+$(BUILD_DIR)/ARMGenSubtargetInfo.inc: $(TDFiles) $(TBLGEN)
+	@$(MAKENOISE) "Generating $(notdir $@) ..."
+	$(VNOISE)$(MKDIR) $(dir $@)
+	$(NONOISE)$(QEMU)$(TableGen) -gen-subtarget -o $@ $(BASETDFILE)
+
+$(BUILD_DIR)/ARMGenCodeEmitter.inc: $(TDFiles) $(TBLGEN)
+	@$(MAKENOISE) "Generating $(notdir $@) ..."
+	$(VNOISE)$(MKDIR) $(dir $@)
+	$(NONOISE)$(QEMU)$(TableGen) -gen-emitter -o $@ $(BASETDFILE)
+
+$(BUILD_DIR)/ARMGenCallingConv.inc: $(TDFiles) $(TBLGEN)
+	@$(MAKENOISE) "Generating $(notdir $@) ..."
+	$(VNOISE)$(MKDIR) $(dir $@)
+	$(NONOISE)$(QEMU)$(TableGen) -gen-callingconv -o $@ $(BASETDFILE)
+
+$(BUILD_DIR)/ARMGenFastISel.inc: $(TDFiles) $(TBLGEN)
+	@$(MAKENOISE) "Generating $(notdir $@) ..."
+	$(VNOISE)$(MKDIR) $(dir $@)
+	$(NONOISE)$(QEMU)$(TableGen) -gen-fast-isel -o $@ $(BASETDFILE)
+
+$(BUILD_DIR)/ARMGenMCCodeEmitter.inc: $(TDFiles) $(TBLGEN)
+	@$(MAKENOISE) "Generating $(notdir $@) ..."
+	$(VNOISE)$(MKDIR) $(dir $@)
+	$(NONOISE)$(QEMU)$(TableGen) -gen-emitter -mc-emitter -o $@ $(BASETDFILE)
+
+$(BUILD_DIR)/ARMGenMCPseudoLowering.inc: $(TDFiles) $(TBLGEN)
+	@$(MAKENOISE) "Generating $(notdir $@) ..."
+	$(VNOISE)$(MKDIR) $(dir $@)
+	$(NONOISE)$(QEMU)$(TableGen) -gen-pseudo-lowering -o $@ $(BASETDFILE)
+
+endif
+
+include $(LLVM_DEPTH)/llvmrules

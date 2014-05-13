@@ -1,0 +1,2 @@
+/usr/bin/ar cr ../../libLLVMMCDisassembler.a  CMakeFiles/LLVMMCDisassembler.dir/Disassembler.cpp.o CMakeFiles/LLVMMCDisassembler.dir/EDDisassembler.cpp.o CMakeFiles/LLVMMCDisassembler.dir/EDInst.cpp.o CMakeFiles/LLVMMCDisassembler.dir/EDMain.cpp.o CMakeFiles/LLVMMCDisassembler.dir/EDOperand.cpp.o CMakeFiles/LLVMMCDisassembler.dir/EDToken.cpp.o
+/usr/bin/ranlib ../../libLLVMMCDisassembler.a

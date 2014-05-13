@@ -1,0 +1,30 @@
+
+D@4 DirectiveVersion(7) size=20
+	c_code=I@4; major=1; minor=0; machine=BrigESmall(0); profile=BrigEFull(0); ftz=BrigENosftz(1); 
+
+D@24 DirectiveFunction(0) size=40
+	c_code=I@4; s_name="&foo"; inParamCount=0; d_firstScopedDirective=D@64; operationCount=1; d_nextDirective=D@64; attribute=BrigStatic(1); fbarCount=0; outParamCount=0; d_firstInParam=D@0; 
+
+D@64 DirectiveVersion(7) size=20
+	c_code=I@36; major=1; minor=0; machine=BrigESmall(0); profile=BrigEFull(0); ftz=BrigENosftz(1); 
+
+D@84 DirectiveFunction(0) size=40
+	c_code=I@36; s_name="&foo"; inParamCount=0; d_firstScopedDirective=D@124; operationCount=1; d_nextDirective=D@124; attribute=BrigStatic(1); fbarCount=0; outParamCount=0; d_firstInParam=D@0; 
+
+I@4 InstBase(0) size=32
+	opcode=BrigMov(26); type=Brigb32(14); packing=BrigNoPacking(0); o_operands[0]=O@4; o_operands[1]=O@16; o_operands[2]=O@0; o_operands[3]=O@0; o_operands[4]=O@0; 
+
+I@36 InstBase(0) size=32
+	opcode=BrigMov(26); type=Brigb32(14); packing=BrigNoPacking(0); o_operands[0]=O@40; o_operands[1]=O@52; o_operands[2]=O@0; o_operands[3]=O@0; o_operands[4]=O@0; 
+
+O@4 OperandReg(1) size=12
+	type=Brigb32(14); name="$s1"; 
+
+O@16 OperandImmed(2) size=24
+	type=Brigb32(14); value=1; 
+
+O@40 OperandReg(1) size=12
+	type=Brigb32(14); name="$s1"; 
+
+O@52 OperandImmed(2) size=24
+	type=Brigb32(14); value=2; 

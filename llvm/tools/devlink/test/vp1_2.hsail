@@ -1,0 +1,9 @@
+version 1:0:small;
+
+global_s32 &gVar = 1;
+
+function &foo()()
+{
+	ret;
+};
+

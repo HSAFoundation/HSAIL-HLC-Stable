@@ -1,0 +1,186 @@
+
+D@4 DirectiveVersion(7) size=20
+	c_code=I@4; major=1; minor=0; machine=BrigESmall(0); profile=BrigEFull(0); ftz=BrigENosftz(1); 
+
+D@24 DirectiveKernel(1) size=40
+	c_code=I@4; s_name="&__AMP___CPR184____cl__131__Ul1_FQ3_3amd11Concurrency21index__tm__9_XCiL_1_2__L1__MatrixMult__FPfRCQ2_3std43vector__tm__29_fQ2_3std18allocator__tm__2_fT2iN24FQ3_3amdJ23JJ36J_kernel"; inParamCount=1; d_firstScopedDirective=D@104; operationCount=31; d_nextDirective=D@140; attribute=BrigNone(2); fbarCount=0; outParamCount=0; d_firstInParam=D@64; 
+
+D@64 DirectiveSymbol(2) size=40
+	c_code=I@4; storageClass=BrigKernargSpace(3); attribute=BrigNone(2); symbolModifier=0; dim=0; s_name="%arg_val0"; type=Brigu32(6); align=1; d_init=D@0; 
+
+D@104 DirectiveLabel(5) size=12
+	c_code=I@4; s_name="@__AMP___CPR184____cl__131__Ul1_FQ3_3amd11Concurrency21index__tm__9_XCiL_1_2__L1__MatrixMult__FPfRCQ2_3std43vector__tm__29_fQ2_3std18allocator__tm__2_fT2iN24FQ3_3amdJ23JJ36J_kernel_entry"; 
+
+D@116 DirectiveLabel(5) size=12
+	c_code=I@176; s_name="@BB0_1"; 
+
+D@128 DirectiveLabel(5) size=12
+	c_code=I@556; s_name="@BB0_3"; 
+
+I@4 InstBase(0) size=32
+	opcode=BrigMov(26); type=Brigb32(14); packing=BrigNoPacking(0); o_operands[0]=O@4; o_operands[1]=O@16; o_operands[2]=O@0; o_operands[3]=O@0; o_operands[4]=O@0; 
+
+I@36 InstBase(0) size=32
+	opcode=BrigMov(26); type=Brigb32(14); packing=BrigNoPacking(0); o_operands[0]=O@40; o_operands[1]=O@16; o_operands[2]=O@0; o_operands[3]=O@0; o_operands[4]=O@0; 
+
+I@68 InstBase(0) size=32
+	opcode=BrigWorkItemAId(103); type=Brigb32(14); packing=BrigNoPacking(0); o_operands[0]=O@52; o_operands[1]=O@64; o_operands[2]=O@0; o_operands[3]=O@0; o_operands[4]=O@0; 
+
+I@100 InstLdSt(5) size=44
+	opcode=BrigLd(66); type=Brigu32(6); packing=BrigNoPacking(0); o_operands[0]=O@16; o_operands[1]=O@88; o_operands[2]=O@100; o_operands[3]=O@0; o_operands[4]=O@0; storageClass=BrigKernargSpace(3); memorySemantic=BrigRegular(0); equivClass=0; 
+
+I@144 InstBase(0) size=32
+	opcode=BrigWorkItemAId(103); type=Brigb32(14); packing=BrigNoPacking(0); o_operands[0]=O@112; o_operands[1]=O@16; o_operands[2]=O@0; o_operands[3]=O@0; o_operands[4]=O@0; 
+
+I@176 InstLdSt(5) size=44
+	opcode=BrigLd(66); type=Brigu32(6); packing=BrigNoPacking(0); o_operands[0]=O@16; o_operands[1]=O@124; o_operands[2]=O@136; o_operands[3]=O@0; o_operands[4]=O@0; storageClass=BrigGlobalSpace(0); memorySemantic=BrigRegular(0); equivClass=0; 
+
+I@220 InstCmp(6) size=44
+	opcode=BrigCmp(49); type=Brigb1(11); packing=BrigNoPacking(0); o_operands[0]=O@152; o_operands[1]=O@4; o_operands[2]=O@124; o_operands[3]=O@0; o_operands[4]=O@0; allBits=0; isFloat=0; rounding=0; hi=0; ftz=0; approx=0; fbar=0; modBits=0; reserved=0; comparisonOperator=BrigLt(2); sourceType=Brigs32(2); 
+
+I@264 InstBase(0) size=32
+	opcode=BrigCbr(83); type=Brigb32(14); packing=BrigNoPacking(0); o_operands[0]=O@16; o_operands[1]=O@152; o_operands[2]=O@164; o_operands[3]=O@0; o_operands[4]=O@0; 
+
+I@296 InstLdSt(5) size=44
+	opcode=BrigLd(66); type=Brigu32(6); packing=BrigNoPacking(0); o_operands[0]=O@16; o_operands[1]=O@4; o_operands[2]=O@172; o_operands[3]=O@0; o_operands[4]=O@0; storageClass=BrigGlobalSpace(0); memorySemantic=BrigRegular(0); equivClass=0; 
+
+I@340 InstBase(0) size=32
+	opcode=BrigMad(11); type=Brigu32(6); packing=BrigNoPacking(0); o_operands[0]=O@4; o_operands[1]=O@52; o_operands[2]=O@4; o_operands[3]=O@112; o_operands[4]=O@0; 
+
+I@372 InstBase(0) size=32
+	opcode=BrigShl(14); type=Brigu32(6); packing=BrigNoPacking(0); o_operands[0]=O@4; o_operands[1]=O@4; o_operands[2]=O@188; o_operands[3]=O@0; o_operands[4]=O@0; 
+
+I@404 InstLdSt(5) size=44
+	opcode=BrigLd(66); type=Brigu32(6); packing=BrigNoPacking(0); o_operands[0]=O@16; o_operands[1]=O@52; o_operands[2]=O@212; o_operands[3]=O@0; o_operands[4]=O@0; storageClass=BrigGlobalSpace(0); memorySemantic=BrigRegular(0); equivClass=0; 
+
+I@448 InstBase(0) size=32
+	opcode=BrigAdd(1); type=Brigu32(6); packing=BrigNoPacking(0); o_operands[0]=O@4; o_operands[1]=O@52; o_operands[2]=O@4; o_operands[3]=O@0; o_operands[4]=O@0; 
+
+I@480 InstLdSt(5) size=44
+	opcode=BrigSt(67); type=Brigf32(9); packing=BrigNoPacking(0); o_operands[0]=O@40; o_operands[1]=O@228; o_operands[2]=O@0; o_operands[3]=O@0; o_operands[4]=O@0; storageClass=BrigGlobalSpace(0); memorySemantic=BrigRegular(0); equivClass=0; 
+
+I@524 InstBase(0) size=32
+	opcode=BrigRet(98); type=Brigb32(14); packing=BrigNoPacking(0); o_operands[0]=O@0; o_operands[1]=O@0; o_operands[2]=O@0; o_operands[3]=O@0; o_operands[4]=O@0; 
+
+I@556 InstLdSt(5) size=44
+	opcode=BrigLd(66); type=Brigu32(6); packing=BrigNoPacking(0); o_operands[0]=O@16; o_operands[1]=O@124; o_operands[2]=O@244; o_operands[3]=O@0; o_operands[4]=O@0; storageClass=BrigGlobalSpace(0); memorySemantic=BrigRegular(0); equivClass=0; 
+
+I@600 InstBase(0) size=32
+	opcode=BrigMad(11); type=Brigu32(6); packing=BrigNoPacking(0); o_operands[0]=O@124; o_operands[1]=O@4; o_operands[2]=O@124; o_operands[3]=O@52; o_operands[4]=O@0; 
+
+I@632 InstBase(0) size=32
+	opcode=BrigShl(14); type=Brigu32(6); packing=BrigNoPacking(0); o_operands[0]=O@124; o_operands[1]=O@124; o_operands[2]=O@188; o_operands[3]=O@0; o_operands[4]=O@0; 
+
+I@664 InstLdSt(5) size=44
+	opcode=BrigLd(66); type=Brigu32(6); packing=BrigNoPacking(0); o_operands[0]=O@16; o_operands[1]=O@260; o_operands[2]=O@272; o_operands[3]=O@0; o_operands[4]=O@0; storageClass=BrigGlobalSpace(0); memorySemantic=BrigRegular(0); equivClass=0; 
+
+I@708 InstBase(0) size=32
+	opcode=BrigAdd(1); type=Brigu32(6); packing=BrigNoPacking(0); o_operands[0]=O@124; o_operands[1]=O@260; o_operands[2]=O@124; o_operands[3]=O@0; o_operands[4]=O@0; 
+
+I@740 InstLdSt(5) size=44
+	opcode=BrigLd(66); type=Brigf32(9); packing=BrigNoPacking(0); o_operands[0]=O@16; o_operands[1]=O@124; o_operands[2]=O@288; o_operands[3]=O@0; o_operands[4]=O@0; storageClass=BrigGlobalSpace(0); memorySemantic=BrigRegular(0); equivClass=0; 
+
+I@784 InstLdSt(5) size=44
+	opcode=BrigLd(66); type=Brigu32(6); packing=BrigNoPacking(0); o_operands[0]=O@16; o_operands[1]=O@260; o_operands[2]=O@304; o_operands[3]=O@0; o_operands[4]=O@0; storageClass=BrigGlobalSpace(0); memorySemantic=BrigRegular(0); equivClass=0; 
+
+I@828 InstBase(0) size=32
+	opcode=BrigMad(11); type=Brigu32(6); packing=BrigNoPacking(0); o_operands[0]=O@260; o_operands[1]=O@112; o_operands[2]=O@260; o_operands[3]=O@4; o_operands[4]=O@0; 
+
+I@860 InstBase(0) size=32
+	opcode=BrigShl(14); type=Brigu32(6); packing=BrigNoPacking(0); o_operands[0]=O@260; o_operands[1]=O@260; o_operands[2]=O@188; o_operands[3]=O@0; o_operands[4]=O@0; 
+
+I@892 InstLdSt(5) size=44
+	opcode=BrigLd(66); type=Brigu32(6); packing=BrigNoPacking(0); o_operands[0]=O@16; o_operands[1]=O@320; o_operands[2]=O@332; o_operands[3]=O@0; o_operands[4]=O@0; storageClass=BrigGlobalSpace(0); memorySemantic=BrigRegular(0); equivClass=0; 
+
+I@936 InstBase(0) size=32
+	opcode=BrigAdd(1); type=Brigu32(6); packing=BrigNoPacking(0); o_operands[0]=O@260; o_operands[1]=O@320; o_operands[2]=O@260; o_operands[3]=O@0; o_operands[4]=O@0; 
+
+I@968 InstLdSt(5) size=44
+	opcode=BrigLd(66); type=Brigf32(9); packing=BrigNoPacking(0); o_operands[0]=O@16; o_operands[1]=O@260; o_operands[2]=O@348; o_operands[3]=O@0; o_operands[4]=O@0; storageClass=BrigGlobalSpace(0); memorySemantic=BrigRegular(0); equivClass=0; 
+
+I@1012 InstMod(1) size=36
+	opcode=BrigMul(7); type=Brigf32(9); packing=BrigNoPacking(0); o_operands[0]=O@124; o_operands[1]=O@260; o_operands[2]=O@124; o_operands[3]=O@0; o_operands[4]=O@0; allBits=1; isFloat=1; rounding=1; hi=0; ftz=0; approx=0; fbar=0; modBits=0; reserved=0; 
+
+I@1048 InstMod(1) size=36
+	opcode=BrigAdd(1); type=Brigf32(9); packing=BrigNoPacking(0); o_operands[0]=O@40; o_operands[1]=O@40; o_operands[2]=O@124; o_operands[3]=O@0; o_operands[4]=O@0; allBits=1; isFloat=1; rounding=1; hi=0; ftz=0; approx=0; fbar=0; modBits=0; reserved=0; 
+
+I@1084 InstBase(0) size=32
+	opcode=BrigAdd(1); type=Brigu32(6); packing=BrigNoPacking(0); o_operands[0]=O@4; o_operands[1]=O@4; o_operands[2]=O@64; o_operands[3]=O@0; o_operands[4]=O@0; 
+
+I@1116 InstBase(0) size=32
+	opcode=BrigBrn(84); type=Brigb32(14); packing=BrigNoPacking(0); o_operands[0]=O@16; o_operands[1]=O@364; o_operands[2]=O@0; o_operands[3]=O@0; o_operands[4]=O@0; 
+
+O@4 OperandReg(1) size=12
+	type=Brigb32(14); name="$s0"; 
+
+O@16 OperandImmed(2) size=24
+	type=Brigb32(14); value=0; 
+
+O@40 OperandReg(1) size=12
+	type=Brigb32(14); name="$s1"; 
+
+O@52 OperandReg(1) size=12
+	type=Brigb32(14); name="$s2"; 
+
+O@64 OperandImmed(2) size=24
+	type=Brigb32(14); value=1; 
+
+O@88 OperandReg(1) size=12
+	type=Brigb32(14); name="$s3"; 
+
+O@100 OperandAddress(5) size=12
+	type=Brigb32(14); directive=D@64; 
+
+O@112 OperandReg(1) size=12
+	type=Brigb32(14); name="$s4"; 
+
+O@124 OperandReg(1) size=12
+	type=Brigb32(14); name="$s5"; 
+
+O@136 OperandIndirect(7) size=16
+	reg=O@88; type=Brigb32(14); offset=8; 
+
+O@152 OperandReg(1) size=12
+	type=Brigb1(11); name="$c0"; 
+
+O@164 OperandLabelRef(6) size=8
+	labeldirective=D@128; 
+
+O@172 OperandIndirect(7) size=16
+	reg=O@88; type=Brigb32(14); offset=68; 
+
+O@188 OperandImmed(2) size=24
+	type=Brigb32(14); value=2; 
+
+O@212 OperandIndirect(7) size=16
+	reg=O@88; type=Brigb32(14); offset=52; 
+
+O@228 OperandIndirect(7) size=16
+	reg=O@4; type=Brigb32(14); offset=0; 
+
+O@244 OperandIndirect(7) size=16
+	reg=O@88; type=Brigb32(14); offset=44; 
+
+O@260 OperandReg(1) size=12
+	type=Brigb32(14); name="$s6"; 
+
+O@272 OperandIndirect(7) size=16
+	reg=O@88; type=Brigb32(14); offset=28; 
+
+O@288 OperandIndirect(7) size=16
+	reg=O@124; type=Brigb32(14); offset=0; 
+
+O@304 OperandIndirect(7) size=16
+	reg=O@88; type=Brigb32(14); offset=20; 
+
+O@320 OperandReg(1) size=12
+	type=Brigb32(14); name="$s7"; 
+
+O@332 OperandIndirect(7) size=16
+	reg=O@88; type=Brigb32(14); offset=4; 
+
+O@348 OperandIndirect(7) size=16
+	reg=O@260; type=Brigb32(14); offset=0; 
+
+O@364 OperandLabelRef(6) size=8
+	labeldirective=D@116; 

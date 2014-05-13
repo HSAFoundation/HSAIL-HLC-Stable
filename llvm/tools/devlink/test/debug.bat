@@ -1,0 +1,1 @@
+"C:\Program Files (x86)\Microsoft Visual Studio 10.0\Common7\IDE\devenv.exe" /debugexe ..\build\w864a\B_dbg\devlink.exe %TSDL_DEVLINK_FILES% %TSDL_DEVLINK_OPTS%

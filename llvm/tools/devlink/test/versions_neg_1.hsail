@@ -1,0 +1,9 @@
+version 1:0:small;
+
+kernel &k1()
+{
+	ret;
+};
+
+
+

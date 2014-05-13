@@ -1,0 +1,11 @@
+version 1:0:small,full;
+
+function &foo_1()()
+{
+	ret;
+};
+
+function &foo_2()()
+{
+	ret;
+};

@@ -1,0 +1,6 @@
+version 1:0:small;
+
+function &foo()()
+{
+	mov_b32 $s1,12345;
+};

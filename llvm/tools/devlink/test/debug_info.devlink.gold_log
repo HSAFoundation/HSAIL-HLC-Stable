@@ -1,0 +1,30 @@
+Parser:
+Parsing...
+Info: Module map:
+      End:96 Begin:4, version 1:0:$full,$small,$nosftz; file: debug_info_1.brig
+      End:188 Begin:96, version 1:0:$full,$small,$nosftz; file: debug_info_2.brig
+DeDuper:
+  .strtab
+    Orig:    4 Dupe:   36.
+    Orig:   10 Dupe:   42.
+  .operands
+Useless Detection, pass 1...
+Useless Detection, pass 1: 0 new useless items found, 0 backRefs removed.
+DeDeader:
+  .code
+  .directives
+  .debug
+  .operands
+  .strtab (size = 68)
+    36 (size = 6): 'debug' 64 65 62 75 67 00
+    42 (size = 16): 'hsa_dwarf_debug' 68 73 61 5f 64 77 61 72 66 5f 64 65 62 75 67 00
+  .code
+    Input (bytes) = 68 Final (bytes) = 68.
+  .operands
+    Input (bytes) = 4 Final (bytes) = 4.
+  .directives
+    Input (bytes) = 188 Final (bytes) = 188.
+  .strings
+    Input (bytes) = 68 Final (bytes) = 46.
+  .debug
+    Input (bytes) = 4 Final (bytes) = 1420.

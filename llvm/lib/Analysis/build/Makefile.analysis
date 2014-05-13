@@ -1,0 +1,17 @@
+include $(LLVM_DEPTH)/llvmdefs
+
+#
+## Targets
+#
+LIB_TARGET = LLVMAnalysis
+
+#
+## C files
+#
+vpath %.cpp $(COMPONENT_DEPTH)
+
+CPPFILES := $(notdir $(wildcard $(COMPONENT_DEPTH)/*.cpp))
+
+LCINCS += $(INCSWITCH) "$(OPENCL_DEPTH)/runtime"
+
+include $(LLVM_DEPTH)/llvmrules

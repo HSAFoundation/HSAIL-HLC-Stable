@@ -1,0 +1,1 @@
+/usr/bin/c++    -fPIC -fvisibility-inlines-hidden    CMakeFiles/yaml-bench.dir/YAMLBench.cpp.o  -o ../../bin/yaml-bench -rdynamic -ldl -lpthread ../../lib/libLLVMSupport.a -ldl -lpthread 

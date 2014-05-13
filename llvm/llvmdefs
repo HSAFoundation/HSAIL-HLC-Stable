@@ -1,0 +1,91 @@
+OPENCL_DEPTH := $(LLVM_DEPTH)/../..
+
+include $(OPENCL_DEPTH)/opencldefs
+
+ifeq ($(BUILD_HSA_TARGET),yes)
+override BUILD_CPU_DEVICE = no
+override BUILD_GPU_DEVICE = no
+endif
+
+ifneq ($(BUILD_GPU_DEVICE),no)
+GCPPFLAGS += $(DEFSWITCH) WITH_TARGET_AMDIL
+endif
+
+ifneq ($(BUILD_CPU_DEVICE),no)
+ifdef ATI_ARCH_ARM
+GCPPFLAGS += $(DEFSWITCH) WITH_TARGET_ARM
+endif
+
+ifdef ATI_ARCH_X86
+GCPPFLAGS += $(DEFSWITCH) WITH_TARGET_X86
+endif
+endif
+
+ifneq ($(BUILD_HSA_DEVICE),no)
+GCPPFLAGS += $(DEFSWITCH) WITH_TARGET_HSAIL
+endif
+
+GCPPFLAGS += $(DEFSWITCH) AMD_LLVM_INTERNAL
+
+GCPPFLAGS += $(INCSWITCH) "$(LLVM_DEPTH)/include"
+GCPPFLAGS += $(INCSWITCH) "$(LLVM_DEPTH)/lib/VMCore/build/$(OS_TYPE)/$(BUILD_DIR)"
+
+ifdef ATI_OS_LINUX
+    GCPPFLAGS += $(INCSWITCH) "$(LLVM_DEPTH)/linux/include"
+    GCPPFLAGS += $(DEFSWITCH) _GNU_SOURCE
+
+    GCPPFLAGS += $(DEFSWITCH) __STDC_LIMIT_MACROS \
+	$(DEFSWITCH) __STDC_CONSTANT_MACROS \
+	$(DEFSWITCH) __STDC_FORMAT_MACROS
+
+    ifneq ($(filter gcc/gcc-4.4.6-glibc-2.12.2-%,$(DK_C)),)
+    GCOPTS += -fno-tree-vectorize
+    GCXXOPTS += -fno-tree-vectorize
+    endif
+
+    ifneq ($(filter $(BUILD_TYPE),rel)$(BUILD_DBG_OPT),)
+        GCOPTS += -Wno-uninitialized
+        GCXXOPTS += -Wno-uninitialized
+    endif
+
+    GCDEFS := $(filter-out -DDEBUG,$(GCDEFS))
+    GCXXDEFS := $(filter-out -DDEBUG,$(GCXXDEFS))
+endif
+
+ifdef ATI_OS_WINDOWS
+    GCPPFLAGS += $(INCSWITCH) "$(LLVM_DEPTH)/win32/include"
+    GCPPFLAGS += $(DEFSWITCH) LLVM_ON_WIN32
+
+    GCPPFLAGS += $(DEFSWITCH) _SCL_SECURE_NO_WARNINGS
+    GCPPFLAGS += $(DEFSWITCH) _SCL_SECURE_NO_DEPRECATE
+
+    SUPPRESSED_WARNINGS = -wd4146 -wd4503 -wd4996 -wd4800 -wd4244 \
+	-wd4624 -wd4355 -wd4715 -wd4180 -wd4345 -wd4224 -wd4351 \
+	-wd4267 -wd4065 -wd4722
+
+    GCOPTS += $(SUPPRESSED_WARNINGS)
+    GCXXOPTS += $(SUPPRESSED_WARNINGS)
+
+    GCDEFS := $(filter-out /DDEBUG,$(GCDEFS))
+    GCXXDEFS := $(filter-out /DDEBUG,$(GCXXDEFS))
+endif
+
+#
+## TableGen stuff...
+#
+
+TBLGEN := $(call select.target,$(LLVM_DEPTH)/utils/TableGen,tblgen)
+
+TableGen = $(TBLGEN) -I . -I $(COMPONENT_DEPTH) \
+	-I $(LLVM_DEPTH)/include -I $(LLVM_DEPTH)/lib/Target
+
+# Set up Clang's tblgen.
+#ifndef CLANG_TBLGEN
+	CLANG_TBLGEN := $(call select.target,$(CLANG_DEPTH)/utils/TableGen,clang-tblgen)
+#endif
+
+ClangTableGen = $(CLANG_TBLGEN)
+#	$(TableGen.Flags)
+
+
+include $(LLVM_DEPTH)/llvmlibs

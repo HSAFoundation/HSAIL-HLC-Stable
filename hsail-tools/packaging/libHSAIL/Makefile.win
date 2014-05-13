@@ -1,0 +1,81 @@
+
+
+
+
+
+WIN_MAIN_NAME = LIBHSAIL.lib
+
+BUILD_DIR:=../build/$(TARGET)
+
+TBLGEN=$(BUILD_DIR)/../w7/tblgen.exe
+
+OBJ_DIR := $(BUILD_DIR)/OBJS
+
+MAIN := $(BUILD_DIR)/$(WIN_MAIN_NAME)
+
+SRCS := $(wildcard ./*.cpp)  
+
+PURE_SRCS := $(notdir $(SRCS)) 
+
+OBJS := $(addprefix $(OBJ_DIR)/,$(PURE_SRCS:.cpp=.o))
+
+INCLUDES  = -I.. -I.  -I$(OBJ_DIR)
+
+DEPS_NAMES := HSAILItems.inc HSAILDirectives.inc HSAILOperands.inc HSAILInst.inc HSAILValidator.inc HSAILInstValidation.inc
+
+DEPS := $(patsubst  %.inc,$(OBJ_DIR)/%.inc,$(DEPS_NAMES)) 
+
+
+include ../Makefile.win.inc
+
+all: $(MAIN)
+
+
+$(MAIN): $(OBJS) $(DEPS)
+	@cmd /c echo Linking $(WIN_MAIN_NAME) ...
+	$(WIN_LIB) $(WIN_LIBFLAGS) $(OBJS)  /out:"$@"	
+
+$(OBJ_DIR)/%.o : ./%.cpp  $(DEPS)
+	@cmd /c echo "$< -> $@"
+	$(WIN_CC) $(CFLAGS) $(INCLUDES) /Fo$@  $<
+
+$(OBJ_DIR)/HSAILItems.inc: HSAILItems.td $(TBLGEN)
+	cmd /c echo "$< -> $@"  
+	$(TBLGEN) -gen-brig-interface HSAILItems.td  > $@
+	 
+$(OBJ_DIR)/HSAILDirectives.inc: HSAILItems.td $(TBLGEN)
+	cmd /c echo "$< -> $@"  
+	$(TBLGEN) -gen-brig-directive-initializers HSAILItems.td  > $@	 
+
+$(OBJ_DIR)/HSAILOperands.inc: HSAILItems.td $(TBLGEN)
+	@cmd /c echo "$< -> $@"  
+	$(TBLGEN) -gen-brig-operand-initializers HSAILItems.td  > $@	 
+
+$(OBJ_DIR)/HSAILInst.inc: HSAILItems.td $(TBLGEN)
+	@cmd /c echo "$< -> $@"  
+	$(TBLGEN) -gen-brig-inst-initializers HSAILItems.td  > $@	 
+
+$(OBJ_DIR)/HSAILValidator.inc: HSAILItems.td $(TBLGEN)
+	@cmd /c echo "$< -> $@"  
+	$(TBLGEN) -gen-brig-validators HSAILItems.td  > $@	 
+
+$(OBJ_DIR)/HSAILInstValidation.inc: Instructions.td $(TBLGEN)
+	@cmd /c echo "$< -> $@"  
+	$(TBLGEN) -gen-brig-inst-validators Instructions.td  > $@
+
+$(TBLGEN): 
+	@cmd /c echo $(TBLGEN)
+	@cmd /c echo Please build TableGen(tblgen.exe) first
+	
+
+$(OBJS) : | $(OBJ_DIR)
+
+$(OBJ_DIR): 
+	cmd /c "md $(subst /,\,$@) || echo ok"
+
+.PHONY: clean all
+
+clean: 
+	rm -rf $(OBJ_DIR) $(MAIN)
+
+

@@ -1,0 +1,31 @@
+version 1:0:$small;
+extension "ext1";
+file 1 "file 1";
+file 2 "file 2";
+workgroupspercu 5;
+extension "ext2";
+
+function &foo_2()()
+{
+	loc 1 20 1;
+	mov_b32	$s4, 4;
+	loc 1 21 1;
+	mov_b32	$s5, 5;
+	workgroupspercu 10;
+	mov_b32	$s6, 6;
+	pragma "42-2";
+	mov_b32	$s7, 7;
+};
+extension "ext3";
+workgroupspercu 15;
+version 1:0:$small;
+
+function &foo_2()();
+
+kernel &koo()
+{
+	{
+		call	&foo_2 () ();
+	}
+	ret;
+};

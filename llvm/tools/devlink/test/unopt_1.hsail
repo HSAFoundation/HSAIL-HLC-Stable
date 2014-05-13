@@ -1,0 +1,6 @@
+version 1:0:small;
+
+static function &foo()()
+{
+	mov_b32 $s1,1;
+};

@@ -1,0 +1,46 @@
+version 1:0:$small;
+
+function &abort() ();
+
+kernel &__OpenCL_vec_copy_kernel(
+	kernarg_u32 %arg_val0, 
+	kernarg_u32 %arg_val1, 
+	kernarg_u32 %arg_val2)
+{
+	block "rti"
+	blockstring "ARGSTART:__OpenCL_vec_copy_kernel";
+	blockstring "version:3:1:104";
+	blockstring "device:generic";
+	blockstring "uniqueid:1024";
+	blockstring "memory:private:0";
+	blockstring "memory:region:0";
+	blockstring "memory:local:0";
+	blockstring "pointer:a:float:1:1:0:uav:8:4:RW:0:0";
+	blockstring "constarg:0:a";
+	blockstring "pointer:b:float:1:1:16:uav:8:4:RW:0:0";
+	blockstring "value:n:u32:1:1:32";
+	blockstring "constarg:2:n";
+	blockstring "function:1:0";
+	blockstring "uavid:8";
+	blockstring "privateid:8";
+	blockstring "reflection:0:float*";
+	blockstring "reflection:1:float*";
+	blockstring "reflection:2:uint";
+	blockstring "ARGEND:__OpenCL_vec_copy_kernel";
+	endblock;
+@__OpenCL_vec_copy_kernel_entry:
+	ld_kernarg_u32	$s0, [%arg_val2] ;
+	workitemaid	$s1, 0 ;
+	cmp_ge_b1_u32	 $c0, $s1, $s0 ;
+	ld_kernarg_u32	$s0, [%arg_val1] ;
+	ld_kernarg_u32	$s2, [%arg_val0] ;
+	cbr	$c0, @BB0_2 ;
+	shl_u32	 $s1, $s1, 2 ;
+	add_u32	 $s0, $s0, $s1 ;
+	add_u32	 $s1, $s2, $s1 ;
+	ld_global_f32	$s1, [$s1] ;
+	st_global_f32	$s1, [$s0] ;
+@BB0_2:                                 
+	ret ;
+};
+

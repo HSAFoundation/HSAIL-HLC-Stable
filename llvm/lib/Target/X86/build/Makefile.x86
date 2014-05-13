@@ -1,0 +1,135 @@
+include $(LLVM_DEPTH)/llvmdefs
+
+ifdef ATI_ARCH_X86
+
+#
+## Targets
+#
+LIB_TARGET = LLVMX86CodeGen
+
+#
+## C files
+#
+vpath %.cpp                             \
+	$(COMPONENT_DEPTH)              \
+	$(COMPONENT_DEPTH)/MCTargetDesc \
+	$(COMPONENT_DEPTH)/AsmParser    \
+	$(COMPONENT_DEPTH)/TargetInfo   \
+	$(COMPONENT_DEPTH)/InstPrinter  \
+	$(COMPONENT_DEPTH)/Utils
+
+CPPFILES :=                                                          \
+	$(notdir $(wildcard $(COMPONENT_DEPTH)/*.cpp))               \
+	$(notdir $(wildcard $(COMPONENT_DEPTH)/MCTargetDesc/*.cpp))  \
+	$(notdir $(wildcard $(COMPONENT_DEPTH)/AsmParser/*.cpp))     \
+	$(notdir $(wildcard $(COMPONENT_DEPTH)/TargetInfo/*.cpp))    \
+	$(notdir $(wildcard $(COMPONENT_DEPTH)/InstPrinter/*.cpp))   \
+	$(notdir $(wildcard $(COMPONENT_DEPTH)/Utils/*.cpp))
+
+ifdef ATI_OS_WINDOWS
+    ifdef ATI_BITS_64
+        vpath %.asm $(COMPONENT_DEPTH)
+        AFILES = X86CompilationCallback_Win64.asm
+    endif
+endif
+
+#
+## C include paths
+#
+LCINCS  = $(INCSWITCH) "$(OPENCL_DEPTH)/compiler/tools/macrodata/include"
+LCINCS += $(INCSWITCH) "$(COMPONENT_DEPTH)"
+LCINCS += $(INCSWITCH) "$(COMPONENT_DEPTH)/MCTargetDesc"
+LCINCS += $(INCSWITCH) "$(COMPONENT_DEPTH)/AsmParser"
+LCINCS += $(INCSWITCH) "$(COMPONENT_DEPTH)/TargetInfo"
+LCINCS += $(INCSWITCH) "$(COMPONENT_DEPTH)/InstPrinter"
+LCINCS += $(INCSWITCH) "$(COMPONENT_DEPTH)/Utils"
+
+#
+# Generated files as PRE_TARGETS
+#
+TDFiles := $(COMPONENT_DEPTH)/*.td
+
+BASETDFILE = $(COMPONENT_DEPTH)/X86.td
+
+GENFILES = \
+    $(BUILD_DIR)/X86GenRegisterInfo.inc \
+    $(BUILD_DIR)/X86GenInstrInfo.inc \
+    $(BUILD_DIR)/X86GenAsmWriter.inc \
+    $(BUILD_DIR)/X86GenAsmWriter1.inc \
+    $(BUILD_DIR)/X86GenDAGISel.inc \
+    $(BUILD_DIR)/X86GenFastISel.inc \
+    $(BUILD_DIR)/X86GenCallingConv.inc \
+    $(BUILD_DIR)/X86GenSubtargetInfo.inc \
+    $(BUILD_DIR)/X86GenAsmMatcher.inc
+
+PRE_TARGETS = $(GENFILES)
+LDIRT = $(GENFILES)
+
+$(BUILD_DIR)/X86GenRegisterInfo.inc: $(TDFiles) $(TBLGEN)
+	@$(MAKENOISE) "Generating $(notdir $@) ..."
+	$(VNOISE)$(MKDIR) $(dir $@)
+	$(NONOISE)$(QEMU)$(TableGen) -gen-register-info -o $@ $(BASETDFILE)
+
+$(BUILD_DIR)/X86GenInstrInfo.inc: $(TDFiles) $(TBLGEN)
+	@$(MAKENOISE) "Generating $(notdir $@) ..."
+	$(VNOISE)$(MKDIR) $(dir $@)
+	$(NONOISE)$(QEMU)$(TableGen) -gen-instr-info -o $@ $(BASETDFILE)
+
+$(BUILD_DIR)/X86GenAsmWriter.inc: $(TDFiles) $(TBLGEN)
+	@$(MAKENOISE) "Generating $(notdir $@) ..."
+	$(VNOISE)$(MKDIR) $(dir $@)
+	$(NONOISE)$(QEMU)$(TableGen) -gen-asm-writer -o $@ $(BASETDFILE)
+
+$(BUILD_DIR)/X86GenAsmWriter1.inc: $(TDFiles) $(TBLGEN)
+	@$(MAKENOISE) "Generating $(notdir $@) ..."
+	$(VNOISE)$(MKDIR) $(dir $@)
+	$(NONOISE)$(QEMU)$(TableGen) -gen-asm-writer -asmwriternum=1 -o $@ $(BASETDFILE)
+
+$(BUILD_DIR)/X86GenAsmMatcher.inc: $(TDFiles) $(TBLGEN)
+	@$(MAKENOISE) "Generating $(notdir $@) ..."
+	$(VNOISE)$(MKDIR) $(dir $@)
+	$(NONOISE)$(QEMU)$(TableGen) -gen-asm-matcher -o $@ $(BASETDFILE)
+
+$(BUILD_DIR)/X86GenCodeEmitter.inc: $(TDFiles) $(TBLGEN)
+	@$(MAKENOISE) "Generating $(notdir $@) ..."
+	$(VNOISE)$(MKDIR) $(dir $@)
+	$(NONOISE)$(QEMU)$(TableGen) -gen-emitter -o $@ $(BASETDFILE)
+
+$(BUILD_DIR)/X86GenDAGISel.inc: $(TDFiles) $(TBLGEN)
+	@$(MAKENOISE) "Generating $(notdir $@) ..."
+	$(VNOISE)$(MKDIR) $(dir $@)
+	$(NONOISE)$(QEMU)$(TableGen) -gen-dag-isel -o $@ $(BASETDFILE)
+
+$(BUILD_DIR)/X86GenDisassemblerTables.inc: $(TDFiles) $(TBLGEN)
+	@$(MAKENOISE) "Generating $(notdir $@) ..."
+	$(VNOISE)$(MKDIR) $(dir $@)
+	$(NONOISE)$(QEMU)$(TableGen) -gen-disassembler -o $@ $(BASETDFILE)
+
+$(BUILD_DIR)/X86GenEDInfo.inc: $(TDFiles) $(TBLGEN)
+	@$(MAKENOISE) "Generating $(notdir $@) ..."
+	$(VNOISE)$(MKDIR) $(dir $@)
+	$(NONOISE)$(QEMU)$(TableGen) -gen-enhanced-disassembly-info -o $@ $(BASETDFILE)
+
+$(BUILD_DIR)/X86GenFastISel.inc: $(TDFiles) $(TBLGEN)
+	@$(MAKENOISE) "Generating $(notdir $@) ..."
+	$(VNOISE)$(MKDIR) $(dir $@)
+	$(NONOISE)$(QEMU)$(TableGen) -gen-fast-isel -o $@ $(BASETDFILE)
+
+$(BUILD_DIR)/X86GenSubtargetInfo.inc: $(TDFiles) $(TBLGEN)
+	@$(MAKENOISE) "Generating $(notdir $@) ..."
+	$(VNOISE)$(MKDIR) $(dir $@)
+	$(NONOISE)$(QEMU)$(TableGen) -gen-subtarget -o $@ $(BASETDFILE)
+
+$(BUILD_DIR)/X86GenCallingConv.inc: $(TDFiles) $(TBLGEN)
+	@$(MAKENOISE) "Generating $(notdir $@) ..."
+	$(VNOISE)$(MKDIR) $(dir $@)
+	$(NONOISE)$(QEMU)$(TableGen) -gen-callingconv -o $@ $(BASETDFILE)
+
+$(BUILD_DIR)/X86GenIntrinsics.inc: $(TDFiles) $(TBLGEN)
+	@$(MAKENOISE) "Generating $(notdir $@) ..."
+	$(VNOISE)$(MKDIR) $(dir $@)
+	$(NONOISE)$(QEMU)$(TableGen) -gen-tgt-intrinsic -o $@ $(BASETDFILE)
+
+endif
+
+include $(LLVM_DEPTH)/llvmrules

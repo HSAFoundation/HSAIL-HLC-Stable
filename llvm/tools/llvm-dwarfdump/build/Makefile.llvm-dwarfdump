@@ -1,0 +1,31 @@
+include $(LLVM_DEPTH)/llvmdefs
+
+#
+## Targets
+#
+EXE_TARGET = llvm-dwarfdump
+DIST_BIN_TARGETS = $(EXE_TARGET)$(EXE_EXT)
+
+#
+## C files
+#
+vpath %.cpp $(COMPONENT_DEPTH)
+
+CPPFILES := $(notdir $(wildcard $(COMPONENT_DEPTH)/*.cpp))
+
+#
+## Libraries
+#
+LLLIBS := $(strip $(call uniq, \
+          $(LLVMObjectLIBS) \
+          $(LLVMDebugInfoLIBS) \
+	   $(LLVMSupportLIBS))) 
+
+ifdef ATI_OS_LINUX
+    LLOPTS = $(LIBSTDCXX) -lpthread -ldl -lm
+else
+    LLOPTS = /STACK:8388608 /subsystem:console
+    GCXXOPTS += /wd4334
+endif
+
+include $(LLVM_DEPTH)/llvmrules

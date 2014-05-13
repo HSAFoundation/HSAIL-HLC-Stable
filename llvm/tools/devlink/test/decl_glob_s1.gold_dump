@@ -1,0 +1,60 @@
+
+D@4 DirectiveVersion(7) size=20
+	c_code=I@4; major=1; minor=0; machine=BrigESmall(0); profile=BrigEFull(0); ftz=BrigENosftz(1); 
+
+D@24 DirectiveSymbol(2) size=40
+	c_code=I@4; storageClass=BrigGlobalSpace(0); attribute=BrigExtern(0); symbolModifier=0; dim=0; s_name="&var_1"; type=Brigs32(2); align=4; d_init=D@0; 
+
+D@64 DirectiveSymbol(2) size=40
+	c_code=I@4; storageClass=BrigGlobalSpace(0); attribute=BrigExtern(0); symbolModifier=0; dim=0; s_name="&var_3"; type=Brigs32(2); align=1; d_init=D@0; 
+
+D@104 DirectiveSymbol(2) size=40
+	c_code=I@4; storageClass=BrigGlobalSpace(0); attribute=BrigExtern(0); symbolModifier=0; dim=0; s_name="&var_6"; type=Brigs32(2); align=1; d_init=D@0; 
+
+D@144 DirectiveSymbol(2) size=40
+	c_code=I@4; storageClass=BrigGlobalSpace(0); attribute=BrigNone(2); symbolModifier=0; dim=0; s_name="&var_6"; type=Brigs32(2); align=1; d_init=D@184; 
+
+D@184 DirectiveInit(12) size=24
+	c_code=I@4; elementCount=1; type=Brigb32(14); values={ 6 }; 
+
+D@208 DirectiveKernel(1) size=40
+	c_code=I@4; s_name="&main_kernel"; inParamCount=0; d_firstScopedDirective=D@248; operationCount=3; d_nextDirective=D@248; attribute=BrigNone(2); fbarCount=0; outParamCount=0; d_firstInParam=D@0; 
+
+D@248 DirectiveSymbol(2) size=40
+	c_code=I@136; storageClass=BrigGlobalSpace(0); attribute=BrigNone(2); symbolModifier=0; dim=0; s_name="&var_3"; type=Brigs32(2); align=1; d_init=D@288; 
+
+D@288 DirectiveInit(12) size=24
+	c_code=I@136; elementCount=1; type=Brigb32(14); values={ 3 }; 
+
+D@312 DirectiveVersion(7) size=20
+	c_code=I@136; major=1; minor=0; machine=BrigESmall(0); profile=BrigEFull(0); ftz=BrigENosftz(1); 
+
+D@332 DirectiveSymbol(2) size=40
+	c_code=I@136; storageClass=BrigGlobalSpace(0); attribute=BrigNone(2); symbolModifier=0; dim=0; s_name="&var_1"; type=Brigs32(2); align=1; d_init=D@372; 
+
+D@372 DirectiveInit(12) size=24
+	c_code=I@136; elementCount=1; type=Brigb32(14); values={ 1 }; 
+
+I@4 InstLdSt(5) size=44
+	opcode=BrigLd(66); type=Brigs32(2); packing=BrigNoPacking(0); o_operands[0]=O@4; o_operands[1]=O@28; o_operands[2]=O@40; o_operands[3]=O@0; o_operands[4]=O@0; storageClass=BrigGlobalSpace(0); memorySemantic=BrigRegular(0); equivClass=0; 
+
+I@48 InstLdSt(5) size=44
+	opcode=BrigLd(66); type=Brigs32(2); packing=BrigNoPacking(0); o_operands[0]=O@4; o_operands[1]=O@28; o_operands[2]=O@52; o_operands[3]=O@0; o_operands[4]=O@0; storageClass=BrigGlobalSpace(0); memorySemantic=BrigRegular(0); equivClass=0; 
+
+I@92 InstLdSt(5) size=44
+	opcode=BrigLd(66); type=Brigs32(2); packing=BrigNoPacking(0); o_operands[0]=O@4; o_operands[1]=O@28; o_operands[2]=O@64; o_operands[3]=O@0; o_operands[4]=O@0; storageClass=BrigGlobalSpace(0); memorySemantic=BrigRegular(0); equivClass=0; 
+
+O@4 OperandImmed(2) size=24
+	type=Brigb32(14); value=0; 
+
+O@28 OperandReg(1) size=12
+	type=Brigb32(14); name="$s1"; 
+
+O@40 OperandAddress(5) size=12
+	type=Brigb32(14); directive=D@332; 
+
+O@52 OperandAddress(5) size=12
+	type=Brigb32(14); directive=D@248; 
+
+O@64 OperandAddress(5) size=12
+	type=Brigb32(14); directive=D@144; 

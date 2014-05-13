@@ -1,0 +1,18 @@
+version 1:0:$small;
+
+function &foo()();
+
+kernel &koo()
+{
+	ld_global_u32	$s0, [$s1+1248];
+	{
+		call	&foo () ();
+	}
+	ret;
+};
+version 1:0:$small;
+
+function &foo()()
+{
+	ld_global_u32	$s0, [$s1+1248];
+};

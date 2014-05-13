@@ -1,0 +1,5 @@
+version 1:0:small,full;
+
+global_s32 &foo_1;
+
+global_s32 &foo_2;
