@@ -7,6 +7,7 @@
 #include <queue>
 #include "HSAILTargetMachine.h"
 #include "HSAILInstrInfo.h"
+#include "HSAILUtilityFunctions.h"
 #include "llvm/Instructions.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
@@ -116,10 +117,7 @@ HSAILInstrInfo::isLoadFromStackSlot(const MachineInstr *MI,
     return 0;
   case HSAIL::spill_ld_u32_v1:
   case HSAIL::spill_ld_u64_v1:
-  case HSAIL::spill_ld_u32_flat_v1:
-  case HSAIL::spill_ld_u64_flat_v1:
   case HSAIL::spill_ld_b1:
-  case HSAIL::spill_ld_b1_flat:
     for (unsigned i = 0, e = MI->getNumOperands(); i != e; ++i) {
       if (MI->getOperand(i).isFI()) {
         FrameIndex = MI->getOperand(i).getIndex();
@@ -155,10 +153,7 @@ HSAILInstrInfo::isStoreToStackSlot(const MachineInstr *MI,
     return 0;
   case HSAIL::spill_st_u32_v1:
   case HSAIL::spill_st_u64_v1:
-  case HSAIL::spill_st_u32_flat_v1:
-  case HSAIL::spill_st_u64_flat_v1:
   case HSAIL::spill_st_b1:
-  case HSAIL::spill_st_b1_flat:
     for (unsigned i = 0, e = MI->getNumOperands(); i != e; ++i) {
       if (MI->getOperand(i).isFI()) {
         FrameIndex = MI->getOperand(i).getIndex();
@@ -267,6 +262,66 @@ IsDefBeforeUse(MachineBasicBlock &MBB, unsigned Reg,
   return true;
 }
 
+static bool
+CheckSpillAfterDef(MachineInstr * start, unsigned reg, bool& canBeSpilled)
+{
+  MachineBasicBlock * MBB = start->getParent();
+  MachineBasicBlock::reverse_iterator B(start);
+  MachineBasicBlock::reverse_iterator E = MBB->rend();
+  if (E == B) return false; // empty block check
+  ++B; // skip branch instr itself
+  for (MachineBasicBlock::reverse_iterator I = B; I != E; ++I) {
+    if (I->definesRegister(reg))
+    {
+      return true;
+    }
+    if (I->readsRegister(reg) && (isConv(&*I) || I->mayStore())) {
+      canBeSpilled = true;
+      return true;
+    }
+  }
+  return false;
+}
+
+static bool
+IsSpilledAfterDef(MachineInstr * start, unsigned reg)
+{
+  bool canBeSpilled = false;
+  if (!CheckSpillAfterDef(start, reg, canBeSpilled))
+  {
+    std::queue<MachineBasicBlock *> Q;
+    SmallPtrSet<MachineBasicBlock*, 32> Visited;
+    MachineBasicBlock * MBB = start->getParent();
+    Q.push(MBB);
+    while (!Q.empty() && !canBeSpilled)
+    {
+      MachineBasicBlock *cur_mbb = Q.front();
+      Q.pop();
+      for (MachineBasicBlock::pred_iterator pred = cur_mbb->pred_begin(),
+        pred_end = cur_mbb->pred_end(); pred != pred_end; ++pred)
+      {
+        if (!Visited.count(*pred) && !(*pred)->empty())
+        {
+          Visited.insert(*pred);
+          MachineInstr * instr;
+          MachineBasicBlock::instr_iterator termIt = (*pred)->getFirstInstrTerminator();
+          if (termIt == (*pred)->instr_end())
+          {
+            instr =  &*(*pred)->rbegin();
+          } else {
+            instr = termIt;
+          }
+          if (!CheckSpillAfterDef(instr, reg, canBeSpilled))
+          {
+            Q.push(*pred);
+          }
+        }
+      }
+    }
+  }
+  return canBeSpilled;
+}
+
 bool
 HSAILInstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,
                               MachineBasicBlock *&TBB,
@@ -355,13 +410,22 @@ HSAILInstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,
       }
 
       // Determine condition dependencies
+      unsigned reg = I->getOperand(0).getReg();
       bool can_reverse = false;
-      bool is_def_before_use = IsDefBeforeUse(MBB, 
-        I->getOperand(0).getReg(), 
-        MRI, can_reverse);
-        
+      bool is_def_before_use = IsDefBeforeUse(MBB, reg, MRI, can_reverse);
+      if (can_reverse)
+      {
+        /* Here we're taking care of the possible control register spilling
+         that occur between it's definition and branch. If it does, we're not
+         allowed to inverse branch because some other place rely on the
+         unspilled value.
+       */
+        can_reverse = !IsSpilledAfterDef(I, reg);
+      }
       // Can not reverse instruction which will require to 
       // insert or remove 'not_b1' inside loop
+      // Also, we avoid reversing for that comparisons
+      // whose result is spilled in between the definition and use.
       if (!can_reverse)
       {
         Cond.push_back(MachineOperand::CreateImm(COND_IRREVERSIBLE));
@@ -748,7 +812,6 @@ HSAILInstrInfo::storeRegToStackSlot(MachineBasicBlock &MBB,
   MachineFunction &MF = *MBB.getParent();
   MachineFrameInfo &MFI = *MF.getFrameInfo();
   DebugLoc DL;
-  const HSAILSubtarget *Subtarget = &TM.getSubtarget<HSAILSubtarget>();
   const HSAILRegisterInfo *HRI = TM.getRegisterInfo();
   
   switch (RC->getID()) {
@@ -756,16 +819,13 @@ HSAILInstrInfo::storeRegToStackSlot(MachineBasicBlock &MBB,
       assert(0 && "unrecognized TargetRegisterClass");
       break;
     case HSAIL::GPR32RegClassID:
-      Opc = Subtarget->usesFlatAddr() ?
-          HSAIL::spill_st_u32_flat_v1  : HSAIL::spill_st_u32_v1;
+      Opc = HSAIL::spill_st_u32_v1;
       break;
     case HSAIL::GPR64RegClassID:
-      Opc = Subtarget->usesFlatAddr() ?
-          HSAIL::spill_st_u64_flat_v1 : HSAIL::spill_st_u64_v1;
+      Opc = HSAIL::spill_st_u64_v1;
       break;
     case HSAIL::CRRegClassID:
-      Opc = Subtarget->usesFlatAddr() ?
-          HSAIL::spill_st_b1_flat : HSAIL::spill_st_b1;
+      Opc = HSAIL::spill_st_b1;
       break;
   }
   if (MI != MBB.end()) {
@@ -793,29 +853,13 @@ HSAILInstrInfo::storeRegToStackSlot(MachineBasicBlock &MBB,
           MachineMemOperand::MOStore,
           MFI.getObjectSize(FrameIndex),
           MFI.getObjectAlignment(FrameIndex));
-      // For flat addressing mode, spill instructions are based
-      // off of a fixed register. The base register is init'd in
-      // the prologue.
-      if (Subtarget->usesFlatAddr()) {
-        unsigned int base = HRI->getReservedLocalBaseReg(MF);
-        nMI = BuildMI(MBB, MI, DL, get(Opc))
-            .addReg(SrcReg, getKillRegState(isKill))
-            // The base register
-            .addFrameIndex(FrameIndex)
-            .addReg(base)
-            .addImm(0)
-            .addImm(1)
-            .addMemOperand(MMO);
-      }
-      else {
-        nMI = BuildMI(MBB, MI, DL, get(Opc))
-            .addReg(SrcReg, getKillRegState(isKill))
-            .addFrameIndex(FrameIndex)
-            .addReg(0)
-            .addImm(0)
-            .addImm(1)
-            .addMemOperand(MMO);            
-      }
+      nMI = BuildMI(MBB, MI, DL, get(Opc))
+          .addReg(SrcReg, getKillRegState(isKill))
+          .addFrameIndex(FrameIndex)
+          .addReg(0)
+          .addImm(0)
+          .addImm(1)
+          .addMemOperand(MMO);            
       break;
   }
 }
@@ -833,7 +877,6 @@ HSAILInstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
   MachineFunction &MF = *MBB.getParent();
   MachineFrameInfo &MFI = *MF.getFrameInfo();
   DebugLoc DL;
-  const HSAILSubtarget *Subtarget = &TM.getSubtarget<HSAILSubtarget>();
   const HSAILRegisterInfo *HRI = TM.getRegisterInfo();
 
   switch (RC->getID()) {
@@ -841,16 +884,13 @@ HSAILInstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
       assert(0 && "unrecognized TargetRegisterClass");
       break;
     case HSAIL::GPR32RegClassID:
-      Opc = Subtarget->usesFlatAddr() ?
-          HSAIL::spill_ld_u32_flat_v1 : HSAIL::spill_ld_u32_v1;
+      Opc = HSAIL::spill_ld_u32_v1;
       break;
     case HSAIL::GPR64RegClassID:
-      Opc = Subtarget->usesFlatAddr() ?
-          HSAIL::spill_ld_u64_flat_v1 : HSAIL::spill_ld_u64_v1;
+      Opc = HSAIL::spill_ld_u64_v1;
       break;
     case HSAIL::CRRegClassID:
-      Opc = Subtarget->usesFlatAddr() ?
-          HSAIL::spill_ld_b1_flat : HSAIL::spill_ld_b1;
+      Opc = HSAIL::spill_ld_b1;
       break;
   }
   if (MI != MBB.end()) {
@@ -869,29 +909,15 @@ HSAILInstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
         MachineMemOperand::MOLoad,
         MFI.getObjectSize(FrameIndex),
         MFI.getObjectAlignment(FrameIndex));
-      if (Subtarget->usesFlatAddr()) {
-        unsigned int base = HRI->getReservedLocalBaseReg(MF);
-        nMI = BuildMI(MBB, MI, DL, get(Opc))
-             .addReg(DestReg, RegState::Define)
-             .addFrameIndex(FrameIndex)
-             .addReg(base)
-             .addImm(0)
-             .addImm(Brig::BRIG_WIDTH_1)
-             .addImm(1)
-             .addImm(0)
-             .addMemOperand(MMO);
-      }
-      else {
-        nMI = BuildMI(MBB, MI, DL, get(Opc))
-            .addReg(DestReg, RegState::Define)
-            .addFrameIndex(FrameIndex)
-            .addReg(0)
-            .addImm(0)
-            .addImm(Brig::BRIG_WIDTH_1)
-            .addImm(1)
-            .addImm(0)
-            .addMemOperand(MMO);
-      }
+      nMI = BuildMI(MBB, MI, DL, get(Opc))
+          .addReg(DestReg, RegState::Define)
+          .addFrameIndex(FrameIndex)
+          .addReg(0)
+          .addImm(0)
+          .addImm(Brig::BRIG_WIDTH_1)
+          .addImm(1)
+          .addImm(0)
+          .addMemOperand(MMO);
       break;
   }
 }
@@ -1226,7 +1252,6 @@ HSAILInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
                             bool KillSrc) const
 {
   unsigned Opc = 0;
-  const HSAILSubtarget *Subtarget = &TM.getSubtarget<HSAILSubtarget>();
 
   if (HSAIL::GPR64RegClass.contains(DestReg, SrcReg)) {
     Opc = HSAIL::mov_r_b64;
@@ -1243,38 +1268,11 @@ HSAILInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
   } else if (HSAIL::GPR64RegClass.contains(DestReg) && 
              HSAIL::GPR32RegClass.contains(SrcReg)) {
     Opc = HSAIL::cvt_u32_u64;
-  } else if (HSAIL::PARAMREGRegClass.contains(DestReg)) {
-    // two instructions!
-    // first declares the param variables
-    if(HSAIL::GPR32RegClass.contains(SrcReg)) {     
-      //      BuildMI(MBB, MI, DL, get(HSAIL::arg_u32), DestReg);
-      Opc = Subtarget->usesFlatAddr() ? HSAIL::st_parg_flat_u32 : HSAIL::st_parg_u32;
-    } else if(HSAIL::GPR64RegClass.contains(SrcReg)) {
-      //BuildMI(MBB, MI, DL, get(HSAIL::arg_i64), DestReg);
-      Opc = Subtarget->usesFlatAddr() ? HSAIL::st_parg_flat_u64 : HSAIL::st_parg_u64;
-    } else
-      assert(!"Src register type is invalid");
-  } else if (HSAIL::RETREGRegClass.contains(DestReg)) {
-    if(HSAIL::GPR32RegClass.contains(SrcReg) || HSAIL::CRRegClass.contains(SrcReg)) 
-      Opc = Subtarget->usesFlatAddr() ? HSAIL::st_rarg_flat_u32: HSAIL::st_rarg_u32;
-    else if(HSAIL::GPR64RegClass.contains(SrcReg))
-      Opc = Subtarget->usesFlatAddr() ? HSAIL::st_rarg_flat_u64: HSAIL::st_rarg_u64;
-    else {
-      errs() << __LINE__ << ":" << __FILE__ << " Invalid Src Register: " << SrcReg << "\n";
-      assert(!"Src register type is invalid");
-    }
-  } else if(HSAIL::RETREGRegClass.contains(SrcReg)) {
-    if(HSAIL::GPR32RegClass.contains(DestReg)) 
-      Opc = Subtarget->usesFlatAddr() ? HSAIL::ld_rarg_flat_u32 : HSAIL::ld_rarg_u32;
-    else if(HSAIL::GPR64RegClass.contains(DestReg))
-      Opc = Subtarget->usesFlatAddr() ? HSAIL::ld_rarg_flat_u64 : HSAIL::ld_rarg_u64;
-    else
-      assert(!"Src register type is invalid");
-    BuildMI(MBB, MI, DL, get(Opc), SrcReg)
-      .addReg(DestReg, getKillRegState(KillSrc));
-    
-    return;
-
+  } else if (HSAIL::GPR32RegClass.contains(DestReg) &&
+             HSAIL::GPR64RegClass.contains(SrcReg)) {
+    // Truncation can occur if a function was defined with different return
+    // types in different places.
+    Opc = HSAIL::cvt_u64_u32;
   } else {
     assert(!"When do we hit this?");
     return TargetInstrInfoImpl::copyPhysReg(MBB, MI, DL, DestReg, SrcReg, 
@@ -1295,12 +1293,6 @@ HSAILInstrInfo::emitFrameIndexDebugValue(MachineFunction &MF,
 {
   return TargetInstrInfoImpl::emitFrameIndexDebugValue(MF, FrameIx, Offset, 
       MDPtr, dl);
-}
-
-void
-HSAILInstrInfo::getNoopForMachoTarget(MCInst &NopInst) const
-{
-  return TargetInstrInfoImpl::getNoopForMachoTarget(NopInst);
 }
 
 bool
@@ -1628,30 +1620,26 @@ HSAILInstrInfo::expandPostRAPseudo(MachineBasicBlock::iterator MBBI) const
 
   switch (opcode) {
   case HSAIL::spill_st_b1:
-  case HSAIL::spill_st_b1_flat:
     {
       unsigned tempU32 = getTempGPR32PostRA(MBBI);
       BuildMI(*MBB, MBBI, MI.getDebugLoc(),
          get(HSAIL::cvt_b1_u32))
         .addReg(tempU32, RegState::Define)
         .addOperand(MI.getOperand(0));
-      MI.setDesc(get((opcode == HSAIL::spill_st_b1) ? HSAIL::spill_st_u32_v1
-                                                    : HSAIL::spill_st_u32_flat_v1));
+      MI.setDesc(get(HSAIL::spill_st_u32_v1));
       MI.getOperand(0).setReg(tempU32);
       MI.getOperand(0).setIsKill();
       RS->setUsed(tempU32);
     }
     return true;
   case HSAIL::spill_ld_b1:
-  case HSAIL::spill_ld_b1_flat:
     {
       unsigned tempU32 = getTempGPR32PostRA(MBBI);
       BuildMI(*MBB, ++MBBI, MI.getDebugLoc(),
          get(HSAIL::cvt_u32_b1))
         .addOperand(MI.getOperand(0))
         .addReg(tempU32, RegState::Kill);
-      MI.setDesc(get((opcode == HSAIL::spill_ld_b1) ? HSAIL::spill_ld_u32_v1
-                                                    : HSAIL::spill_ld_u32_flat_v1));
+      MI.setDesc(get(HSAIL::spill_ld_u32_v1));
       MI.getOperand(0).setReg(tempU32);
       MI.getOperand(0).setIsDef();
       RS->setUsed(tempU32);

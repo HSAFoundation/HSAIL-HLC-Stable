@@ -10,14 +10,38 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#include "HSAILMetadataUtils.h"
 #include "HSAILModuleInfo.h"
 #include "HSAILParseMetadata.h"
 #include "HSAILUtilityFunctions.h"
 
 #include "llvm/Metadata.h"
-
+#include "llvm/Transforms/AMDMetadataUtils.h"
 using namespace llvm;
+
+// This header file is required for generating global variables for kernel
+// argument info.
+namespace clk {
+typedef unsigned int uint;
+typedef uint32_t cl_mem_fence_flags;
+//kernel arg access qualifier and type qualifier
+typedef enum clk_arg_qualifier_t
+{
+    Q_NONE = 0,
+
+    //for image type only, access qualifier
+    Q_READ = 1,
+    Q_WRITE = 2,
+
+    //for pointer type only
+    Q_CONST = 4, // pointee
+    Q_RESTRICT = 8,
+    Q_VOLATILE = 16,  // pointee
+    Q_PIPE = 32  // pipe
+
+} clk_arg_qualifier_t;
+
+//#include <amdocl/cl_kernel.h>
+} // end of namespace clk
 
 /// \brief Set user-specified values for required workgroup size
 static void parseRequiredWorkgroupSize(HSAILKernel *K, const MDNode *Q)
@@ -63,9 +87,48 @@ static void parseAccessQualifiers(HSAILKernel *K, const MDNode *Q)
       K->readOnly.insert(ImgCount++);
     else if (Qual.equals("write_only"))
       K->writeOnly.insert(ImgCount++);
+    else if (Qual.equals("read_write"))
+      K->readWrite.insert(ImgCount++);
     else 
       assert(Qual.equals("none"));
     // "read_write" cannot occur in OCL 1.2
+  }
+}
+
+/// \brief Retrieve the kernel index required for device enqueue.
+static void parseKernelIndexVal(HSAILKernel *K, const MDNode *Enq)
+{
+  ConstantInt *KIdx = cast<ConstantInt>(Enq->getOperand(1));
+  K->KernelIndex = KIdx->getZExtValue();
+}
+
+/// \brief Retrieve the device enqueue info for the kernel.
+static void parseEnqueueKernelData(HSAILKernel *K, const MDNode *Enq)
+{
+   // Presence of the MDString "device enqueue"denotes that
+   // the kernel may enqueue another kernel.
+   K->EnqueuesKernel = true;
+}
+
+/// \brief Retrieve and store the arg type qualifers of kernel arguments
+static void parseArgTypeQual(HSAILKernel *K, const MDNode *Q)
+{
+
+  // Skip first operand, which is the name of the MDNode
+  for (unsigned i = 1, e = Q->getNumOperands(); i != e; ++i) {
+    MDString *QualNode = cast<MDString>(Q->getOperand(i));
+    StringRef Qual = QualNode->getString();
+
+    K->accessTypeQualifer.push_back(clk::Q_NONE);
+
+    if (Qual.equals("volatile"))
+      K->accessTypeQualifer[i-1] |= clk::Q_VOLATILE;
+    else if (Qual.equals("restrict"))
+      K->accessTypeQualifer[i-1] |= clk::Q_RESTRICT;
+    else if (Qual.equals("const"))
+      K->accessTypeQualifer[i-1] |= clk::Q_CONST;
+    else if (Qual.equals("pipe"))
+      K->accessTypeQualifer[i-1] |= clk::Q_PIPE;
   }
 }
 
@@ -100,6 +163,19 @@ static void parseKernelInfo(HSAILKernel *K, const MDNode *KInfo)
     if (matchName(Q, "kernel_arg_type")) {
       parseArgTypeNames(K, Q);
       continue;
+    }
+
+    if (matchName(Q, "kernel_arg_type_qual")) {
+      parseArgTypeQual(K, Q);
+      continue;
+    }
+
+    if (matchName(Q, "device_enqueue")) {
+      parseEnqueueKernelData(K, Q);
+    }
+
+    if (matchName(Q, "kernel_index")) {
+      parseKernelIndexVal(K, Q);
     }
   }
 }

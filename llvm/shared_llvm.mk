@@ -40,6 +40,7 @@ llvm_post_static_libraries := \
   AMDlibLLVMTarget \
   AMDlibLLVMMC \
   AMDlibLLVMMCParser \
+  AMDlibLLVMMCDisassembler \
   AMDlibLLVMAsmParser \
   AMDlibLLVMSupport \
   AMDlibLLVMVectorize \

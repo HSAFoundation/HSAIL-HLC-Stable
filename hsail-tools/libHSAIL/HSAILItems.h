@@ -356,7 +356,7 @@ typename ReqBrigType::CType getImmValue(Inst i, unsigned opndIndex, Brig::BrigMa
         assert(false);
         return typename ReqBrigType::CType();
     }
-    unsigned const opndType = getOperandType(i, opndIndex, machine);
+    unsigned const opndType = getOperandType(i, opndIndex, machine, Brig::BRIG_PROFILE_FULL); // \todo olsemenov fix the hardcoded profile!
     return getImmValue<ReqBrigType, Convertor>(imm, opndType);
 }
 

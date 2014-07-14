@@ -1,10 +1,8 @@
-
-/* A Bison parser, made by GNU Bison 2.4.1.  */
+/* A Bison parser, made by GNU Bison 2.7.1.  */
 
 /* Skeleton implementation for Bison LALR(1) parsers in C++
    
-      Copyright (C) 2002, 2003, 2004, 2005, 2006, 2007, 2008 Free Software
-   Foundation, Inc.
+      Copyright (C) 2002-2013 Free Software Foundation, Inc.
    
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -34,8 +32,7 @@
 
 
 /* First part of user declarations.  */
-
-/* Line 311 of lalr1.cc  */
+/* Line 283 of lalr1.cc  */
 #line 12 "AMDILMDParser.y"
 
 #include <string>
@@ -55,21 +52,18 @@
 #define MATCH(rule)
 #endif
 
-
-/* Line 311 of lalr1.cc  */
-#line 61 "AMDILMDParser.tab.cpp"
+/* Line 283 of lalr1.cc  */
+#line 57 "AMDILMDParser.tab.cpp"
 
 
 #include "AMDILMDParser.tab.hpp"
 
 /* User implementation prologue.  */
 
-
-/* Line 317 of lalr1.cc  */
-#line 70 "AMDILMDParser.tab.cpp"
+/* Line 289 of lalr1.cc  */
+#line 65 "AMDILMDParser.tab.cpp"
 /* Unqualified %code blocks.  */
-
-/* Line 318 of lalr1.cc  */
+/* Line 290 of lalr1.cc  */
 #line 38 "AMDILMDParser.y"
 
   // prototype for the yylex function
@@ -78,12 +72,20 @@
                    llvm::AMDILMDScanner &scanner);
 
 
+/* Line 290 of lalr1.cc  */
+#line 77 "AMDILMDParser.tab.cpp"
 
-/* Line 318 of lalr1.cc  */
-#line 84 "AMDILMDParser.tab.cpp"
+
+# ifndef YY_NULL
+#  if defined __cplusplus && 201103L <= __cplusplus
+#   define YY_NULL nullptr
+#  else
+#   define YY_NULL 0
+#  endif
+# endif
 
 #ifndef YY_
-# if YYENABLE_NLS
+# if defined YYENABLE_NLS && YYENABLE_NLS
 #  if ENABLE_NLS
 #   include <libintl.h> /* FIXME: INFRINGES ON USER NAME SPACE */
 #   define YY_(msgid) dgettext ("bison-runtime", msgid)
@@ -93,6 +95,27 @@
 #  define YY_(msgid) msgid
 # endif
 #endif
+
+#define YYRHSLOC(Rhs, K) ((Rhs)[K])
+/* YYLLOC_DEFAULT -- Set CURRENT to span from RHS[1] to RHS[N].
+   If N is 0, then set CURRENT to the empty location which ends
+   the previous symbol: RHS[0] (always defined).  */
+
+# ifndef YYLLOC_DEFAULT
+#  define YYLLOC_DEFAULT(Current, Rhs, N)                               \
+    do                                                                  \
+      if (N)                                                            \
+        {                                                               \
+          (Current).begin  = YYRHSLOC (Rhs, 1).begin;                   \
+          (Current).end    = YYRHSLOC (Rhs, N).end;                     \
+        }                                                               \
+      else                                                              \
+        {                                                               \
+          (Current).begin = (Current).end = YYRHSLOC (Rhs, 0).end;      \
+        }                                                               \
+    while (/*CONSTCOND*/ false)
+# endif
+
 
 /* Suppress unused-variable warnings by "using" E.  */
 #define YYUSE(e) ((void) (e))
@@ -128,9 +151,9 @@ do {					\
 #else /* !YYDEBUG */
 
 # define YYCDEBUG if (false) std::cerr
-# define YY_SYMBOL_PRINT(Title, Type, Value, Location)
-# define YY_REDUCE_PRINT(Rule)
-# define YY_STACK_PRINT()
+# define YY_SYMBOL_PRINT(Title, Type, Value, Location) YYUSE(Type)
+# define YY_REDUCE_PRINT(Rule)        static_cast<void>(0)
+# define YY_STACK_PRINT()             static_cast<void>(0)
 
 #endif /* !YYDEBUG */
 
@@ -142,53 +165,11 @@ do {					\
 #define YYERROR		goto yyerrorlab
 #define YYRECOVERING()  (!!yyerrstatus_)
 
-
-/* Line 380 of lalr1.cc  */
+/* Line 357 of lalr1.cc  */
 #line 5 "AMDILMDParser.y"
 namespace llvm {
-
-/* Line 380 of lalr1.cc  */
-#line 152 "AMDILMDParser.tab.cpp"
-#if YYERROR_VERBOSE
-
-  /* Return YYSTR after stripping away unnecessary quotes and
-     backslashes, so that it's suitable for yyerror.  The heuristic is
-     that double-quoting is unnecessary unless the string contains an
-     apostrophe, a comma, or backslash (other than backslash-backslash).
-     YYSTR is taken from yytname.  */
-  std::string
-  AMDILMDParser::yytnamerr_ (const char *yystr)
-  {
-    if (*yystr == '"')
-      {
-        std::string yyr = "";
-        char const *yyp = yystr;
-
-        for (;;)
-          switch (*++yyp)
-            {
-            case '\'':
-            case ',':
-              goto do_not_strip_quotes;
-
-            case '\\':
-              if (*++yyp != '\\')
-                goto do_not_strip_quotes;
-              /* Fall through.  */
-            default:
-              yyr += *yyp;
-              break;
-
-            case '"':
-              return yyr;
-            }
-      do_not_strip_quotes: ;
-      }
-
-    return yystr;
-  }
-
-#endif
+/* Line 357 of lalr1.cc  */
+#line 173 "AMDILMDParser.tab.cpp"
 
   /// Build a parser object.
   AMDILMDParser::AMDILMDParser (llvm::AMDILMDScanner &scanner_yyarg, CompUnit* root_yyarg, bool _merror_yyarg, std::string _mmsg_yyarg)
@@ -219,11 +200,10 @@ namespace llvm {
   {
     YYUSE (yylocationp);
     YYUSE (yyvaluep);
-    switch (yytype)
-      {
-         default:
-	  break;
-      }
+    std::ostream& yyo = debug_stream ();
+    std::ostream& yyoutput = yyo;
+    YYUSE (yyoutput);
+    YYUSE (yytype);
   }
 
 
@@ -247,14 +227,10 @@ namespace llvm {
     YYUSE (yymsg);
     YYUSE (yyvaluep);
 
-    YY_SYMBOL_PRINT (yymsg, yytype, yyvaluep, yylocationp);
+    if (yymsg)
+      YY_SYMBOL_PRINT (yymsg, yytype, yyvaluep, yylocationp);
 
-    switch (yytype)
-      {
-  
-	default:
-	  break;
-      }
+    YYUSE (yytype);
   }
 
   void
@@ -292,6 +268,18 @@ namespace llvm {
   }
 #endif
 
+  inline bool
+  AMDILMDParser::yy_pact_value_is_default_ (int yyvalue)
+  {
+    return yyvalue == yypact_ninf_;
+  }
+
+  inline bool
+  AMDILMDParser::yy_table_value_is_error_ (int yyvalue)
+  {
+    return yyvalue == yytable_ninf_;
+  }
+
   int
   AMDILMDParser::parse ()
   {
@@ -299,21 +287,22 @@ namespace llvm {
     int yychar = yyempty_;
     int yytoken = 0;
 
-    /* State.  */
+    // State.
     int yyn;
     int yylen = 0;
     int yystate = 0;
 
-    /* Error handling.  */
+    // Error handling.
     int yynerrs_ = 0;
     int yyerrstatus_ = 0;
 
     /// Semantic value of the lookahead.
-    semantic_type yylval;
+    static semantic_type yyval_default;
+    semantic_type yylval = yyval_default;
     /// Location of the lookahead.
     location_type yylloc;
     /// The locations where the error started and ended.
-    location_type yyerror_range[2];
+    location_type yyerror_range[3];
 
     /// $$.
     semantic_type yyval;
@@ -322,6 +311,10 @@ namespace llvm {
 
     int yyresult;
 
+    // FIXME: This shoud be completely indented.  It is not yet to
+    // avoid gratuitous conflicts when merging into the master branch.
+
+      {
     YYCDEBUG << "Starting parse" << std::endl;
 
 
@@ -329,9 +322,9 @@ namespace llvm {
        yynewstate, since the latter expects the semantical and the
        location values to have been already stored, initialize these
        stacks with a primary value.  */
-    yystate_stack_ = state_stack_type (0);
-    yysemantic_stack_ = semantic_stack_type (0);
-    yylocation_stack_ = location_stack_type (0);
+    yystate_stack_.clear ();
+    yysemantic_stack_.clear ();
+    yylocation_stack_.clear ();
     yysemantic_stack_.push (yylval);
     yylocation_stack_.push (yylloc);
 
@@ -351,16 +344,15 @@ namespace llvm {
 
     /* Try to take a decision without lookahead.  */
     yyn = yypact_[yystate];
-    if (yyn == yypact_ninf_)
+    if (yy_pact_value_is_default_ (yyn))
       goto yydefault;
 
     /* Read a lookahead token.  */
     if (yychar == yyempty_)
       {
-	YYCDEBUG << "Reading a token: ";
-	yychar = yylex (&yylval, &yylloc, scanner);
+        YYCDEBUG << "Reading a token: ";
+        yychar = yylex (&yylval, &yylloc, scanner);
       }
-
 
     /* Convert token to internal form.  */
     if (yychar <= yyeof_)
@@ -384,8 +376,8 @@ namespace llvm {
     yyn = yytable_[yyn];
     if (yyn <= 0)
       {
-	if (yyn == 0 || yyn == yytable_ninf_)
-	goto yyerrlab;
+	if (yy_table_value_is_error_ (yyn))
+	  goto yyerrlab;
 	yyn = -yyn;
 	goto yyreduce;
       }
@@ -432,16 +424,18 @@ namespace llvm {
     else
       yyval = yysemantic_stack_[0];
 
+    // Compute the default @$.
     {
       slice<location_type, location_stack_type> slice (yylocation_stack_, yylen);
       YYLLOC_DEFAULT (yyloc, slice, yylen);
     }
+
+    // Perform the reduction.
     YY_REDUCE_PRINT (yyn);
     switch (yyn)
       {
-	  case 5:
-
-/* Line 678 of lalr1.cc  */
+          case 5:
+/* Line 664 of lalr1.cc  */
 #line 109 "AMDILMDParser.y"
     {
         MATCH(CompUnit/CompUnitEnd);
@@ -451,8 +445,7 @@ namespace llvm {
     break;
 
   case 6:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 115 "AMDILMDParser.y"
     {
         MATCH(CompUnit/ILStates);
@@ -463,8 +456,7 @@ namespace llvm {
     break;
 
   case 7:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 122 "AMDILMDParser.y"
     {
         MATCH(CompUnit/MacroStates);
@@ -475,8 +467,7 @@ namespace llvm {
     break;
 
   case 8:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 129 "AMDILMDParser.y"
     {
         MATCH(CompUnit/DBGStates);
@@ -487,8 +478,7 @@ namespace llvm {
     break;
 
   case 9:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 136 "AMDILMDParser.y"
     {
         MATCH(CompUnit/MDStates);
@@ -499,8 +489,7 @@ namespace llvm {
     break;
 
   case 10:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 143 "AMDILMDParser.y"
     {
         MATCH(CompUnit/ILMain);
@@ -510,8 +499,7 @@ namespace llvm {
     break;
 
   case 11:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 149 "AMDILMDParser.y"
     {
         MATCH(CompUnit/DataStates);
@@ -522,8 +510,7 @@ namespace llvm {
     break;
 
   case 12:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 159 "AMDILMDParser.y"
     {
         MATCH(ILMain/IL_VERSION Statements IL_ENDMAIN);
@@ -536,8 +523,7 @@ namespace llvm {
     break;
 
   case 14:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 176 "AMDILMDParser.y"
     {
         MATCH(ILStates/ILState);
@@ -547,8 +533,7 @@ namespace llvm {
     break;
 
   case 15:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 182 "AMDILMDParser.y"
     {
         MATCH(ILStates/ILStates ILState);
@@ -558,8 +543,7 @@ namespace llvm {
     break;
 
   case 16:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 191 "AMDILMDParser.y"
     {
         MATCH(MacroStates/MacroState);
@@ -569,8 +553,7 @@ namespace llvm {
     break;
 
   case 17:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 197 "AMDILMDParser.y"
     {
         MATCH(MacroStates/MacroStates MacroState);
@@ -580,8 +563,7 @@ namespace llvm {
     break;
 
   case 18:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 206 "AMDILMDParser.y"
     {
         MATCH(DBGStates/DBGState);
@@ -593,8 +575,7 @@ namespace llvm {
     break;
 
   case 19:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 214 "AMDILMDParser.y"
     {
         MATCH(DBGStates/DBGStates DBGState);
@@ -606,8 +587,7 @@ namespace llvm {
     break;
 
   case 20:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 225 "AMDILMDParser.y"
     {
         MATCH(DataStates/DataState);
@@ -617,8 +597,7 @@ namespace llvm {
     break;
 
   case 21:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 231 "AMDILMDParser.y"
     {
         MATCH(DataStates/DataStates DataState);
@@ -628,8 +607,7 @@ namespace llvm {
     break;
 
   case 22:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 241 "AMDILMDParser.y"
     {
         MATCH(MDStates/MDState);
@@ -639,8 +617,7 @@ namespace llvm {
     break;
 
   case 23:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 247 "AMDILMDParser.y"
     {
         MATCH(MDStates/MDStates MDState);
@@ -650,8 +627,7 @@ namespace llvm {
     break;
 
   case 24:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 256 "AMDILMDParser.y"
     {
         MATCH(ILState/IL_FUNC STR_TOKEN ';' STR_TOKEN Statements IL_ENDFUNC ';' STR_TOKEN);
@@ -669,8 +645,7 @@ namespace llvm {
     break;
 
   case 25:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 270 "AMDILMDParser.y"
     {
         MATCH(ILState/IL_FUNC STR_TOKEN ';' STR_TOKEN ';' STR_TOKEN Statements IL_ENDFUNC ';' STR_TOKEN);
@@ -689,8 +664,7 @@ namespace llvm {
     break;
 
   case 26:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 288 "AMDILMDParser.y"
     {
         MATCH(MacroState/MACRO_START STR_TOKEN Statements MACRO_END);
@@ -711,8 +685,7 @@ namespace llvm {
     break;
 
   case 27:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 305 "AMDILMDParser.y"
     {
         MATCH(MacroState/MACRO_START STR_TOKEN ';' STR_TOKEN Statements MACRO_END ';' STR_TOKEN);
@@ -735,8 +708,7 @@ namespace llvm {
     break;
 
   case 28:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 324 "AMDILMDParser.y"
     {
         MATCH(MacroState/MACRO_START STR_TOKEN ';' STR_TOKEN ';' STR_TOKEN Statements MACRO_END ';' STR_TOKEN);
@@ -756,8 +728,7 @@ namespace llvm {
     break;
 
   case 29:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 343 "AMDILMDParser.y"
     {
         MATCH(DBGState/DBG_START Statements DBG_END);
@@ -767,8 +738,7 @@ namespace llvm {
     break;
 
   case 30:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 349 "AMDILMDParser.y"
     {
         MATCH(DBGState/DBG_START DBG_END);
@@ -777,8 +747,7 @@ namespace llvm {
     break;
 
   case 31:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 357 "AMDILMDParser.y"
     {
         MATCH(DataState/DATA_START ':' STR_TOKEN ':' STR_TOKEN DataEntries ';' '#' DATA_END ':' INT_TOKEN);
@@ -794,8 +763,7 @@ namespace llvm {
     break;
 
   case 32:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 369 "AMDILMDParser.y"
     {
         MATCH(DataState/DATA_START ':' STR_TOKEN DataEntries ';' '#' DATA_END);
@@ -808,8 +776,7 @@ namespace llvm {
     break;
 
   case 33:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 381 "AMDILMDParser.y"
     {
         MATCH(DataEntries/DataEntry);
@@ -819,8 +786,7 @@ namespace llvm {
     break;
 
   case 34:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 387 "AMDILMDParser.y"
     {
         MATCH(DataEntries/DataEntries DataEntry);
@@ -830,8 +796,7 @@ namespace llvm {
     break;
 
   case 35:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 396 "AMDILMDParser.y"
     {
         MATCH(DataEntry/';' '#' CompoundToken ':' StrList);
@@ -842,8 +807,7 @@ namespace llvm {
     break;
 
   case 36:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 406 "AMDILMDParser.y"
     {
         MATCH(Statements/STR_TOKEN);
@@ -853,8 +817,7 @@ namespace llvm {
     break;
 
   case 37:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 412 "AMDILMDParser.y"
     {
         MATCH(Statements/Statements STR_TOKEN);
@@ -864,8 +827,7 @@ namespace llvm {
     break;
 
   case 38:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 421 "AMDILMDParser.y"
     {
         MATCH(MDState/ARG_START ':' STR_TOKEN MDStmts  ARG_END ':' STR_TOKEN);
@@ -879,8 +841,7 @@ namespace llvm {
     break;
 
   case 39:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 434 "AMDILMDParser.y"
     {
         MATCH(MDStmts/MDStmt);
@@ -890,8 +851,7 @@ namespace llvm {
     break;
 
   case 40:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 440 "AMDILMDParser.y"
     {
         MATCH(MDStmts/MDStmts MDStmt);
@@ -901,8 +861,7 @@ namespace llvm {
     break;
 
   case 41:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 449 "AMDILMDParser.y"
     {
         MATCH(MDStmt/MD_STRING ':' CompoundToken);
@@ -915,8 +874,7 @@ namespace llvm {
     break;
 
   case 42:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 458 "AMDILMDParser.y"
     {
         MATCH(MDStmt/MD_ERRWAR ':' CompoundToken ':' SpaceCompoundToken);
@@ -930,8 +888,7 @@ namespace llvm {
     break;
 
   case 43:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 468 "AMDILMDParser.y"
     {
       MATCH(MDStmt/MD_REFLECTION ':' INT_TOKEN ':' CompoundToken);
@@ -944,8 +901,7 @@ namespace llvm {
     break;
 
   case 44:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 477 "AMDILMDParser.y"
     {
       MATCH(MDStmt/MD_CONSTARG ':' INT_TOKEN ':' CompoundToken);
@@ -958,8 +914,7 @@ namespace llvm {
     break;
 
   case 45:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 486 "AMDILMDParser.y"
     {
         MATCH(MDStmt/MD_MEMORY ':' STR_TOKEN ':' INT_TOKEN);
@@ -973,8 +928,7 @@ namespace llvm {
     break;
 
   case 46:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 496 "AMDILMDParser.y"
     {
         MATCH(MDStmt/MD_MEMORY ':' STR_TOKEN);
@@ -987,8 +941,7 @@ namespace llvm {
     break;
 
   case 47:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 505 "AMDILMDParser.y"
     {
         MATCH(MDStmt/MD_INT ':' INT_TOKEN);
@@ -1000,8 +953,7 @@ namespace llvm {
     break;
 
   case 48:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 513 "AMDILMDParser.y"
     {
         MATCH(MDStmt/MD_SAMPLER ':' CompoundToken ':' INT_TOKEN ':' INT_TOKEN ':' INT_TOKEN);
@@ -1017,8 +969,7 @@ namespace llvm {
     break;
 
   case 49:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 525 "AMDILMDParser.y"
     {
         MATCH(MDStmt/MD_IMAGE ':' CompoundToken ':' CompoundToken ':' STR_TOKEN ':' INT_TOKEN ':' INT_TOKEN ':' INT_TOKEN);
@@ -1038,8 +989,7 @@ namespace llvm {
     break;
 
   case 50:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 541 "AMDILMDParser.y"
     {
         MATCH(MDStmt/MD_SEMAPHORE ':' CompoundToken ':' INT_TOKEN ':' INT_TOKEN ':' INT_TOKEN);
@@ -1055,8 +1005,7 @@ namespace llvm {
     break;
 
   case 51:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 553 "AMDILMDParser.y"
     {
         MATCH(MDStmt/MD_COUNTER ':' CompoundToken ':' INT_TOKEN ':' INT_TOKEN ':' INT_TOKEN ':' INT_TOKEN);
@@ -1073,8 +1022,7 @@ namespace llvm {
     break;
 
   case 52:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 566 "AMDILMDParser.y"
     {
         MATCH(MDStmt/MD_VALUE ':' CompoundToken ':' CompoundToken ':' INT_TOKEN ':' INT_TOKEN ':' INT_TOKEN);
@@ -1092,8 +1040,7 @@ namespace llvm {
     break;
 
   case 53:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 580 "AMDILMDParser.y"
     {
         MATCH(MDStmt/MD_POINTER ':' CompoundToken ':' CompoundToken ':' INT_TOKEN ':' INT_TOKEN ':' INT_TOKEN ':' STR_TOKEN ':' INT_TOKEN ':' INT_TOKEN);
@@ -1115,8 +1062,7 @@ namespace llvm {
     break;
 
   case 54:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 598 "AMDILMDParser.y"
     {
         MATCH(MDStmt/MD_POINTER ':' CompoundToken ':' CompoundToken ':' INT_TOKEN ':' INT_TOKEN ':' INT_TOKEN ':' STR_TOKEN ':' INT_TOKEN ':' INT_TOKEN ':' STR_TOKEN);
@@ -1140,8 +1086,7 @@ namespace llvm {
     break;
 
   case 55:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 618 "AMDILMDParser.y"
     {
         MATCH(MDStmt/MD_POINTER ':' CompoundToken ':' CompoundToken ':' INT_TOKEN ':' INT_TOKEN ':' INT_TOKEN ':' STR_TOKEN ':' INT_TOKEN ':' INT_TOKEN ':' STR_TOKEN ':' INT_TOKEN ':' INT_TOKEN);
@@ -1167,9 +1112,35 @@ namespace llvm {
     break;
 
   case 56:
-
-/* Line 678 of lalr1.cc  */
+/* Line 664 of lalr1.cc  */
 #line 640 "AMDILMDParser.y"
+    {
+        MATCH(MDStmt/MD_POINTER ':' CompoundToken ':' CompoundToken ':' INT_TOKEN ':' INT_TOKEN ':' INT_TOKEN ':' STR_TOKEN ':' INT_TOKEN ':' INT_TOKEN ':' STR_TOKEN ':' INT_TOKEN ':' INT_TOKEN':' INT_TOKEN);
+        MDPointer* pointerNode = new MDPointer(*(yysemantic_stack_[(25) - (1)].str));
+        pointerNode->Arg_ = *(yysemantic_stack_[(25) - (3)].str);
+        pointerNode->Type_ = *(yysemantic_stack_[(25) - (5)].str);
+        pointerNode->Size_ = (yysemantic_stack_[(25) - (7)].token);
+        pointerNode->CBNum_ = (yysemantic_stack_[(25) - (9)].token);
+        pointerNode->CBOffset_ = (yysemantic_stack_[(25) - (11)].token);
+        pointerNode->MemType_ = *(yysemantic_stack_[(25) - (13)].str);
+        pointerNode->BufNum_ = (yysemantic_stack_[(25) - (15)].token);
+        pointerNode->Alignment_ = (yysemantic_stack_[(25) - (17)].token);
+        pointerNode->AccessType_ = *(yysemantic_stack_[(25) - (19)].str);
+        pointerNode->Volatile_ = (yysemantic_stack_[(25) - (21)].token);
+        pointerNode->Restrict_ = (yysemantic_stack_[(25) - (23)].token);
+        pointerNode->Pipe_ = (yysemantic_stack_[(25) - (25)].token);
+        (yyval.MDNode) = pointerNode;
+        delete (yysemantic_stack_[(25) - (1)].str);
+        delete (yysemantic_stack_[(25) - (3)].str);
+        delete (yysemantic_stack_[(25) - (5)].str);
+        delete (yysemantic_stack_[(25) - (13)].str);
+        delete (yysemantic_stack_[(25) - (19)].str);
+    }
+    break;
+
+  case 57:
+/* Line 664 of lalr1.cc  */
+#line 663 "AMDILMDParser.y"
     {
         MATCH(MDStmt/MD_INTLIST ':' IntList);
         MDIntList* ilNode = new MDIntList(*(yysemantic_stack_[(3) - (1)].str));
@@ -1179,10 +1150,9 @@ namespace llvm {
     }
     break;
 
-  case 57:
-
-/* Line 678 of lalr1.cc  */
-#line 648 "AMDILMDParser.y"
+  case 58:
+/* Line 664 of lalr1.cc  */
+#line 671 "AMDILMDParser.y"
     {
         MATCH(MDStmt/MD_PRINTF ':' IntList ':' STR_TOKEN);
         MDPrintf* printfNode = new MDPrintf(*(yysemantic_stack_[(5) - (1)].str));
@@ -1197,10 +1167,9 @@ namespace llvm {
     }
     break;
 
-  case 58:
-
-/* Line 678 of lalr1.cc  */
-#line 661 "AMDILMDParser.y"
+  case 59:
+/* Line 664 of lalr1.cc  */
+#line 684 "AMDILMDParser.y"
     {
         MATCH(MDStmt/MD_LGS);
         MDFlag* flagNode = new MDFlag(*(yysemantic_stack_[(1) - (1)].str));
@@ -1210,10 +1179,9 @@ namespace llvm {
     }
     break;
 
-  case 59:
-
-/* Line 678 of lalr1.cc  */
-#line 672 "AMDILMDParser.y"
+  case 60:
+/* Line 664 of lalr1.cc  */
+#line 695 "AMDILMDParser.y"
     {
         MATCH(CompoundToken/CompoundToken INT_TOKEN);
         std::stringstream out;
@@ -1223,10 +1191,9 @@ namespace llvm {
     }
     break;
 
-  case 60:
-
-/* Line 678 of lalr1.cc  */
-#line 680 "AMDILMDParser.y"
+  case 61:
+/* Line 664 of lalr1.cc  */
+#line 703 "AMDILMDParser.y"
     {
         MATCH(CompoundToken/CompoundToken STR_TOKEN);
         std::stringstream out;
@@ -1237,10 +1204,9 @@ namespace llvm {
     }
     break;
 
-  case 61:
-
-/* Line 678 of lalr1.cc  */
-#line 689 "AMDILMDParser.y"
+  case 62:
+/* Line 664 of lalr1.cc  */
+#line 712 "AMDILMDParser.y"
     {
         MATCH(CompoundToken/STR_TOKEN);
         (yyval.str) = new std::string(*(yysemantic_stack_[(1) - (1)].str));
@@ -1248,10 +1214,9 @@ namespace llvm {
     }
     break;
 
-  case 62:
-
-/* Line 678 of lalr1.cc  */
-#line 695 "AMDILMDParser.y"
+  case 63:
+/* Line 664 of lalr1.cc  */
+#line 718 "AMDILMDParser.y"
     {
         MATCH(CompoundToken/INT_TOKEN);
         std::stringstream out;
@@ -1260,10 +1225,9 @@ namespace llvm {
     }
     break;
 
-  case 63:
-
-/* Line 678 of lalr1.cc  */
-#line 705 "AMDILMDParser.y"
+  case 64:
+/* Line 664 of lalr1.cc  */
+#line 728 "AMDILMDParser.y"
     {
         MATCH(SpaceCompoundToken/SpaceCompoundToken INT_TOKEN);
         std::stringstream out;
@@ -1273,10 +1237,9 @@ namespace llvm {
     }
     break;
 
-  case 64:
-
-/* Line 678 of lalr1.cc  */
-#line 713 "AMDILMDParser.y"
+  case 65:
+/* Line 664 of lalr1.cc  */
+#line 736 "AMDILMDParser.y"
     {
         MATCH(SpaceCompoundToken/SpaceCompoundToken STR_TOKEN);
         std::stringstream out;
@@ -1287,10 +1250,9 @@ namespace llvm {
     }
     break;
 
-  case 65:
-
-/* Line 678 of lalr1.cc  */
-#line 722 "AMDILMDParser.y"
+  case 66:
+/* Line 664 of lalr1.cc  */
+#line 745 "AMDILMDParser.y"
     {
         MATCH(SpaceCompoundToken/STR_TOKEN);
         (yyval.str) = new std::string(*(yysemantic_stack_[(1) - (1)].str));
@@ -1298,10 +1260,9 @@ namespace llvm {
     }
     break;
 
-  case 66:
-
-/* Line 678 of lalr1.cc  */
-#line 728 "AMDILMDParser.y"
+  case 67:
+/* Line 664 of lalr1.cc  */
+#line 751 "AMDILMDParser.y"
     {
         MATCH(SpaceCompoundToken/INT_TOKEN);
         std::stringstream out;
@@ -1310,10 +1271,9 @@ namespace llvm {
     }
     break;
 
-  case 67:
-
-/* Line 678 of lalr1.cc  */
-#line 738 "AMDILMDParser.y"
+  case 68:
+/* Line 664 of lalr1.cc  */
+#line 761 "AMDILMDParser.y"
     {
         MATCH(IntList/INT_TOKEN);
         (yyval.intVec) = new std::vector<unsigned>;
@@ -1321,10 +1281,9 @@ namespace llvm {
     }
     break;
 
-  case 68:
-
-/* Line 678 of lalr1.cc  */
-#line 744 "AMDILMDParser.y"
+  case 69:
+/* Line 664 of lalr1.cc  */
+#line 767 "AMDILMDParser.y"
     {
         MATCH(IntList/IntList ':' INT_TOKEN);
         (yysemantic_stack_[(3) - (1)].intVec)->push_back((yysemantic_stack_[(3) - (3)].token));
@@ -1332,10 +1291,9 @@ namespace llvm {
     }
     break;
 
-  case 69:
-
-/* Line 678 of lalr1.cc  */
-#line 753 "AMDILMDParser.y"
+  case 70:
+/* Line 664 of lalr1.cc  */
+#line 776 "AMDILMDParser.y"
     {
         MATCH(StrList/STR_TOKEN);
         (yyval.strList) = new std::list<std::string*>;
@@ -1343,10 +1301,9 @@ namespace llvm {
     }
     break;
 
-  case 70:
-
-/* Line 678 of lalr1.cc  */
-#line 759 "AMDILMDParser.y"
+  case 71:
+/* Line 664 of lalr1.cc  */
+#line 782 "AMDILMDParser.y"
     {
         MATCH(StrList/StrList:STR_TOKEN);
         (yysemantic_stack_[(3) - (1)].strList)->push_back((yysemantic_stack_[(3) - (3)].str));
@@ -1355,12 +1312,23 @@ namespace llvm {
     break;
 
 
-
-/* Line 678 of lalr1.cc  */
-#line 1361 "AMDILMDParser.tab.cpp"
-	default:
-          break;
+/* Line 664 of lalr1.cc  */
+#line 1317 "AMDILMDParser.tab.cpp"
+      default:
+        break;
       }
+
+    /* User semantic actions sometimes alter yychar, and that requires
+       that yytoken be updated with the new translation.  We take the
+       approach of translating immediately before every use of yytoken.
+       One alternative is translating here after every semantic action,
+       but that translation would be missed if the semantic action
+       invokes YYABORT, YYACCEPT, or YYERROR immediately after altering
+       yychar.  In the case of YYABORT or YYACCEPT, an incorrect
+       destructor might then be invoked immediately.  In the case of
+       YYERROR, subsequent parser actions might lead to an incorrect
+       destructor call or verbose syntax error message before the
+       lookahead is translated.  */
     YY_SYMBOL_PRINT ("-> $$ =", yyr1_[yyn], &yyval, &yyloc);
 
     yypop_ (yylen);
@@ -1384,30 +1352,35 @@ namespace llvm {
   | yyerrlab -- here on detecting error |
   `------------------------------------*/
   yyerrlab:
+    /* Make sure we have latest lookahead translation.  See comments at
+       user semantic actions for why this is necessary.  */
+    yytoken = yytranslate_ (yychar);
+
     /* If not already recovering from an error, report this error.  */
     if (!yyerrstatus_)
       {
 	++yynerrs_;
-	error (yylloc, yysyntax_error_ (yystate));
+	if (yychar == yyempty_)
+	  yytoken = yyempty_;
+	error (yylloc, yysyntax_error_ (yystate, yytoken));
       }
 
-    yyerror_range[0] = yylloc;
+    yyerror_range[1] = yylloc;
     if (yyerrstatus_ == 3)
       {
-	/* If just tried and failed to reuse lookahead token after an
-	 error, discard it.  */
-
-	if (yychar <= yyeof_)
-	  {
-	  /* Return failure if at end of input.  */
-	  if (yychar == yyeof_)
-	    YYABORT;
-	  }
-	else
-	  {
-	    yydestruct_ ("Error: discarding", yytoken, &yylval, &yylloc);
-	    yychar = yyempty_;
-	  }
+        /* If just tried and failed to reuse lookahead token after an
+           error, discard it.  */
+        if (yychar <= yyeof_)
+          {
+            /* Return failure if at end of input.  */
+            if (yychar == yyeof_)
+              YYABORT;
+          }
+        else
+          {
+            yydestruct_ ("Error: discarding", yytoken, &yylval, &yylloc);
+            yychar = yyempty_;
+          }
       }
 
     /* Else will try to reuse lookahead token after shifting the error
@@ -1426,7 +1399,7 @@ namespace llvm {
     if (false)
       goto yyerrorlab;
 
-    yyerror_range[0] = yylocation_stack_[yylen - 1];
+    yyerror_range[1] = yylocation_stack_[yylen - 1];
     /* Do not reclaim the symbols of the rule which action triggered
        this YYERROR.  */
     yypop_ (yylen);
@@ -1443,7 +1416,7 @@ namespace llvm {
     for (;;)
       {
 	yyn = yypact_[yystate];
-	if (yyn != yypact_ninf_)
+	if (!yy_pact_value_is_default_ (yyn))
 	{
 	  yyn += yyterror_;
 	  if (0 <= yyn && yyn <= yylast_ && yycheck_[yyn] == yyterror_)
@@ -1456,9 +1429,9 @@ namespace llvm {
 
 	/* Pop the current state because it cannot handle the error token.  */
 	if (yystate_stack_.height () == 1)
-	YYABORT;
+	  YYABORT;
 
-	yyerror_range[0] = yylocation_stack_[0];
+	yyerror_range[1] = yylocation_stack_[0];
 	yydestruct_ ("Error: popping",
 		     yystos_[yystate],
 		     &yysemantic_stack_[0], &yylocation_stack_[0]);
@@ -1467,10 +1440,10 @@ namespace llvm {
 	YY_STACK_PRINT ();
       }
 
-    yyerror_range[1] = yylloc;
+    yyerror_range[2] = yylloc;
     // Using YYLLOC is tempting, but would change the location of
     // the lookahead.  YYLOC is available though.
-    YYLLOC_DEFAULT (yyloc, (yyerror_range - 1), 2);
+    YYLLOC_DEFAULT (yyloc, yyerror_range, 2);
     yysemantic_stack_.push (yylval);
     yylocation_stack_.push (yyloc);
 
@@ -1493,70 +1466,35 @@ namespace llvm {
 
   yyreturn:
     if (yychar != yyempty_)
-      yydestruct_ ("Cleanup: discarding lookahead", yytoken, &yylval, &yylloc);
+      {
+        /* Make sure we have latest lookahead translation.  See comments
+           at user semantic actions for why this is necessary.  */
+        yytoken = yytranslate_ (yychar);
+        yydestruct_ ("Cleanup: discarding lookahead", yytoken, &yylval,
+                     &yylloc);
+      }
 
     /* Do not reclaim the symbols of the rule which action triggered
        this YYABORT or YYACCEPT.  */
     yypop_ (yylen);
-    while (yystate_stack_.height () != 1)
+    while (1 < yystate_stack_.height ())
       {
-	yydestruct_ ("Cleanup: popping",
-		   yystos_[yystate_stack_[0]],
-		   &yysemantic_stack_[0],
-		   &yylocation_stack_[0]);
-	yypop_ ();
+        yydestruct_ ("Cleanup: popping",
+                     yystos_[yystate_stack_[0]],
+                     &yysemantic_stack_[0],
+                     &yylocation_stack_[0]);
+        yypop_ ();
       }
 
     return yyresult;
+    }
   }
 
   // Generate an error message.
   std::string
-  AMDILMDParser::yysyntax_error_ (int yystate)
+  AMDILMDParser::yysyntax_error_ (int, int)
   {
-    std::string res;
-    YYUSE (yystate);
-#if YYERROR_VERBOSE
-    int yyn = yypact_[yystate];
-    if (yypact_ninf_ < yyn && yyn <= yylast_)
-      {
-	/* Start YYX at -YYN if negative to avoid negative indexes in
-	   YYCHECK.  */
-	int yyxbegin = yyn < 0 ? -yyn : 0;
-
-	/* Stay within bounds of both yycheck and yytname.  */
-	int yychecklim = yylast_ - yyn + 1;
-	int yyxend = yychecklim < yyntokens_ ? yychecklim : yyntokens_;
-	int count = 0;
-	for (int x = yyxbegin; x < yyxend; ++x)
-	  if (yycheck_[x + yyn] == x && x != yyterror_)
-	    ++count;
-
-	// FIXME: This method of building the message is not compatible
-	// with internationalization.  It should work like yacc.c does it.
-	// That is, first build a string that looks like this:
-	// "syntax error, unexpected %s or %s or %s"
-	// Then, invoke YY_ on this string.
-	// Finally, use the string as a format to output
-	// yytname_[tok], etc.
-	// Until this gets fixed, this message appears in English only.
-	res = "syntax error, unexpected ";
-	res += yytnamerr_ (yytname_[tok]);
-	if (count < 5)
-	  {
-	    count = 0;
-	    for (int x = yyxbegin; x < yyxend; ++x)
-	      if (yycheck_[x + yyn] == x && x != yyterror_)
-		{
-		  res += (!count++) ? ", expecting " : " or ";
-		  res += yytnamerr_ (yytname_[x]);
-		}
-	  }
-      }
-    else
-#endif
-      res = YY_("syntax error");
-    return res;
+    return YY_("syntax error");
   }
 
 
@@ -1587,12 +1525,13 @@ namespace llvm {
      -68,   -68,   -68,   213,   214,   215,   216,   217,   218,   219,
      -68,   190,   -68,   192,   197,   199,   -68,   221,   223,   224,
      225,   -68,   -68,   201,   204,   227,   226,   205,   -68,   230,
-     206,   232,   207,   237,   209,   233,   210,   241,   -68
+     206,   232,   207,   237,   209,   233,   210,   241,   212,   243,
+     -68
   };
 
-  /* YYDEFACT[S] -- default rule to reduce with in state S when YYTABLE
-     doesn't specify something else to do.  Zero means the default is an
-     error.  */
+  /* YYDEFACT[S] -- default reduction number in state S.  Performed when
+     YYTABLE doesn't specify something else to do.  Zero means the
+     default is an error.  */
   const unsigned char
   AMDILMDParser::yydefact_[] =
   {
@@ -1601,32 +1540,33 @@ namespace llvm {
       18,    20,    22,     0,    36,     0,     0,     0,    30,     0,
        0,     1,     4,    15,    17,    19,    21,    23,     0,    37,
       12,     0,     0,     0,    29,     0,     0,     0,     0,     0,
-       0,     0,     0,     0,     0,     0,    58,     0,     0,     0,
+       0,     0,     0,     0,     0,     0,    59,     0,     0,     0,
        0,     0,    39,     0,     0,    26,     0,     0,     0,    33,
        0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
        0,     0,     0,     0,     0,    40,     0,     0,     0,     0,
-       0,     0,     0,    34,    62,    61,     0,     0,    46,     0,
-      47,    67,    56,     0,     0,     0,    41,     0,     0,     0,
-       0,     0,     0,     0,     0,     0,     0,     0,     0,    59,
-      60,     0,     0,     0,     0,     0,     0,     0,     0,     0,
+       0,     0,     0,    34,    63,    62,     0,     0,    46,     0,
+      47,    68,    57,     0,     0,     0,    41,     0,     0,     0,
+       0,     0,     0,     0,     0,     0,     0,     0,     0,    60,
+      61,     0,     0,     0,     0,     0,     0,     0,     0,     0,
        0,     0,     0,    38,     0,     0,     0,     0,     0,     0,
-      32,     0,     0,    45,     0,    68,     0,     0,    57,     0,
-      43,    44,    66,    65,    42,     0,    24,     0,    27,    69,
-      35,     0,     0,     0,     0,     0,     0,     0,    63,    64,
+      32,     0,     0,    45,     0,    69,     0,     0,    58,     0,
+      43,    44,    67,    66,    42,     0,    24,     0,    27,    70,
+      35,     0,     0,     0,     0,     0,     0,     0,    64,    65,
        0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
-      25,    28,    70,     0,     0,     0,     0,     0,     0,     0,
+      25,    28,    71,     0,     0,     0,     0,     0,     0,     0,
       31,     0,    48,     0,     0,     0,    50,     0,     0,     0,
        0,    52,    51,     0,     0,     0,     0,     0,    49,     0,
-       0,     0,    53,     0,    54,     0,     0,     0,    55
+       0,     0,    53,     0,    54,     0,     0,     0,    55,     0,
+      56
   };
 
   /* YYPGOTO[NTERM-NUM].  */
   const short int
   AMDILMDParser::yypgoto_[] =
   {
-       -68,   -68,   -68,   236,   -68,   -68,   -68,   -68,   -68,   -68,
-     -68,   234,   235,   231,   238,   108,   -66,    -6,   239,   -68,
-     189,   -67,   -68,   208,   -68
+       -68,   -68,   -68,   238,   -68,   -68,   -68,   -68,   -68,   -68,
+     -68,   235,   236,   234,   239,   108,   -66,    -6,   240,   -68,
+     208,   -67,   -68,   189,   -68
   };
 
   /* YYDEFGOTO[NTERM-NUM].  */
@@ -1640,7 +1580,7 @@ namespace llvm {
 
   /* YYTABLE[YYPACT[STATE-NUM]].  What to do in state STATE-NUM.  If
      positive, shift that token.  If negative, reduce the rule which
-     number is the opposite.  If zero, do what YYDEFACT says.  */
+     number is the opposite.  If YYTABLE_NINF_, syntax error.  */
   const signed char AMDILMDParser::yytable_ninf_ = -1;
   const unsigned char
   AMDILMDParser::yytable_[] =
@@ -1669,11 +1609,9 @@ namespace llvm {
      184,   185,   186,   187,   188,   189,   190,   191,   192,   193,
      194,   195,   196,   197,   201,   198,   202,   203,   204,   208,
      199,   207,   200,   210,   205,   212,   216,   206,   209,   211,
-     213,   214,   215,   217,   218,    32,    35,    33,     0,    34,
-      85,     0,     0,     0,    36,     0,    37,     0,     0,     0,
-       0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
-       0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
-       0,     0,     0,     0,     0,     0,   105
+     213,   214,   215,   217,   218,   219,   220,    32,    33,    35,
+      34,     0,     0,     0,     0,    36,     0,    37,     0,     0,
+       0,     0,     0,     0,     0,     0,     0,   105,     0,    85
   };
 
   /* YYCHECK.  */
@@ -1704,11 +1642,9 @@ namespace llvm {
       33,    33,    33,    33,    33,    33,     3,     3,     3,     3,
        3,     3,     3,    33,     3,    33,     3,     3,     3,     3,
       33,     4,    33,     3,    33,     3,     3,    33,    33,    33,
-      33,     4,    33,    33,     3,     9,    15,    13,    -1,    14,
-      61,    -1,    -1,    -1,    16,    -1,    17,    -1,    -1,    -1,
-      -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,
-      -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,
-      -1,    -1,    -1,    -1,    -1,    -1,    78
+      33,     4,    33,    33,     3,    33,     3,     9,    13,    15,
+      14,    -1,    -1,    -1,    -1,    16,    -1,    17,    -1,    -1,
+      -1,    -1,    -1,    -1,    -1,    -1,    -1,    78,    -1,    61
   };
 
   /* STOS_[STATE-NUM] -- The (internal number of the) accessing
@@ -1737,7 +1673,8 @@ namespace llvm {
        4,     4,     4,    33,    33,    33,    33,    33,    33,    33,
        3,     3,     3,     3,     3,     3,     3,    33,    33,    33,
       33,     3,     3,     3,     3,    33,    33,     4,     3,    33,
-       3,    33,     3,    33,     4,    33,     3,    33,     3
+       3,    33,     3,    33,     4,    33,     3,    33,     3,    33,
+       3
   };
 
 #if YYDEBUG
@@ -1762,9 +1699,9 @@ namespace llvm {
       44,    44,    45,    45,    46,    46,    47,    47,    47,    48,
       48,    49,    49,    50,    50,    51,    52,    52,    53,    54,
       54,    55,    55,    55,    55,    55,    55,    55,    55,    55,
-      55,    55,    55,    55,    55,    55,    55,    55,    55,    56,
-      56,    56,    56,    57,    57,    57,    57,    58,    58,    59,
-      59
+      55,    55,    55,    55,    55,    55,    55,    55,    55,    55,
+      56,    56,    56,    56,    57,    57,    57,    57,    58,    58,
+      59,    59
   };
 
   /* YYR2[YYN] -- Number of symbols composing right hand side of rule YYN.  */
@@ -1776,12 +1713,12 @@ namespace llvm {
        1,     2,     1,     2,     8,    10,     4,     8,    10,     3,
        2,    11,     7,     1,     2,     5,     1,     2,     7,     1,
        2,     3,     5,     5,     5,     5,     3,     3,     9,    13,
-       9,    11,    11,    17,    19,    23,     3,     5,     1,     2,
-       2,     1,     1,     2,     2,     1,     1,     1,     3,     1,
-       3
+       9,    11,    11,    17,    19,    23,    25,     3,     5,     1,
+       2,     2,     1,     1,     2,     2,     1,     1,     1,     3,
+       1,     3
   };
 
-#if YYDEBUG || YYERROR_VERBOSE || YYTOKEN_TABLE
+#if YYDEBUG
   /* YYTNAME[SYMBOL-NUM] -- String name of the symbol SYMBOL-NUM.
      First, the terminals, then, starting at \a yyntokens_, nonterminals.  */
   const char*
@@ -1798,11 +1735,10 @@ namespace llvm {
   "DBGStates", "DataStates", "MDStates", "ILState", "MacroState",
   "DBGState", "DataState", "DataEntries", "DataEntry", "Statements",
   "MDState", "MDStmts", "MDStmt", "CompoundToken", "SpaceCompoundToken",
-  "IntList", "StrList", 0
+  "IntList", "StrList", YY_NULL
   };
-#endif
 
-#if YYDEBUG
+
   /* YYRHS -- A `-1'-separated list of the rules' RHS.  */
   const AMDILMDParser::rhs_number_type
   AMDILMDParser::yyrhs_[] =
@@ -1838,11 +1774,14 @@ namespace llvm {
        4,    33,     3,    33,     3,    33,     4,    -1,    11,    33,
       56,    33,    56,    33,     3,    33,     3,    33,     3,    33,
        4,    33,     3,    33,     3,    33,     4,    33,     3,    33,
-       3,    -1,    10,    33,    58,    -1,    13,    33,    58,    33,
-       4,    -1,    15,    -1,    56,     3,    -1,    56,     4,    -1,
-       4,    -1,     3,    -1,    57,     3,    -1,    57,     4,    -1,
-       4,    -1,     3,    -1,     3,    -1,    58,    33,     3,    -1,
-       4,    -1,    59,    33,     4,    -1
+       3,    -1,    11,    33,    56,    33,    56,    33,     3,    33,
+       3,    33,     3,    33,     4,    33,     3,    33,     3,    33,
+       4,    33,     3,    33,     3,    33,     3,    -1,    10,    33,
+      58,    -1,    13,    33,    58,    33,     4,    -1,    15,    -1,
+      56,     3,    -1,    56,     4,    -1,     4,    -1,     3,    -1,
+      57,     3,    -1,    57,     4,    -1,     4,    -1,     3,    -1,
+       3,    -1,    58,    33,     3,    -1,     4,    -1,    59,    33,
+       4,    -1
   };
 
   /* YYPRHS[YYN] -- Index of the first RHS symbol of rule number YYN in
@@ -1855,9 +1794,9 @@ namespace llvm {
       45,    47,    50,    52,    55,    64,    75,    80,    89,   100,
      104,   107,   119,   127,   129,   132,   138,   140,   143,   151,
      153,   156,   160,   166,   172,   178,   184,   188,   192,   202,
-     216,   226,   238,   250,   268,   288,   312,   316,   322,   324,
-     327,   330,   332,   334,   337,   340,   342,   344,   346,   350,
-     352
+     216,   226,   238,   250,   268,   288,   312,   338,   342,   348,
+     350,   353,   356,   358,   360,   363,   366,   368,   370,   372,
+     376,   378
   };
 
   /* YYRLINE[YYN] -- Source line where rule number YYN was defined.  */
@@ -1869,9 +1808,9 @@ namespace llvm {
      224,   230,   240,   246,   255,   269,   287,   304,   323,   342,
      348,   356,   368,   380,   386,   395,   405,   411,   420,   433,
      439,   448,   457,   467,   476,   485,   495,   504,   512,   524,
-     540,   552,   565,   579,   597,   617,   639,   647,   660,   671,
-     679,   688,   694,   704,   712,   721,   727,   737,   743,   752,
-     758
+     540,   552,   565,   579,   597,   617,   639,   662,   670,   683,
+     694,   702,   711,   717,   727,   735,   744,   750,   760,   766,
+     775,   781
   };
 
   // Print the state stack on the debug stream.
@@ -1948,7 +1887,7 @@ namespace llvm {
   }
 
   const int AMDILMDParser::yyeof_ = 0;
-  const int AMDILMDParser::yylast_ = 286;
+  const int AMDILMDParser::yylast_ = 269;
   const int AMDILMDParser::yynnts_ = 25;
   const int AMDILMDParser::yyempty_ = -2;
   const int AMDILMDParser::yyfinal_ = 31;
@@ -1959,17 +1898,13 @@ namespace llvm {
   const unsigned int AMDILMDParser::yyuser_token_number_max_ = 286;
   const AMDILMDParser::token_number_type AMDILMDParser::yyundef_token_ = 2;
 
-
-/* Line 1054 of lalr1.cc  */
+/* Line 1135 of lalr1.cc  */
 #line 5 "AMDILMDParser.y"
 } // llvm
-
-/* Line 1054 of lalr1.cc  */
-#line 1969 "AMDILMDParser.tab.cpp"
-
-
-/* Line 1056 of lalr1.cc  */
-#line 765 "AMDILMDParser.y"
+/* Line 1135 of lalr1.cc  */
+#line 1931 "AMDILMDParser.tab.cpp"
+/* Line 1136 of lalr1.cc  */
+#line 788 "AMDILMDParser.y"
 
 
 // We have to implement the error function
@@ -1986,6 +1921,5 @@ static int yylex(llvm::AMDILMDParser::semantic_type * yylval,
 llvm::AMDILMDParser::location_type * yylloc, llvm::AMDILMDScanner &scanner) {
     return scanner.yylex(yylval, yylloc);
 }
-
 
 

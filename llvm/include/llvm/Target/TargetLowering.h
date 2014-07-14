@@ -198,6 +198,23 @@ public:
     return true;
   }
 
+#if defined(AMD_OPENCL) || 1
+  /// isVectorToScalarLoadStoreWidenBeneficial() - Return true if the vector
+  /// load or store packing into a larger scalar type is beneficial.
+  /// Width:     Width to load/store.
+  /// WidenVT:   The widen vector type to load to/store from.
+  /// N:         Load or store SDNode.
+  ///
+  /// Some architectures like GPUs have 3 element loads and stores, and in case
+  /// of uneven vector size it can be more efficient to use one 3 element
+  /// load or store instead of several scalar loads even of of a wider type.
+  /// This callback tells if a particular widening is profitable.
+  virtual bool isVectorToScalarLoadStoreWidenBeneficial(unsigned Width,
+                 EVT WidenVT, const MemSDNode *N) const {
+    return true;
+  }
+#endif
+
   /// getSetCCResultType - Return the ValueType of the result of SETCC
   /// operations.  Also used to obtain the target's preferred type for
   /// the condition operand of SELECT and BRCOND nodes.  In the case of
@@ -453,6 +470,19 @@ public:
     return VT.isSimple() && getLoadExtAction(ExtType, VT) == Legal;
   }
 
+  bool isLoadExtCustom(unsigned ExtType, EVT VT) const {
+    return VT.isSimple() &&
+      getLoadExtAction(ExtType, VT.getSimpleVT()) == Custom;
+  }
+
+  bool isLoadExtLegalOrCustom(unsigned ExtType, EVT VT) const {
+    if (!VT.isSimple())
+      return false;
+
+    LegalizeAction Action = getLoadExtAction(ExtType, VT.getSimpleVT());
+    return Action == Legal || Action == Custom;
+  }
+
   /// getTruncStoreAction - Return how this store with truncation should be
   /// treated: either it is legal, needs to be promoted to a larger size, needs
   /// to be expanded to some other code sequence, or the target has a custom
@@ -581,14 +611,14 @@ public:
       VectorType *VTy = cast<VectorType>(Ty);
       Type *Elm = VTy->getElementType();
       // Lower vectors of pointers to native pointer types.
-      if (Elm->isPointerTy()) 
+      if (Elm->isPointerTy())
         Elm = EVT(PointerTy).getTypeForEVT(Ty->getContext());
       return EVT::getVectorVT(Ty->getContext(), EVT::getEVT(Elm, false),
                        VTy->getNumElements());
     }
     return EVT::getEVT(Ty, AllowUnknown);
   }
-  
+
 
   /// getByValTypeAlignment - Return the desired alignment for ByVal aggregate
   /// function arguments in the caller parameter area.  This is the actual

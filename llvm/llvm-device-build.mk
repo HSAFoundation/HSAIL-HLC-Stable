@@ -68,11 +68,10 @@ LOCAL_CPPFLAGS :=	\
 	-fno-math-errno \
 	-fmerge-all-constants \
 	-fno-tree-vectorize \
-	-frtti \
 	-DUNIX_OS \
 	-DqLittleEndian \
-	-D OPENCL_MAJOR=1 \
-	-D OPENCL_MINOR=2 \
+	-D OPENCL_MAJOR=2 \
+	-D OPENCL_MINOR=0 \
 	-D WITH_TARGET_HSAIL \
 	-D WITH_AQL \
 	-D WITH_ONLINE_COMPILER \
@@ -82,7 +81,10 @@ LOCAL_CPPFLAGS :=	\
 	-D ATI_BITS_32 \
 	-D ATI_COMP_GCC \
 	-D AMD_LLVM_INTERNAL \
-	-D AMD_HSAIL
+	-D AMD_HSAIL \
+	-nostdinc++
+#	-std=c++11 \
+
 LOCAL_CPPFLAGS :=	\
 	$(LOCAL_CPPFLAGS)	\
 	-Wno-non-virtual-dtor \
@@ -101,6 +103,7 @@ LOCAL_C_INCLUDES :=	\
 	$(LLVM_ROOT_PATH)/device/include	\
 	$(LLVM_ROOT_PATH)/linux/include	\
 	$(LOCAL_C_INCLUDES)
+#	vendor/amd/proprietary/opengl/android/stlport/stlport \
 
 ###########################################################
 ## Commands for running tblgen to compile a td file

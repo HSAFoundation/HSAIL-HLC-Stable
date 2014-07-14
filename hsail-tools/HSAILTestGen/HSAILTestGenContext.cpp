@@ -104,32 +104,30 @@ Operand Context::getOperand(unsigned oprId)
     case O_VEC3_R64_DST:  opr = emitVector(3, 64);           break;
     case O_VEC4_R64_DST:  opr = emitVector(4, 64);           break;
                          
-    case O_WAVESIZE:      opr = emitWavesize();                           break;
-
-    case O_FUNCTIONREF:   opr = emitFuncRef(sym_func);                    break;
-    case O_FBARRIERREF:   opr = emitFBarrierRef(sym_fbarrier);            break;
-    case O_LABELREF:      opr = emitLabelRef(NAME_LABEL);                 break;
+    case O_WAVESIZE:      opr = emitWavesize();              break;
 
     case O_ADDRESS_FLAT_REG:       opr = emitAddrRef(Directive(), emitReg(machineSize)); break;
     case O_ADDRESS_FLAT_OFF:       opr = emitAddrRef(Directive());        break;
-    case O_ADDRESS_GLOBAL_VAR:     opr = emitAddrRef(sym_global_var);     break;
-    case O_ADDRESS_READONLY_VAR:   opr = emitAddrRef(sym_readonly_var);   break;
-                                                                          
-    case O_ADDRESS_GROUP_VAR:      opr = emitAddrRef(sym_group_var);      break;
-    case O_ADDRESS_PRIVATE_VAR:    opr = emitAddrRef(sym_private_var);    break;
-                                                                          
-    case O_ADDRESS_GLOBAL_ROIMG:   opr = emitAddrRef(sym_global_roimg);   break;
-    case O_ADDRESS_GLOBAL_RWIMG:   opr = emitAddrRef(sym_global_rwimg);   break;
-    case O_ADDRESS_GLOBAL_SAMP:    opr = emitAddrRef(sym_global_samp);    break;
-    case O_ADDRESS_GLOBAL_SIG32:   opr = emitAddrRef(sym_global_sig32);   break;
-    case O_ADDRESS_GLOBAL_SIG64:   opr = emitAddrRef(sym_global_sig64);   break;
-                                     
-    case O_ADDRESS_READONLY_ROIMG: opr = emitAddrRef(sym_readonly_roimg); break;
-    case O_ADDRESS_READONLY_RWIMG: opr = emitAddrRef(sym_readonly_rwimg); break;
-    case O_ADDRESS_READONLY_SAMP:  opr = emitAddrRef(sym_readonly_samp);  break;
-    case O_ADDRESS_READONLY_SIG32: opr = emitAddrRef(sym_readonly_sig32); break;
-    case O_ADDRESS_READONLY_SIG64: opr = emitAddrRef(sym_readonly_sig64); break;
-                                      
+
+    case O_ADDRESS_GLOBAL_VAR:     
+    case O_ADDRESS_READONLY_VAR:                                                                       
+    case O_ADDRESS_GROUP_VAR:      
+    case O_ADDRESS_PRIVATE_VAR:                                                                        
+    case O_ADDRESS_GLOBAL_ROIMG:   
+    case O_ADDRESS_GLOBAL_WOIMG:   
+    case O_ADDRESS_GLOBAL_RWIMG:   
+    case O_ADDRESS_GLOBAL_SAMP:    
+    case O_ADDRESS_GLOBAL_SIG32:   
+    case O_ADDRESS_GLOBAL_SIG64:                                  
+    case O_ADDRESS_READONLY_ROIMG: 
+    case O_ADDRESS_READONLY_RWIMG: 
+    case O_ADDRESS_READONLY_SAMP:  
+    case O_ADDRESS_READONLY_SIG32: 
+    case O_ADDRESS_READONLY_SIG64:                                 
+    case O_FUNCTIONREF:            
+    case O_FBARRIERREF:            
+    case O_LABELREF:               opr = emitOperandRef(operandId2SymId(oprId)); break;
+
     case O_JUMPTAB: assert(false); break; // Currently not used
     case O_CALLTAB: assert(false); break; // Currently not used
 
@@ -141,50 +139,54 @@ Operand Context::getOperand(unsigned oprId)
 
 void Context::genSymbols()
 {
-    genSymbol(O_FUNCTIONREF);
-    genSymbol(O_ADDRESS_GLOBAL_VAR);
-    genSymbol(O_ADDRESS_GROUP_VAR);
-    genSymbol(O_ADDRESS_PRIVATE_VAR);
-    genSymbol(O_ADDRESS_READONLY_VAR);
-    genSymbol(O_ADDRESS_GLOBAL_ROIMG);
-    genSymbol(O_ADDRESS_GLOBAL_RWIMG);
-    genSymbol(O_ADDRESS_READONLY_ROIMG);
-    genSymbol(O_ADDRESS_READONLY_RWIMG);
-    genSymbol(O_ADDRESS_GLOBAL_SAMP);
-    genSymbol(O_ADDRESS_READONLY_SAMP);
-    genSymbol(O_ADDRESS_GLOBAL_SIG32);
-    genSymbol(O_ADDRESS_READONLY_SIG32);
-    genSymbol(O_ADDRESS_GLOBAL_SIG64);
-    genSymbol(O_ADDRESS_READONLY_SIG64);
-    genSymbol(O_FBARRIERREF);
+    for (unsigned i = SYM_MINID + 1; i < SYM_MAXID; ++i) genSymbol(i);
 }
 
-void Context::genSymbol(unsigned operandId)
+Directive Context::emitSymbol(unsigned symId)
 {
-    using namespace Brig;
+    assert(SYM_MINID < symId && symId < SYM_MAXID);
 
-    switch(operandId)
+    const char* name = getSymName(symId);
+
+    if (symId == SYM_FBARRIER)
     {
-    case O_ADDRESS_GLOBAL_VAR:      if (!sym_global_var)     { sym_global_var     = emitSymbol(BRIG_TYPE_S32,   NAME_GLOBAL_VAR,     BRIG_SEGMENT_GLOBAL);   } break;
-    case O_ADDRESS_READONLY_VAR:    if (!sym_readonly_var)   { sym_readonly_var   = emitSymbol(BRIG_TYPE_S32,   NAME_READONLY_VAR,   BRIG_SEGMENT_READONLY); } break;
-    case O_ADDRESS_GROUP_VAR:       if (!sym_group_var)      { sym_group_var      = emitSymbol(BRIG_TYPE_S32,   NAME_GROUP_VAR,      BRIG_SEGMENT_GROUP);    } break;
-    case O_ADDRESS_PRIVATE_VAR:     if (!sym_private_var)    { sym_private_var    = emitSymbol(BRIG_TYPE_S32,   NAME_PRIVATE_VAR,    BRIG_SEGMENT_PRIVATE);  } break;
+        return emitFBarrier(name);
+    }
+    else if (symId == SYM_FUNC)
+    {
+        Directive fn = emitFuncStart(name, 0, 0); 
+        emitFuncEnd(fn); 
+        return fn;
+    }
+    else
+    {
+        return BrigContext::emitSymbol(getSymType(symId), name, getSymSegment(symId));
+    }
+}
 
-    case O_ADDRESS_GLOBAL_ROIMG:    if (!sym_global_roimg)   { sym_global_roimg   = emitSymbol(BRIG_TYPE_ROIMG, NAME_GLOBAL_ROIMG,   BRIG_SEGMENT_GLOBAL);   } break;
-    case O_ADDRESS_READONLY_ROIMG:  if (!sym_readonly_roimg) { sym_readonly_roimg = emitSymbol(BRIG_TYPE_ROIMG, NAME_READONLY_ROIMG, BRIG_SEGMENT_READONLY); } break;
-    case O_ADDRESS_GLOBAL_RWIMG:    if (!sym_global_rwimg)   { sym_global_rwimg   = emitSymbol(BRIG_TYPE_RWIMG, NAME_GLOBAL_RWIMG,   BRIG_SEGMENT_GLOBAL);   } break;
-    case O_ADDRESS_READONLY_RWIMG:  if (!sym_readonly_rwimg) { sym_readonly_rwimg = emitSymbol(BRIG_TYPE_RWIMG, NAME_READONLY_RWIMG, BRIG_SEGMENT_READONLY); } break;
+//==============================================================================
+//==============================================================================
+//==============================================================================
 
-    case O_ADDRESS_GLOBAL_SAMP:     if (!sym_global_samp)    { sym_global_samp    = emitSymbol(BRIG_TYPE_SAMP,  NAME_GLOBAL_SAMP,    BRIG_SEGMENT_GLOBAL);   } break;
-    case O_ADDRESS_READONLY_SAMP:   if (!sym_readonly_samp)  { sym_readonly_samp  = emitSymbol(BRIG_TYPE_SAMP,  NAME_READONLY_SAMP,  BRIG_SEGMENT_READONLY); } break;
+void Context::genSymbol(unsigned symId)
+{
+    assert((SYM_MINID < symId && symId < SYM_MAXID) || symId == SYM_NONE);
 
-    case O_ADDRESS_GLOBAL_SIG32:    if (!sym_global_sig32)   { sym_global_sig32   = emitSymbol(BRIG_TYPE_SIG32, NAME_GLOBAL_SIG32,   BRIG_SEGMENT_GLOBAL);   } break;
-    case O_ADDRESS_READONLY_SIG32:  if (!sym_readonly_sig32) { sym_readonly_sig32 = emitSymbol(BRIG_TYPE_SIG32, NAME_READONLY_SIG32, BRIG_SEGMENT_READONLY); } break;
-    case O_ADDRESS_GLOBAL_SIG64:    if (!sym_global_sig64)   { sym_global_sig64   = emitSymbol(BRIG_TYPE_SIG64, NAME_GLOBAL_SIG64,   BRIG_SEGMENT_GLOBAL);   } break;
-    case O_ADDRESS_READONLY_SIG64:  if (!sym_readonly_sig64) { sym_readonly_sig64 = emitSymbol(BRIG_TYPE_SIG64, NAME_READONLY_SIG64, BRIG_SEGMENT_READONLY); } break;
+    if (symId == SYM_NONE || symId == SYM_LABEL || !isSupportedSym(symId)) return;
+    if (!symTab[symId]) symTab[symId] = emitSymbol(symId);
+}
 
-    case O_FBARRIERREF:             if (!sym_fbarrier)       { sym_fbarrier       = emitFBarrier(NAME_FBARRIER);                                             } break;
-    case O_FUNCTIONREF:             if (!sym_func)           { sym_func           = emitFuncStart(NAME_FUNC, 0, 0); emitFuncEnd(sym_func);                   } break;
+Operand Context::emitOperandRef(unsigned symId)
+{
+    assert(SYM_MINID < symId && symId < SYM_MAXID);
+    assert(isSupportedSym(symId));
+
+    switch(symId)
+    {
+    case SYM_LABEL:                           return emitLabelRef(getSymName(symId));
+    case SYM_FUNC:     assert(symTab[symId]); return emitFuncRef(symTab[symId]);
+    case SYM_FBARRIER: assert(symTab[symId]); return emitFBarrierRef(symTab[symId]);
+    default:           assert(symTab[symId]); return emitAddrRef(symTab[symId]);
     }
 }
 

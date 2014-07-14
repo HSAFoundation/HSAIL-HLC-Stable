@@ -151,7 +151,7 @@ void AMDILSIIOExpansionImpl::expandGlobalLoad(MachineInstr *MI) {
       if (!isXComponentReg(Reg))
         Reg = AMDIL::Rx1011;
       if (Cacheable) {
-        opc = isSWSExtLoadInst(MI)
+        opc = isSExtLoadInst(MI)
               ? (Is64Bit
                  ? AMDIL::UAVRAW64LOADCACHEDi8
                  : AMDIL::UAVRAW32LOADCACHEDi8)
@@ -159,7 +159,7 @@ void AMDILSIIOExpansionImpl::expandGlobalLoad(MachineInstr *MI) {
                  ? AMDIL::UAVRAW64LOADCACHEDu8
                  : AMDIL::UAVRAW32LOADCACHEDu8);
       } else {
-        opc = isSWSExtLoadInst(MI)
+        opc = isSExtLoadInst(MI)
               ? (Is64Bit ? AMDIL::UAVRAW64LOADi8 : AMDIL::UAVRAW32LOADi8)
               : (Is64Bit ? AMDIL::UAVRAW64LOADu8 : AMDIL::UAVRAW32LOADu8);
       }
@@ -174,7 +174,7 @@ void AMDILSIIOExpansionImpl::expandGlobalLoad(MachineInstr *MI) {
       if (!isXComponentReg(Reg))
         Reg = AMDIL::Rx1011;
       if (Cacheable) {
-        opc = isSWSExtLoadInst(MI)
+        opc = isSExtLoadInst(MI)
               ? (Is64Bit
                  ? AMDIL::UAVRAW64LOADCACHEDi16
                  : AMDIL::UAVRAW32LOADCACHEDi16)
@@ -182,7 +182,7 @@ void AMDILSIIOExpansionImpl::expandGlobalLoad(MachineInstr *MI) {
                  ? AMDIL::UAVRAW64LOADCACHEDu16
                  : AMDIL::UAVRAW32LOADCACHEDu16);
       } else {
-        opc = isSWSExtLoadInst(MI)
+        opc = isSExtLoadInst(MI)
               ? (Is64Bit ? AMDIL::UAVRAW64LOADi16 : AMDIL::UAVRAW32LOADi16)
               : (Is64Bit ? AMDIL::UAVRAW64LOADu16 : AMDIL::UAVRAW32LOADu16);
       }
@@ -238,12 +238,25 @@ void AMDILSIIOExpansionImpl::expandGlobalLoad(MachineInstr *MI) {
     expandPackedData(MI, Reg, DataReg);
     Reg = DataReg;
   }
-  if (isExtendLoad(MI)) {
-    expandExtendLoad(MI, Reg, DataReg);
-    MI->getOperand(0).setReg(DataReg);
-  } else if (Reg != DataReg) {
+
+  if (Reg != DataReg) {
     BuildMI(*mBB, MI, DL, mTII->get(AMDIL::COPY), DataReg).addReg(Reg);
   }
+}
+
+void AMDILSIIOExpansionImpl::expandConstantLoad(MachineInstr *MI) {
+  if (!isHardwareInst(MI) || MI->memoperands_empty()) {
+    return expandGlobalLoad(MI);
+  }
+  uint32_t cID = getPointerID(MI);
+  if (cID < 2) {
+    return expandGlobalLoad(MI);
+  }
+  if (!mMFI->usesConstant() && mMFI->isKernel()) {
+    mMFI->addErrorMsg(amd::CompilerErrorMessage[MEMOP_NO_ALLOCATION]);
+  }
+
+  llvm_unreachable("Only constant UAV should be used on SI");
 }
 
 void AMDILSIIOExpansionImpl::expandGlobalStore(MachineInstr *MI) {
@@ -308,4 +321,20 @@ void AMDILSIIOExpansionImpl::expandGlobalStore(MachineInstr *MI) {
         .addImm(ID);
       break;
   };
+}
+
+void AMDILSIIOExpansionImpl::expandPrivateLoad(MachineInstr *MI) {
+  bool HWPrivate = mSTM->usesHardware(AMDIL::Caps::PrivateMem);
+
+  assert(mSTM->isSupported(AMDIL::Caps::PrivateUAV) &&
+         "Only private UAV should be used");
+  return expandGlobalLoad(MI);
+}
+
+void AMDILSIIOExpansionImpl::expandPrivateStore(MachineInstr *MI) {
+  bool HWPrivate = mSTM->usesHardware(AMDIL::Caps::PrivateMem);
+
+  assert(mSTM->isSupported(AMDIL::Caps::PrivateUAV) &&
+         "Only private UAV should be in use");
+  return expandGlobalStore(MI);
 }

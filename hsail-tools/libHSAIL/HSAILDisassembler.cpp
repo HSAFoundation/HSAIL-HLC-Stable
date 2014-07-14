@@ -142,9 +142,9 @@ int Disassembler::run(const char* path) const
     return hasError() || os.bad(); //TBD
 }
 
-string Disassembler::get(Directive d, unsigned model)  { machineModel = model; return getImpl(d); }
-string Disassembler::get(Inst i, unsigned model)       { machineModel = model; return getImpl(i); }
-string Disassembler::get(Operand i, unsigned model)    { machineModel = model; return getImpl(i); }
+string Disassembler::get(Directive d, unsigned model, unsigned profile)  { mModel = model; mProfile = profile; return getImpl(d); }
+string Disassembler::get(Inst i,      unsigned model, unsigned profile)  { mModel = model; mProfile = profile; return getImpl(i); }
+string Disassembler::get(Operand i,   unsigned model, unsigned profile)  { mModel = model; mProfile = profile; return getImpl(i); }
 
 void Disassembler::log(std::ostream &s) { err = &s; }
 
@@ -161,7 +161,7 @@ void Disassembler::printDirectiveFmt(Directive d) const
 
     if (kind == BRIG_DIRECTIVE_VERSION)
     {
-        machineModel = DirectiveVersion(d).machineModel();
+        mModel = DirectiveVersion(d).machineModel();
     }
 
     switch (kind)
@@ -369,15 +369,15 @@ void Disassembler::printDirective(DirectiveLabelInit d) const
 void Disassembler::printDirective(DirectiveImageProperties d, unsigned type) const
 {
     string valList;
-    add2ValList(valList, "geometry",  imageGeometry2str(d.geometry()));
-    add2ValList(valList, "width",     d.width());
-    add2ValList(valList, "height",    d.height());
-    add2ValList(valList, "depth",     d.depth());
-    add2ValList(valList, "array",     d.array());
-    add2ValList(valList, "format",    imageFormat2str(d.format()));
-    add2ValList(valList, "order",     imageOrder2str(d.order()));
+    add2ValList(valList, "geometry",      imageGeometry2str(d.geometry()));
+    add2ValList(valList, "width",         d.width());
+    add2ValList(valList, "height",        d.height());
+    add2ValList(valList, "depth",         d.depth());
+    add2ValList(valList, "array",         d.array());
+    add2ValList(valList, "channel_type",  imageChannelType2str(d.channelType()));
+    add2ValList(valList, "channel_order", imageChannelOrder2str(d.channelOrder()));
 
-    print(string(typeX2str(type)) + "(" + valList + ")");
+    print_(string(typeX2str(type)) + "(" + valList + ")");
 }
 
 void Disassembler::printDirective(DirectiveImageInit init, unsigned type) const
@@ -395,13 +395,11 @@ void Disassembler::printDirective(DirectiveImageInit init, unsigned type) const
 void Disassembler::printDirective(DirectiveSamplerProperties d, unsigned type) const
 {
     string valList;
-    add2ValList(valList, "coord",        coord2str(d.modifier().isUnnormalized()));
-    add2ValList(valList, "filter",       filter2str(d.modifier().filter()));
-    add2ValList(valList, "boundaryu",    boundaryMode2str(d.boundaryU()));
-    add2ValList(valList, "boundaryv",    boundaryMode2str(d.boundaryV()));
-    add2ValList(valList, "boundaryw",    boundaryMode2str(d.boundaryW()));
+    add2ValList(valList, "coord",        samplerCoordNormalization2str(d.coord()));
+    add2ValList(valList, "filter",       samplerFilter2str(d.filter()));
+    add2ValList(valList, "addressing",   samplerAddressing2str(d.addressing()));
 
-    print(string(typeX2str(type)) + "(" + valList + ")");
+    print_(string(typeX2str(type)) + "(" + valList + ")");
 }
 
 void Disassembler::printDirective(DirectiveSamplerInit init, unsigned type) const
@@ -676,24 +674,25 @@ void Disassembler::printInst(Inst i) const
 
     switch(i.brig()->kind)
     {
-    case BRIG_INST_BASIC:        printInst(InstBasic(i));       break;
-    case BRIG_INST_ADDR:         printInst(InstAddr(i));        break;
-    case BRIG_INST_MOD:          printInst(InstMod(i));         break;
-    case BRIG_INST_CVT:          printInst(InstCvt(i));         break;
-    case BRIG_INST_MEM_FENCE:    printInst(InstMemFence(i));    break;
-    case BRIG_INST_CMP:          printInst(InstCmp(i));         break;
-    case BRIG_INST_MEM:          printInst(InstMem(i));         break;
-    case BRIG_INST_BR:           printInst(InstBr(i));          break;
-    case BRIG_INST_ATOMIC:       printInst(InstAtomic(i));      break;
-    case BRIG_INST_ATOMIC_IMAGE: printInst(InstAtomicImage(i)); break;
-    case BRIG_INST_IMAGE:        printInst(InstImage(i));       break;
-    case BRIG_INST_LANE:         printInst(InstLane(i));        break;
-    case BRIG_INST_QUEUE:        printInst(InstQueue(i));       break;
-    case BRIG_INST_SEG:          printInst(InstSeg(i));         break;
-    case BRIG_INST_SEG_CVT:      printInst(InstSegCvt(i));      break;
-    case BRIG_INST_SOURCE_TYPE:  printInst(InstSourceType(i));  break;
-    case BRIG_INST_SIGNAL:       printInst(InstSignal(i));      break;
-    case BRIG_INST_NONE:         printNop();                    break;
+    case BRIG_INST_BASIC:         printInst(InstBasic(i));        break;
+    case BRIG_INST_ADDR:          printInst(InstAddr(i));         break;
+    case BRIG_INST_MOD:           printInst(InstMod(i));          break;
+    case BRIG_INST_CVT:           printInst(InstCvt(i));          break;
+    case BRIG_INST_MEM_FENCE:     printInst(InstMemFence(i));     break;
+    case BRIG_INST_CMP:           printInst(InstCmp(i));          break;
+    case BRIG_INST_MEM:           printInst(InstMem(i));          break;
+    case BRIG_INST_BR:            printInst(InstBr(i));           break;
+    case BRIG_INST_ATOMIC:        printInst(InstAtomic(i));       break;
+    case BRIG_INST_IMAGE:         printInst(InstImage(i));        break;
+    case BRIG_INST_LANE:          printInst(InstLane(i));         break;
+    case BRIG_INST_QUEUE:         printInst(InstQueue(i));        break;
+    case BRIG_INST_SEG:           printInst(InstSeg(i));          break;
+    case BRIG_INST_SEG_CVT:       printInst(InstSegCvt(i));       break;
+    case BRIG_INST_SOURCE_TYPE:   printInst(InstSourceType(i));   break;
+    case BRIG_INST_SIGNAL:        printInst(InstSignal(i));       break;
+    case BRIG_INST_QUERY_IMAGE:   printInst(InstQueryImage(i));   break;
+    case BRIG_INST_QUERY_SAMPLER: printInst(InstQuerySampler(i)); break;
+    case BRIG_INST_NONE:          printNop();                     break;
     default: error(i, "Unsupported Instruction Format", i.brig()->kind); break;
     }
     print(';');
@@ -711,7 +710,7 @@ void Disassembler::print_rounding(Inst i) const
 {
     AluModifier am = i.modifier();
     unsigned rounding = am.round();
-    unsigned defaultRounding = getDefRounding(i, machineModel);
+    unsigned defaultRounding = getDefRounding(i, mModel, mProfile);
     if (rounding != defaultRounding) print_(round2str(rounding));
 }
 
@@ -850,18 +849,6 @@ void Disassembler::printInst(InstLane i) const
     printInstArgs(i);
 }
 
-void Disassembler::printInst(InstAtomicImage i) const
-{
-    print(opcode2str(i.opcode()));
-    print_(atomicOperation2str(i.atomicOperation()));
-    print_(imageGeometry2str(i.geometry()));
-    print_(equiv2str(i.equivClass()));
-    print_(type2str(i.type()));
-    print_(type2str(i.imageType()));
-    print_(type2str(i.coordType()));
-    printInstArgs(i);
-}
-
 void Disassembler::printInst(InstMemFence i) const
 {
     print(opcode2str(i.opcode()));
@@ -881,6 +868,28 @@ void Disassembler::printInst(InstSignal i) const
     print_(memoryOrder2str(i.memoryOrder()));
     print_(type2str(i.type()));
     print_(type2str(i.signalType()));
+    printInstArgs(i);
+}
+
+void Disassembler::printInst(InstQueryImage i) const
+{
+    print(opcode2str(i.opcode()));
+    print_(imageGeometry2str(i.geometry()));
+
+    print_(imageQuery2str(i.imageQuery()));
+
+    print_(type2str(i.type()));
+    print_(type2str(i.imageType()));
+    printInstArgs(i);
+}
+
+void Disassembler::printInst(InstQuerySampler i) const
+{
+    print(opcode2str(i.opcode()));
+
+    print_(samplerQuery2str(i.samplerQuery()));
+
+    print_(type2str(i.type()));
     printInstArgs(i);
 }
 
@@ -915,7 +924,7 @@ void Disassembler::print_v(Inst i) const
 template<class T>
 void Disassembler::print_width(T inst) const
 {
-    if (getDefWidth(inst, machineModel) != inst.width())
+    if (getDefWidth(inst, mModel, mProfile) != inst.width())
     {
         print_(width2str(inst.width()));
     }
@@ -1003,8 +1012,8 @@ void Disassembler::printOperand(Operand opr, bool dump /*=false*/) const
     case BRIG_OPERAND_FUNCTION_LIST:      printOperand(OperandFunctionList(opr));     break;
 
     // These operands require special handling and should only be printed when a dump is requested
-    case BRIG_OPERAND_VECTOR:             assert(dump); printOperandVector(Inst(), opr, -1); break;
-    case BRIG_OPERAND_IMMED:              assert(dump); printOperandImmed(Inst(), opr, -1);  break;
+    case BRIG_OPERAND_VECTOR:             assert(dump); printOperandVector(Inst(), opr, 0); break;
+    case BRIG_OPERAND_IMMED:              assert(dump); printOperandImmed(Inst(), opr, 0);  break;
 
     default: error(opr, "Unsupported Operand Kind", opr.brig()->kind); break;
     }
@@ -1020,13 +1029,13 @@ void Disassembler::printOperand(OperandWavesize opr) const { print("WAVESIZE"); 
 
 void Disassembler::printOperand(OperandAddress opr) const
 {
-    assert(machineModel == Brig::BRIG_MACHINE_SMALL || machineModel == Brig::BRIG_MACHINE_LARGE);
+    assert(mModel == Brig::BRIG_MACHINE_SMALL || mModel == Brig::BRIG_MACHINE_LARGE);
 
     DirectiveVariable name = opr.symbol();
-    int64_t offset = (machineModel == Brig::BRIG_MACHINE_LARGE)
+    int64_t offset = (mModel == Brig::BRIG_MACHINE_LARGE)
       ? (int64_t)opr.offset()
       : (int32_t)opr.offsetLo();
-    uint64_t uoffset = (machineModel == Brig::BRIG_MACHINE_LARGE)
+    uint64_t uoffset = (mModel == Brig::BRIG_MACHINE_LARGE)
       ? (uint64_t)opr.offset()
       : (uint32_t)opr.offsetLo();
     StrRef reg = opr.reg();
@@ -1055,7 +1064,7 @@ void Disassembler::printOperandVector(Inst inst, OperandVector opr, unsigned ope
     assert(opr);
     // \todo olsemenov fix this ugly type cast!
     assert((inst && operandIdx < (unsigned)5) || (!inst && operandIdx == (unsigned)-1));
-    assert(machineModel == Brig::BRIG_MACHINE_SMALL || machineModel == Brig::BRIG_MACHINE_LARGE);
+
 
     print('(');
 
@@ -1114,10 +1123,11 @@ void Disassembler::printOperandImmed(Inst inst, OperandImmed opr, unsigned opera
     assert(opr);
     // \todo olsemenov fix this ugly type cast!
     assert((inst && operandIdx < (unsigned)5) || (!inst && operandIdx == (unsigned)-1));
-    assert(machineModel == Brig::BRIG_MACHINE_SMALL || machineModel == Brig::BRIG_MACHINE_LARGE);
+    assert(mModel   == Brig::BRIG_MACHINE_SMALL || mModel   == Brig::BRIG_MACHINE_LARGE);
+    assert(mProfile == Brig::BRIG_PROFILE_BASE  || mProfile == Brig::BRIG_PROFILE_FULL);
 
     unsigned requiredType = 
-        inst? getOperandType(inst, operandIdx, machineModel) :
+        inst? getOperandType(inst, operandIdx, mModel, mProfile) :
               getBitType(getImmSize(opr));
 
     if (!isValidImmType(requiredType))
@@ -1336,6 +1346,39 @@ const char* Disassembler::imageGeometry2str(unsigned g) const
     else return invalid("Geom", g);
 }
 
+const char* Disassembler::samplerCoordNormalization2str(unsigned val) const
+{
+    const char* result=HSAIL_ASM::samplerCoordNormalization2str(val);
+    if (result != NULL) return result;
+    else return invalid("Coord", val);
+}
+const char* Disassembler::samplerFilter2str(unsigned val) const
+{
+    const char* result=HSAIL_ASM::samplerFilter2str(val);
+    if (result != NULL) return result;
+    else return invalid("Filter", val);
+}
+const char* Disassembler::samplerAddressing2str(unsigned val) const
+{
+    const char* result=HSAIL_ASM::samplerAddressing2str(val);
+    if (result != NULL) return result;
+    else return invalid("Addressing", val);
+}
+
+const char* Disassembler::samplerQuery2str(unsigned g) const
+{
+    const char* result=HSAIL_ASM::samplerQuery2str(g);
+    if (result != NULL) return result;
+    else return invalid("SamplerQuery", g);
+}
+
+const char* Disassembler::imageQuery2str(unsigned g) const
+{
+    const char* result=HSAIL_ASM::imageQuery2str(g);
+    if (result != NULL) return result;
+    else return invalid("ImageQuery", g);
+}
+
 const char* Disassembler::memoryOrder2str(unsigned memOrder) const 
 {
     const char* result=HSAIL_ASM::memoryOrder2str(memOrder);
@@ -1345,14 +1388,9 @@ const char* Disassembler::memoryOrder2str(unsigned memOrder) const
 
 const char* Disassembler::memoryFenceSegments2str(unsigned segments) const
 {
-  switch(segments) {
-  case Brig::BRIG_MEMORY_FENCE_GROUP:
-    return segment2str(Brig::BRIG_SEGMENT_GROUP);
-  case Brig::BRIG_MEMORY_FENCE_GLOBAL:
-    return segment2str(Brig::BRIG_SEGMENT_GLOBAL);
-  default:
-    return "";
-  }
+    const char* result=HSAIL_ASM::memoryFenceSegments2str(segments);
+    if (result != NULL) return result;
+    else return invalid("MemoryFenceSegments", segments);
 }
 
 const char* Disassembler::memoryScope2str(unsigned flags) const 
@@ -1410,47 +1448,18 @@ const char* Disassembler::v2str(Operand opr) const
     return invalid("vX operand", opr? opr.kind() : -1);
 }
 
-const char* Disassembler::imageFormat2str(Brig::BrigImageFormat8_t fmt) const
+const char* Disassembler::imageChannelType2str(Brig::BrigImageChannelType8_t fmt) const
 {
-    const char *result = HSAIL_ASM::imageFormat2str(fmt);
+    const char *result = HSAIL_ASM::imageChannelType2str(fmt);
     if (result != NULL) return result;
-    else return invalid("ImageFormat", fmt);
+    else return invalid("ImageChannelType", fmt);
 }
 
-const char* Disassembler::imageOrder2str(Brig::BrigImageOrder8_t order) const
+const char* Disassembler::imageChannelOrder2str(Brig::BrigImageChannelOrder8_t order) const
 {
-    const char *result = HSAIL_ASM::imageOrder2str(order);
+    const char *result = HSAIL_ASM::imageChannelOrder2str(order);
     if (result != NULL) return result;
-    else return invalid("ImageOrder", order);
-}
-
-const char* Disassembler::filter2str(uint8_t val) const
-{
-    switch (val)
-    {
-    case Brig::BRIG_FILTER_LINEAR:  return "linear";
-    case Brig::BRIG_FILTER_NEAREST: return "nearest";
-    default: return "";
-    }
-}
-
-const char* Disassembler::coord2str(bool inUnnormalized) const
-{
-    return inUnnormalized ? "unnormalized" : "normalized";
-}
-
-const char* Disassembler::boundaryMode2str(uint8_t val) const
-{
-    switch (val)
-    {
-    case Brig::BRIG_BOUNDARY_UNDEFINED:  return "undefined";
-    case Brig::BRIG_BOUNDARY_CLAMP:      return "clamp";
-    case Brig::BRIG_BOUNDARY_WRAP:       return "wrap";
-    case Brig::BRIG_BOUNDARY_MIRROR:     return "mirror";
-    case Brig::BRIG_BOUNDARY_MIRRORONCE: return "mirroronce";
-    case Brig::BRIG_BOUNDARY_BORDER:     return "border";
-    default: return "";
-    }
+    else return invalid("ImageChannelOrder", order);
 }
 
 string Disassembler::equiv2str(unsigned val) const

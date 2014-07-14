@@ -60,6 +60,11 @@ LLVMMCParserDEPS = \
 	$(LLVMMCLIBS)
 LLVMMCParserLIBS = $(LLVMMCParserLIB) $(LLVMMCParserDEPS)
 
+LLVMMCDisassemblerLIB = $(LLVM_LIB)/MC/MCDisassembler/$(FULL_BUILD_DIR)/LLVMMCDisassembler$(LIB_EXT)
+LLVMMCDisassemblerDEPS = \
+	$(LLVMMCLIBS)
+LLVMMCDisassemblerLIBS = $(LLVMMCDisassemblerLIB) $(LLVMMCDisassemblerDEPS)
+
 LLVMScalarOptsLIB = $(LLVM_LIB)/Transforms/Scalar/$(FULL_BUILD_DIR)/LLVMScalarOpts$(LIB_EXT)
 LLVMScalarOptsDEPS = \
 	$(LLVMVectorizeLIBS) $(LLVMSPIRLIB)
@@ -144,6 +149,7 @@ LLVMAMDILCodeGenDEPS = \
 LLVMAMDILCodeGenLIBS = $(LLVMAMDILCodeGenLIB) $(LLVMAMDILCodeGenDEPS)
 endif
 
+ifneq ($(BUILD_HSA_DEVICE),no)
 LIBHSAILLIBS = $(OPENCL_DEPTH)/compiler/hsail-tools/libHSAIL/$(FULL_BUILD_DIR)/LIBHSAIL$(LIB_EXT)
 LLVMHSAILCodeGenLIB = $(LLVM_LIB)/Target/HSAIL/$(FULL_BUILD_DIR)/LLVMHSAILCodeGen$(LIB_EXT)
 LLVMHSAILCodeGenDEPS = \
@@ -152,6 +158,7 @@ LLVMHSAILCodeGenDEPS = \
 	$(LLVMAsmPrinterLIBS) \
 	$(LLVMSelectionDAGLIBS)
 LLVMHSAILCodeGenLIBS = $(LLVMHSAILCodeGenLIB) $(LLVMHSAILCodeGenDEPS)
+endif
 
 LLVMMacroDataLIB = $(OPENCL_DEPTH)/compiler/tools/macrodata/$(FULL_BUILD_DIR)/LLVMMacroData$(LIB_EXT)
 LLVMMacroDataDEPS = # nothing

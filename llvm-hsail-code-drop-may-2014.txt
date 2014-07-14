@@ -19,3 +19,10 @@ files). There is a shell script which runs all the tests and generates the HSAIL
 5. The binary ("bin") directory has the built "CLC" (OpenCL front-end), OpenCL
 builtin library (in LLVM bc format), HSAILAsm (HSAIL assembler/disassembler) for
 convenience.
+
+July 2014 - Drop:
+
+This drop has the latest compiler (OpenCL branch from AMD). This has been tested
+with CLANG (CLC2), the binary of this is given along with this drop. The hsail-tools
+is also given. However it is recommended to use the separate libHSAIL drop found on
+the Foundation github. Follow the same steps as above.

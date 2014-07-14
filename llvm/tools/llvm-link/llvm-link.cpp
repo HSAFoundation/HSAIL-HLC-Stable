@@ -27,8 +27,10 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Transforms/AMDEDGToIA64Translator.h"
 #if defined(AMD_OPENCL) || 1
+#include "llvm/AMDLLVMContextHook.h"
+#include "llvm/AMDPrelinkOpt.h"
+#include "llvm/AMDResolveLinker.h"
 #include "llvm/ADT/Triple.h"
-#include "bclinker.h"
 #endif // AMD_OPENCL
 #include <memory>
 using namespace llvm;
@@ -55,16 +57,32 @@ static cl::opt<bool>
 DumpAsm("d", cl::desc("Print assembly as linked"), cl::Hidden);
 
 #if defined(AMD_OPENCL) || 1
+static cl::opt<bool>
+PreLinkOpt("prelink-opt", cl::desc("Enable pre-link optimizations"));
+
+static cl::opt<bool>
+DisableSimplifyLibCalls("disable-simplify-libcalls",
+                        cl::desc("Disable simplify-libcalls"));
+
+static cl::opt<bool>
+EnableWholeProgram("whole", cl::desc("Enable whole program mode"));
+
+static cl::opt<bool>
+EnableUnsafeFPMath("enable-unsafe-fp-math",
+          cl::desc("Enable optimizations that may decrease FP precision"));
+
+static cl::opt<bool>
+LowerToPreciseFunctions("fp32-correctly-rounded-divide-sqrt",
+     cl::desc("lower sqrt and divide functions to precise library functions"));
+
 static cl::list<std::string> Libraries("l", cl::Prefix,
                                        cl::desc("Specify libraries to link to"),
                                        cl::value_desc("library prefix"));
 
-static cl::opt<std::string>
-TargetTriple("mtriple", cl::desc("Override target triple for module"));
-
 namespace llvm {
   // Defined in FixUpModule.cpp
-  void fixUpModule(Module *M, StringRef TargetTriple);
+  void fixUpModule(Module *M, StringRef TargetTripleStr,
+                   StringRef TargetLayoutStr);
 }
 
 #endif // AMD_OPENCL
@@ -102,10 +120,6 @@ int main(int argc, char **argv) {
   LLVMContext &Context = getGlobalContext();
   llvm_shutdown_obj Y;  // Call llvm_shutdown() on exit.
   cl::ParseCommandLineOptions(argc, argv, "llvm linker\n");
-
-#if defined(AMD_OPENCL) || 1
-  std::string NormalizedTargetTriple = Triple::normalize(TargetTriple);
-#endif
 
   unsigned BaseArg = 0;
   std::string ErrorMessage;
@@ -151,7 +165,8 @@ int main(int argc, char **argv) {
        e = Libraries.end(); i != e; ++i) {
     std::auto_ptr<Module> M(LoadFile(argv[0], *i, Context));
     if (M.get() == 0) {
-      errs() << argv[0] << ": error loading file '" << *i << "'\n";
+      SMDiagnostic Err(*i, SourceMgr::DK_Error, "error loading file");
+      Err.print(argv[0], errs());
       return 1;
     }
     if (Verbose) errs() << "Linking in '" << *i << "'\n";
@@ -160,20 +175,28 @@ int main(int argc, char **argv) {
   }
 
   if (Libs.size() > 0) {
-    // FIXME: The following assertion fails on some builds.
-    // http://ocltc.amd.com/bugs/show_bug.cgi?id=9582
-    // assert(Composite->getDataLayout() == Libs[0]->getDataLayout());
-    //fixUpModule(Composite.get(), NormalizedTargetTriple);
+    // The first member in the list of libraries is assumed to be
+    // representative of the target device.
+    fixUpModule(Composite.get(), Libs[0]->getTargetTriple(),
+                Libs[0]->getDataLayout());
 
-    if (BCLinker::link(Composite.get(), Libs)) {
-      errs() << argv[0]
-             << ": internal error: failed to link modules correctly.\n";
+    if (PreLinkOpt) {
+      AMDLLVMContextHook AmdHook;
+      Composite.get()->getContext().setAMDLLVMContextHook(&AmdHook);
+      AmdHook.amdrtFunctions = NULL;
+      AMDPrelinkOpt(Composite.get(), EnableWholeProgram, DisableSimplifyLibCalls,
+                 EnableUnsafeFPMath, NULL /*UseNative*/,
+                 LowerToPreciseFunctions);
+    }
+
+    std::string ErrorMsg;
+    if (resolveLink(Composite.get(), Libs, &ErrorMsg)) {
+      SMDiagnostic Err(InputFilenames[BaseArg], SourceMgr::DK_Error, ErrorMsg);
+      Err.print(argv[0], errs());
       return 1;
     }
   }
 
-  if (!NormalizedTargetTriple.empty())
-    Composite.get()->setTargetTriple(NormalizedTargetTriple);
 #endif // AMD_OPENCL
 
   if (DumpAsm) errs() << "Here's the assembly:\n" << *Composite;

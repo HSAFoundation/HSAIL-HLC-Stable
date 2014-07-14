@@ -69,14 +69,16 @@ namespace HSAIL_ASM {
 class PropValidator
 {
 private:
-    unsigned machineModel;
+    const unsigned mModel;
+    const unsigned mProfile;
 
     //==========================================================================
 public:
-    PropValidator(unsigned model) : machineModel(model) {}
+    PropValidator(unsigned model, unsigned profile) : mModel(model), mProfile(profile) {}
 
     unsigned getMachineSize()  { return isLargeModel()? 64 : 32; }
-    bool isLargeModel()        { return machineModel == Brig::BRIG_MACHINE_LARGE; }
+    bool isLargeModel()        { return mModel   == Brig::BRIG_MACHINE_LARGE; }
+    bool isFullProfile()       { return mProfile == Brig::BRIG_PROFILE_FULL; }
 
     //==========================================================================
     // Interface with HDL-generated code
@@ -128,7 +130,7 @@ public:
         if      (InstCmp   i = inst) return i.modifier().round(); 
         else if (InstCvt   i = inst) return i.modifier().round();
         else if (InstMod   i = inst) return i.modifier().round();
-        else if (InstBasic i = inst) return getDefRounding(i, machineModel);
+        else if (InstBasic i = inst) return getDefRounding(i, mModel, mProfile);
         assert(false);               return Brig::BRIG_ROUND_NONE;
     }
 

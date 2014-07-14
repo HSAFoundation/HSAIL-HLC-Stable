@@ -59,6 +59,7 @@
 #include "HSAILLLVMVersion.h"
 #include "HSAILTargetMachine.h"
 #include "llvm/ADT/SmallVector.h"
+#include "libHSAIL/Brig.h"
 
 // Utility functions from ID
 //
@@ -78,6 +79,8 @@ class PointerType;
 class MachineInstr;
 class HSAILMachineFunctionInfo;
 class GlobalVariable;
+class SelectionDAG;
+class DebugLoc;
 }
 
 // Debug functions for SDNode and SDValue.
@@ -103,6 +106,9 @@ size_t HSAILgetNumElements(llvm::FunctionType * const FT);
 size_t HSAILgetNumElements(llvm::ArrayType * const AT);
 size_t HSAILgetNumElements(llvm::VectorType * const VT);
 size_t HSAILgetNumElements(llvm::PointerType * const PT);
+
+Brig::BrigType16_t HSAILgetBrigType(llvm::Type* type, bool is64Bit, bool Signed = false);
+
 const llvm::Value *HSAILgetBasePointerValue(const llvm::Value *V);
 const llvm::Value *HSAILgetBasePointerValue(const llvm::MachineInstr *MI);
 
@@ -131,12 +137,13 @@ llvm::MachineOperand &getLoadConstQual(const llvm::MachineInstr *MI);
 
 bool isLoad(const llvm::MachineInstr *MI);
 bool isStore(const llvm::MachineInstr *MI);
+bool isConv(const llvm::MachineInstr *MI);
 
 bool HSAILisGlobalInst(const llvm::TargetMachine &TM, const llvm::MachineInstr *MI);
 bool HSAILisPrivateInst(const llvm::TargetMachine &TM, const llvm::MachineInstr *MI);
 bool HSAILisConstantInst(const llvm::TargetMachine &TM, const llvm::MachineInstr *MI);
 bool HSAILisGroupInst(const llvm::TargetMachine &TM, const llvm::MachineInstr *MI);
-bool HSAILisKernargInst(const llvm::TargetMachine &TM, const llvm::MachineInstr *MI);
+bool HSAILisArgInst(const llvm::TargetMachine &TM, const llvm::MachineInstr *MI);
 
 bool isKernelFunc(const llvm::Function *F);
 bool isSPIRModule(const llvm::Module &M);
@@ -156,5 +163,9 @@ bool isParametrizedTernaryAtomicOp(int opcode);
 bool isParametrizedAtomicOp(int opcode);
 bool isParametrizedRetAtomicOp(int opcode);
 bool hasParametrizedAtomicNoRetVersion(const llvm::MachineInstr *MI, llvm::SDNode *Node);
+
+llvm::SDValue generateFenceIntrinsic(llvm::SDValue Chain, llvm::DebugLoc dl,
+        unsigned memSeg, llvm::SDValue brigMemoryOrder,
+        llvm::SDValue brigMemoryScope, llvm::SelectionDAG &CurDAG);
 
 #endif // HSAILUTILITYFUNCTIONS_H_

@@ -116,9 +116,6 @@ bool AMDSimplifyLibCalls::runOnFunction(Function &F) {
       Function *Callee = CI->getCalledFunction();
       if (Callee == 0) continue;
 
-      // Our library function name starts with "__"
-      if (!Callee->getName().startswith("__")) continue;
-
       if(Simplifier->fold(CI, DL,&AA)) {
         Changed = true;
       }
@@ -141,9 +138,6 @@ bool AMDUseNativeCalls::runOnFunction(Function &F) {
       // Ignore indirect calls.
       Function *Callee = CI->getCalledFunction();
       if (Callee == 0) continue;
-
-      // Our library function name starts with "__"
-      if (!Callee->getName().startswith("__")) continue;
 
       if(Simplifier->useNative(CI, DL)) {
         Changed = true;

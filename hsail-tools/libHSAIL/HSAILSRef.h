@@ -46,6 +46,7 @@
 #include <cstring>
 #include <vector>
 #include <iosfwd>
+#include <assert.h>
 
 namespace HSAIL_ASM {
 
@@ -84,7 +85,14 @@ public:
 
     operator bool_type() const { return !empty() ? &SRef::toCompare : NULL; }
 
-    SRef mid(int start) const { return SRef(begin + start,end); }
+    SRef mid(int start) const { assert(start<=length()); return SRef(begin + start, end); }
+    SRef mid(int start, int n) const { assert((start+n)<=length()); return SRef(begin + start, begin + start + n); }
+
+    SRef drop_front(int n) const { return mid(n); }
+    SRef drop_back(int n) const { assert(n<=length()); return SRef(begin, end-n); }
+
+    char front() const { assert(length()>0); return *begin; }
+    char back() const { assert(length()>0); return *(end-1); }
 };
 
 inline bool operator>(const SRef& lhs, const SRef& rhs)  { return SRef::compare(lhs, rhs) > 0; }

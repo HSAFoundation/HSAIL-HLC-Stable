@@ -269,6 +269,8 @@ void HSAILModuleInfo::parseImageAnnotate(const GlobalVariable *GV) {
       k->readOnly.insert(i);
     } else if (val == 2) {
       k->writeOnly.insert(i);
+    } else if (val == 3) {
+      k->readWrite.insert(i);
     } else {
       assert(!"Unknown image type value!");
     }
@@ -357,6 +359,15 @@ bool HSAILModuleInfo::isReadOnlyImage(const llvm::StringRef &name,
     return false;
   }
   return kiter->second->readOnly.count(iID);
+}
+
+bool HSAILModuleInfo::isReadWriteImage(const llvm::StringRef &name,
+                                         uint32_t iID) const {
+  const StringMap<HSAILKernel*>::const_iterator kiter = mKernels.find(name);
+  if (kiter == mKernels.end()) {
+    return false;
+  }
+  return kiter->second->readWrite.count(iID);
 }
 
 int32_t HSAILModuleInfo::getArgID(const Argument *arg) {

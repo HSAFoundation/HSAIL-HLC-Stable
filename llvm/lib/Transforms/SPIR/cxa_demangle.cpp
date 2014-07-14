@@ -3938,11 +3938,11 @@ public:
     }
 };
 
-class __Lambda
+class __lambda
     : public __node
 {
 public:
-    __Lambda(__node* params, const char *number, size_t number_size)
+    __lambda(__node* params, const char *number, size_t number_size)
     {
         __right_ = params;
         __name_ = number;
@@ -7301,7 +7301,7 @@ __demangle_tree::__parse_unnamed_type_name(const char* first, const char* last)
                 return first;
               
             if (type == 'l')
-                __make<__Lambda>(__root_, number_start, static_cast<size_t>(number_end - number_start));
+                __make<__lambda>(__root_, number_start, static_cast<size_t>(number_end - number_start));
             else
                 __make<__unnamed>(number_start, static_cast<size_t>(number_end - number_start));
             

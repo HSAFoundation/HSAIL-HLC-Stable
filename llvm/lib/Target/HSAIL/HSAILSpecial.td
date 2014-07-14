@@ -18,10 +18,15 @@ let isAsCheapAsAMove = 1 in {
                          [(set (i32 GPR32:$dst),
                                (int_HSAIL_get_local_id (i32 imm:$src)))]>;
 
-    def get_local_size_i : HSAILInst<(outs GPR32:$dst), (ins i32imm:$src),
+    def workgroup_size_i : HSAILInst<(outs GPR32:$dst), (ins i32imm:$src),
                          "workgroupsize_u32\t$dst, $src",
                          [(set (i32 GPR32:$dst),
-                               (int_HSAIL_get_local_size (i32 imm:$src)))]>;
+                               (int_HSAIL_workgroup_size (i32 imm:$src)))]>;
+
+    def currentworkgroup_size_i : HSAILInst<(outs GPR32:$dst), (ins i32imm:$src),
+                         "currentworkgroupsize_u32\t$dst, $src",
+                         [(set (i32 GPR32:$dst),
+                               (int_HSAIL_currentworkgroup_size (i32 imm:$src)))]>;
 
     def get_num_groups_i : HSAILInst<(outs GPR32:$dst), (ins i32imm:$src),
                           "gridgroups_u32\t$dst, $src",
@@ -44,10 +49,10 @@ let isAsCheapAsAMove = 1 in {
                     [(set (i32 GPR32:$dst), 
                       (int_HSAIL_workitemid_flat))]>;
 
-  def do_syscall : HSAILInst<(outs GPR32:$dst), (ins i32imm:$src1, GPR32:$src2, GPR32:$src3, GPR32:$src4),
-                         "syscall_u32\t$dst, $src1, $src2, $src3, $src4",
-                         [(set (i32 GPR32:$dst),
-                               (int_HSAIL_syscall (i32 imm:$src1), (i32 GPR32:$src2), (i32 GPR32:$src3), (i32 GPR32:$src4)))]>;
+  def get_workitemid_flatabs : HSAILInst<(outs GPR32:$dst), (ins),
+                    "workitemflatabsid_u32\t$dst",
+                    [(set (i32 GPR32:$dst), 
+                      (int_HSAIL_workitemid_flatabs))]>;
 
   def get_lane_id : HSAILInst<(outs GPR32:$dst), (ins),
                     "laneid_u32\t$dst",
@@ -77,6 +82,8 @@ let isAsCheapAsAMove = 1 in {
   let isNotDuplicable = 1 in {
     def barrier : HSAILInst<(outs), (ins),
              "barrier", [(int_HSAIL_barrier)]>;
+    def wavebarrier : HSAILInst<(outs), (ins),
+             "wavebarrier", [(int_HSAIL_wavebarrier)]>;
 
   }
 
@@ -92,80 +99,12 @@ let isAsCheapAsAMove = 1 in {
 
 ////////////////////////////////////////////////////////////////////////////////
 // SYNC OCL 2.0
-		  
-  def memfence_global_acq_wg : HSAILInst<(outs), (ins), 
-          "memfence_global_acq_wg", [(int_HSAIL_memfence_g_acq_wg)]>;	
 
-  def memfence_global_acq_cmp : HSAILInst<(outs), (ins), 
-          "memfence_global_acq_cmp", [(int_HSAIL_memfence_g_acq_cmp)]>;	
+def hsail_atomic_memfence : HSAILInst< (outs),
+    (ins i32imm:$seg, i32imm:$order, i32imm:$scope), "",
+    [(int_HSAIL_atomic_memfence (i32 imm:$seg), (i32 imm:$order), (i32 imm:$scope))]>;
 
-  def memfence_global_acq_sys : HSAILInst<(outs), (ins), 
-          "memfence_global_acq_sys", [(int_HSAIL_memfence_g_acq_sys)]>;	
-
-  def memfence_global_rel_wg : HSAILInst<(outs), (ins), 
-          "memfence_global_rel_wg", [(int_HSAIL_memfence_g_rel_wg)]>;	
-
-  def memfence_global_rel_cmp : HSAILInst<(outs), (ins), 
-          "memfence_global_rel_cmp", [(int_HSAIL_memfence_g_rel_cmp)]>;	
-
-  def memfence_global_rel_sys : HSAILInst<(outs), (ins), 
-          "memfence_global_rel_sys", [(int_HSAIL_memfence_g_rel_sys)]>;	
-
-  def memfence_global_ar_wg : HSAILInst<(outs), (ins), 
-          "memfence_global_ar_wg", [(int_HSAIL_memfence_g_ar_wg)]>;	
-
-  def memfence_global_ar_cmp : HSAILInst<(outs), (ins), 
-          "memfence_global_ar_cmp", [(int_HSAIL_memfence_g_ar_cmp)]>;	
-
-  def memfence_global_ar_sys : HSAILInst<(outs), (ins), 
-          "memfence_global_ar_sys", [(int_HSAIL_memfence_g_ar_sys)]>;
-
-  def memfence_global_sc_wg : HSAILInst<(outs), (ins), 
-          "memfence_global_sc_wg", [(int_HSAIL_memfence_g_sc_wg)]>;	
-
-  def memfence_global_sc_cmp : HSAILInst<(outs), (ins), 
-          "memfence_global_sc_cmp", [(int_HSAIL_memfence_g_sc_cmp)]>;	
-
-  def memfence_global_sc_sys : HSAILInst<(outs), (ins), 
-          "memfence_global_sc_sys", [(int_HSAIL_memfence_g_sc_sys)]>;			  
-
-  def memfence_local_acq_wg : HSAILInst<(outs), (ins), 
-          "memfence_group_acq_wg", [(int_HSAIL_memfence_l_acq_wg)]>;	
-
-  def memfence_local_acq_cmp : HSAILInst<(outs), (ins), 
-          "memfence_group_acq_cmp", [(int_HSAIL_memfence_l_acq_cmp)]>;	
-
-  def memfence_local_acq_sys : HSAILInst<(outs), (ins), 
-          "memfence_group_acq_sys", [(int_HSAIL_memfence_l_acq_sys)]>;	
-
-  def memfence_local_rel_wg : HSAILInst<(outs), (ins), 
-          "memfence_group_rel_wg", [(int_HSAIL_memfence_l_rel_wg)]>;	
-
-  def memfence_local_rel_cmp : HSAILInst<(outs), (ins), 
-          "memfence_group_rel_cmp", [(int_HSAIL_memfence_l_rel_cmp)]>;	
-
-  def memfence_local_rel_sys : HSAILInst<(outs), (ins), 
-          "memfence_group_rel_sys", [(int_HSAIL_memfence_l_rel_sys)]>;	
-
-  def memfence_local_ar_wg : HSAILInst<(outs), (ins), 
-          "memfence_group_ar_wg", [(int_HSAIL_memfence_l_ar_wg)]>;	
-
-  def memfence_local_ar_cmp : HSAILInst<(outs), (ins), 
-          "memfence_group_ar_cmp", [(int_HSAIL_memfence_l_ar_cmp)]>;	
-
-  def memfence_local_ar_sys : HSAILInst<(outs), (ins), 
-          "memfence_group_ar_sys", [(int_HSAIL_memfence_l_ar_sys)]>;
-
-  def memfence_local_sc_wg : HSAILInst<(outs), (ins), 
-          "memfence_group_sc_wg", [(int_HSAIL_memfence_l_sc_wg)]>;	
-
-  def memfence_local_sc_cmp : HSAILInst<(outs), (ins), 
-          "memfence_group_sc_cmp", [(int_HSAIL_memfence_l_sc_cmp)]>;	
-
-  def memfence_local_sc_sys : HSAILInst<(outs), (ins), 
-          "memfence_group_sc_sys", [(int_HSAIL_memfence_l_sc_sys)]>;
-
-  // Cross-Lane Operations
+// Cross-Lane Operations
   class CrossLaneV4<string asm>
 		: HSAILInst<(outs GPR64:$dst1, GPR64:$dst2,  GPR64:$dst3,  GPR64:$dst4),
 					(ins CR:$src1),
@@ -233,3 +172,22 @@ let isAsCheapAsAMove = 1 in {
     def activelanemask_v4_b64_b1 : CrossLaneV4<"activelanemask_v4_b64_b1">;
     def activelanemask_v4_width_b64_b1 : CrossLaneV4<"activelanemask_v4_width(WAVESIZE)_b64_b1">;
   }
+
+def nullptr_flat_u64  : HSAILInst<(outs GPR64:$dst), (ins),
+          "nullptr_u64\t $dst",
+          [(set (i64 GPR64:$dst), (int_HSAIL_nullptr_flat))]>;
+def nullptr_flat_u32  : HSAILInst<(outs GPR32:$dst), (ins),
+          "nullptr_u32\t $dst",
+          [(set (i32 GPR32:$dst), (int_HSAIL_nullptr_flat))]>;
+def nullptr_global_u64  : HSAILInst<(outs GPR64:$dst), (ins),
+          "nullptr_global_u64\t $dst",
+          [(set (i64 GPR64:$dst), (int_HSAIL_nullptr_global))]>;
+def nullptr_global_u32  : HSAILInst<(outs GPR32:$dst), (ins),
+          "nullptr_global_u32\t $dst",
+          [(set (i32 GPR32:$dst), (int_HSAIL_nullptr_global))]>;
+def nullptr_group_u32  : HSAILInst<(outs GPR32:$dst), (ins),
+          "nullptr_group_u32\t $dst",
+          [(set (i32 GPR32:$dst), (int_HSAIL_nullptr_group))]>;
+def nullptr_private_u32  : HSAILInst<(outs GPR32:$dst), (ins),
+          "nullptr_private_u32\t $dst",
+          [(set (i32 GPR32:$dst), (int_HSAIL_nullptr_private))]>;

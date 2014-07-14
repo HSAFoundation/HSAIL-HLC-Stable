@@ -77,6 +77,7 @@ static uint32_t getDeviceFlag(StringRef GPUName) {
     .Case("tonga", OCL_DEVICE_TONGA)
     .Case("goose", OCL_DEVICE_BERMUDA)
     .Case("hoatzin", OCL_DEVICE_FIJI)
+    .Case("peacock", OCL_DEVICE_CARRIZO)
     .Case("owls", OCL_DEVICE_TIRAN)
     .Case("tiran", OCL_DEVICE_TIRAN)
     .Case("spectre", OCL_DEVICE_SPECTRE)
@@ -114,6 +115,7 @@ static AMDIL::GPUFamily findGeneration(uint32_t DeviceID) {
   case OCL_DEVICE_TONGA:
   case OCL_DEVICE_BERMUDA:
   case OCL_DEVICE_FIJI:
+  case OCL_DEVICE_CARRIZO:
     return AMDIL::VOLCANIC_ISLANDS;
 
   case OCL_DEVICE_SPECTRE:
@@ -436,17 +438,8 @@ void AMDILSubtarget::setSouthernIslandsCapabilities() {
   mSWBits.reset(AMDIL::Caps::LongOps);
   mHWBits.set(AMDIL::Caps::TmrReg);
   mHWBits.set(AMDIL::Caps::PPAMode);
-
-  // TODO: Hack to disable software constant buffers on Hainan until
-  // correctness issues with Luxmark complex test are resolved
-  if (getDeviceFlag() != OCL_DEVICE_HAINAN) {
-    mHWBits.reset(AMDIL::Caps::ConstantMem);
-    mSWBits.set(AMDIL::Caps::ConstantMem);
-  } else {
-    mSWBits.reset(AMDIL::Caps::ConstantMem);
-    mHWBits.set(AMDIL::Caps::ConstantMem);
-  }
-
+  mHWBits.reset(AMDIL::Caps::ConstantMem);
+  mSWBits.set(AMDIL::Caps::ConstantMem);
   mHWBits.set(AMDIL::Caps::PrivateMem);
   mHWBits.set(AMDIL::Caps::LocalMem);
   mHWBits.set(AMDIL::Caps::RegionMem);
@@ -605,6 +598,30 @@ AMDILSubtarget::ExecutionMode AMDILSubtarget::getExecutionMode(
   }
 
   return Unsupported;
+}
+
+unsigned AMDILSubtarget::getMaxStoreSizeInBits(unsigned AS) const {
+  switch (AS) {
+  case AMDILAS::CONSTANT_ADDRESS:
+    llvm_unreachable("Cannot store to constant address space");
+
+  default:
+    return 128;
+  }
+}
+
+unsigned AMDILSubtarget::getMaxLoadSizeInBits(unsigned AS) const {
+  switch (AS) {
+  case AMDILAS::PRIVATE_ADDRESS:
+    return 128;
+  case AMDILAS::LOCAL_ADDRESS:
+  case AMDILAS::REGION_ADDRESS:
+    return 64;
+  case AMDILAS::CONSTANT_ADDRESS:
+  case AMDILAS::GLOBAL_ADDRESS:
+  default:
+    return 128;
+  }
 }
 
 std::string AMDILSubtarget::getDataLayout() const {

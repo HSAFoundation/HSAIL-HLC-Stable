@@ -40,11 +40,6 @@ def FeatureDebug : SubtargetFeature<"debug",
   "true",
   "Debug mode is enabled, so disable hardware accelerated address spaces.">;
   
-def FeatureFlatAddr : SubtargetFeature<"flataddr",
-  "mUsesFlatAddr",  
-  "true",
-  "Enable flat addressing modes in HSAIL.">;
-
 //===----------------------------------------------------------------------===//
 // HSAIL processors supported.
 //===----------------------------------------------------------------------===//
@@ -53,7 +48,6 @@ class Proc<string Name, list<SubtargetFeature> Features>
  : Processor<Name, NoItineraries, Features>;
 
 def : Proc<"generic", [FeatureDebug, FeatureImages]>;
-def : Proc<"generic_flat", [FeatureDebug, FeatureImages, FeatureFlatAddr]>;
 
 //===----------------------------------------------------------------------===//
 // Register File Description
@@ -69,43 +63,8 @@ include "HSAILInstrInfo.td"
 
 def HSAILInstrInfo : InstrInfo;
 
-//===----------------------------------------------------------------------===//
-// Calling Conventions
-//===----------------------------------------------------------------------===//
-
-include "HSAILCallingConv.td"
-
-
-//===----------------------------------------------------------------------===//
-// Assembly Parser
-//===----------------------------------------------------------------------===//
-
-def AsmParser : AsmParser {
-  string AsmParserClassName = "AsmParser";
-  int Variant = 0;
-
-  // Discard comments in assembly strings.
-  string CommentDelimiter = "#";
-
-  // Recognize hard coded registers.
-  string RegisterPrefix = "%";
-}
-
-//===----------------------------------------------------------------------===//
-// Assembly Printers
-//===----------------------------------------------------------------------===//
-
-def AsmWriter : AsmWriter {
-  string AsmWriterClassName  = "AsmPrinter";
-  int Variant = 0;
-  bit isMCAsmWriter = 0;
-}
 def HSAIL : Target {
   // Information about the instructions...
   let InstructionSet = HSAILInstrInfo;
-
-  let AssemblyParsers = [AsmParser];
-
-  let AssemblyWriters = [AsmWriter];
 }
 

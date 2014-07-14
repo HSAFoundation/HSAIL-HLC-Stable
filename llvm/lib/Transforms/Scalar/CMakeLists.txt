@@ -41,6 +41,10 @@ add_llvm_library(LLVMScalarOpts
   AMDMemCombine.cpp
   AMDSimplifyLibCalls.cpp
   AMDVectorCoarsening.cpp
+  AMDLowerEnqueueKernel.cpp
+  AMDLowerToPreciseBuiltins.cpp
+  AMDGenerateDevEnqMetadata.cpp
+  AMDPrintfRuntimeBinding.cpp
   )
 
 add_dependencies(LLVMScalarOpts intrinsics_gen)

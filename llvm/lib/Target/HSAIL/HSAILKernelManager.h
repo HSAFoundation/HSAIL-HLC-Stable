@@ -81,7 +81,6 @@ class HSAILSubtarget;
 class HSAILMachineFunctionInfo;
 class HSAILModuleInfo;
 class HSAILTargetMachine;
-class HSAILAsmPrinter;
 class StructType;
 class Value;
 class TypeSymbolTable;
@@ -140,11 +139,11 @@ private:
   void printKernelArgs(OSTREAM_TYPE &O);
 
   void updatePtrArg(llvm::Function::const_arg_iterator Ip,
-                    int numWriteImages,
                     int raw_uav_buffer,
                     int counter,
                     bool isKernel,
-                    const Function *F);
+                    const Function *F,
+                    int pointerCount);
   /// Name of the current kernel.
   std::string mName;
   uint32_t mUniqueID;

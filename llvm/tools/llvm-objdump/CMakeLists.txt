@@ -5,6 +5,7 @@ set(LLVM_LINK_COMPONENTS
   MCParser
   MCDisassembler
   Object
+  SPIRUtils
   )
 
 add_llvm_tool(llvm-objdump

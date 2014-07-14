@@ -99,6 +99,7 @@ namespace llvm
       RET_FLAG,
       BRANCH_COND,
       ADDADDR,
+      CONST_ADDRESS,
       // ATOMIC Operations
       // Global Memory
       ATOM_G_ADD = ISD::FIRST_TARGET_MEMORY_OPCODE,
@@ -224,19 +225,21 @@ namespace llvm
     };
   } // AMDILISD
 
+  class AMDILSubtarget;
+  class DebugLoc;
   class MachineBasicBlock;
   class MachineInstr;
-  class DebugLoc;
   class TargetInstrInfo;
 
   class AMDILTargetLowering : public TargetLowering {
-  private:
-    int VarArgsFrameOffset;   // Frame offset to start of varargs area.
+    private:
+    const AMDILSubtarget &Subtarget;
+      int VarArgsFrameOffset;   // Frame offset to start of varargs area.
 
     void setFloatCondCodeActions(MVT::SimpleValueType VT);
     void setIntCondCodeActions(MVT::SimpleValueType VT);
 
-  public:
+    public:
       AMDILTargetLowering(TargetMachine &TM);
 
       virtual MVT getShiftAmountTy(EVT LHSTy) const LLVM_OVERRIDE {
@@ -322,9 +325,10 @@ namespace llvm
       bool isLoadBitCastBeneficial(EVT load, EVT bitcast) const LLVM_OVERRIDE;
 
     private:
-      CCAssignFn* CCAssignFnForNode(unsigned int CC, bool isReturn,
-          bool atCallSite) const;
-
+      CCAssignFn *CCAssignFnForNode(CallingConv::ID CC,
+                                    bool isReturn,
+                                    bool atCallSite,
+                                    bool isKernel = false) const;
       SDValue LowerCallResult(SDValue Chain,
           SDValue InFlag,
           CallingConv::ID CallConv,
@@ -421,6 +425,27 @@ namespace llvm
 
       SDValue
         LowerExternalSymbol(SDValue Op, SelectionDAG &DAG) const;
+
+  /// \brief Split a vector load into a scalar load of each component.
+  SDValue ScalarizeVectorLoad(SDValue Op, SelectionDAG &DAG) const;
+
+  /// \brief Split a vector store into 2 stores of half the vector.
+  SDValue SplitVectorStore(SDValue Op, SelectionDAG &DAG) const;
+
+  SDValue ScalarizeVectorStore(SDValue Op, SelectionDAG &DAG) const;
+
+  /// \brief Split a vector load into 2 loads of half the vector.
+  SDValue SplitVectorLoad(SDValue Op, SelectionDAG &DAG) const;
+
+  SDValue unpackSmallVector(SelectionDAG &DAG, SDValue Op, DebugLoc DL,
+                            EVT FinalVT, EVT SrcVT, bool Signed) const;
+  SDValue packSmallVector(SelectionDAG &DAG, ArrayRef<SDValue> Elts,
+                          DebugLoc DL, EVT PackedVT) const;
+
+  SDValue MergeVectorStore(SDValue Op, SelectionDAG &DAG) const;
+
+      SDValue LowerLOAD(SDValue Op, SelectionDAG &DAG) const;
+      SDValue LowerSTORE(SDValue Op, SelectionDAG &DAG) const;
 
       SDValue
         LowerADD(SDValue Op, SelectionDAG &DAG) const;
@@ -532,10 +557,11 @@ namespace llvm
         addExtensionInstructions(
           uint32_t reg, bool signedShift,
           unsigned int simpleVT) const;
-      SDValue
-        BuildKernelArgVal(ArgListEntry &Arg, unsigned NumParts,
-          unsigned PartIdx, SDValue OutVal, EVT VT, SDValue &Chain,
-          unsigned &CBIdx, SelectionDAG &DAG) const;
+    void BuildKernelArgVal(SmallVectorImpl<SDValue> &Result,
+                           ArgListEntry &Arg, unsigned NumParts,
+                           SDValue OutVal, EVT VT, EVT ArgVT,
+                           SDValue &Chain, unsigned &CBIdx,
+                           SelectionDAG &DAG) const;
   }; // AMDILTargetLowering
 } // end namespace llvm
 

@@ -38,7 +38,6 @@ HSAILSubtarget::HSAILSubtarget(llvm::StringRef TT, llvm::StringRef CPU, llvm::St
          HSAILDeviceInfo::MaxNumberCapabilities);
   mVersion = 0;
   mMetadata30 = true;
-  mUsesFlatAddr = false;
   mIs32on64bit = false;
   mDefaultSize[0] = 64;
   mDefaultSize[1] = 1;
@@ -73,12 +72,6 @@ bool
 HSAILSubtarget::supportMetadata30() const
 {
   return mMetadata30;
-}
-
-bool
-HSAILSubtarget::usesFlatAddr() const
-{
-  return mUsesFlatAddr;
 }
 
 size_t

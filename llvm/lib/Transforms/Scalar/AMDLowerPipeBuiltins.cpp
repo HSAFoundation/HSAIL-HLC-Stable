@@ -51,10 +51,10 @@ namespace {
                                                 Type *ReturnType);
 
     void GetPipeProperties(llvm::CallInst *CI,unsigned &PipePacketSize,
-                           unsigned &PipePacketAlign, unsigned &PipeAccess);
+                           unsigned &PipePacketAlign);
 
     bool GetLibraryName(llvm::CallInst *CI, std::string FunctionName,
-                        std::string &LibraryName,bool &AddAlign, bool &AddAccess);
+                        std::string &LibraryName,bool &AddAlign);
 
   };
 
@@ -77,44 +77,35 @@ namespace {
                                  // call. (e.g read/write pipe internal
                                  // function calls.
 
-    int addAccess;               // field indicates if there is need to add
-                                 // the access type field
-                                 // (read_only/write_only) to the internal
-                                 // function call. e.g. get_pipe_num_packets
   } PipeBuiltinLoweringDescr[] = {
-    {"read_pipe",4,"__read_pipe_internal_",1,0},
-    {"read_pipe",6,"__read_pipe_reserved_internal_",1,0},
-    {"write_pipe",4,"__write_pipe_internal_",1,0},
-    {"write_pipe",6,"__write_pipe_reserved_internal_",1,0},
-    {"reserve_read_pipe",4, "__reserve_read_pipe_internal_",0,0},
-    {"reserve_write_pipe",4, "__reserve_write_pipe_internal_",0,0},
-    {"commit_read_pipe",4, "__commit_read_pipe_internal_",0,0},
-    {"commit_write_pipe",4, "__commit_write_pipe_internal_",0,0},
+    {"read_pipe",4,"__read_pipe_internal_",1},
+    {"read_pipe",6,"__read_pipe_reserved_internal_",1},
+    {"write_pipe",4,"__write_pipe_internal_",1},
+    {"write_pipe",6,"__write_pipe_reserved_internal_",1},
+    {"reserve_read_pipe",4, "__reserve_read_pipe_internal_",0},
+    {"reserve_write_pipe",4, "__reserve_write_pipe_internal_",0},
+    {"commit_read_pipe",4, "__commit_read_pipe_internal_",0},
+    {"commit_write_pipe",4, "__commit_write_pipe_internal_",0},
     {"work_group_reserve_read_pipe",4,
-                   "__work_group_reserve_read_pipe_internal_",0,0},
+                   "__work_group_reserve_read_pipe_internal_",0},
     {"work_group_reserve_write_pipe",4,
-                   "__work_group_reserve_write_pipe_internal_",0,0},
+                   "__work_group_reserve_write_pipe_internal_",0},
     {"work_group_commit_read_pipe",4,
-                   "__work_group_commit_read_pipe_internal_",0,0},
+                   "__work_group_commit_read_pipe_internal_",0},
     {"work_group_commit_write_pipe",4,
-                   "__work_group_commit_write_pipe_internal_",0,0},
-    {"get_pipe_num_packets",3,"__get_pipe_num_packets_internal_",0,1},
-    {"get_pipe_max_packets",3,"__get_pipe_max_packets_internal_",0,0},
+                   "__work_group_commit_write_pipe_internal_",0},
+    {"get_pipe_num_packets",3,"__get_pipe_num_packets_internal_",0},
+    {"get_pipe_max_packets",3,"__get_pipe_max_packets_internal_",0},
     {"sub_group_reserve_read_pipe",4,
-                   "__sub_group_reserve_read_pipe_internal_",0,0},
+                   "__sub_group_reserve_read_pipe_internal_",0},
     {"sub_group_reserve_write_pipe",4,
-                   "__sub_group_reserve_write_pipe_internal_",0,0},
+                   "__sub_group_reserve_write_pipe_internal_",0},
     {"sub_group_commit_read_pipe",4,
-                   "__sub_group_commit_read_pipe_internal_",0,0},
+                   "__sub_group_commit_read_pipe_internal_",0},
     {"sub_group_commit_write_pipe",4,
-                   "__sub_group_commit_write_pipe_internal_",0,0},
-    {NULL,0,NULL,0,0}
+                   "__sub_group_commit_write_pipe_internal_",0},
+    {NULL,0,NULL,0}
   };
-
-  // metadata string which will be emitted by frontend to indicate
-  // pipe access type
-  const std::string PipeAccessQualString = "pipe_access_qual";
-
 } // end anonymous namespace
 
 INITIALIZE_PASS(AMDLowerPipeBuiltins, "amd-lower-opencl-pipe-builtins",
@@ -124,15 +115,15 @@ INITIALIZE_PASS(AMDLowerPipeBuiltins, "amd-lower-opencl-pipe-builtins",
 char AMDLowerPipeBuiltins::ID = 0;
 
 // Implements the lowering of pipe builtin function calls to internal
-// library function calls. 
+// library function calls.
 
 // pipe buitlin functions can have generic types(scalar, vector of basic
-// types) or user defined pipe types. 
+// types) or user defined pipe types.
 
-// The builtin functions which uses generic types are lowered 
+// The builtin functions which uses generic types are lowered
 // to <builtin>_internal_<packetsize> library calls.
 
-// The builtin functions which uses user defined types are lowered 
+// The builtin functions which uses user defined types are lowered
 // to <builtin>_internal_user library calls with additional arguments
 // packet size and struct alignment.
 
@@ -142,7 +133,7 @@ char AMDLowerPipeBuiltins::ID = 0;
 
 bool AMDLowerPipeBuiltins::runOnModule(Module& M) {
 
-  bool Changed = false; 
+  bool Changed = false;
   for(Module::iterator MF = M.begin(), E = M.end(); MF != E; ++MF) { 
     for(Function::iterator BB=MF->begin(), MFE=MF->end(); BB != MFE; ++BB) { 
       for(BasicBlock::iterator instr = BB->begin(), instr_end = BB->end(); 
@@ -219,32 +210,31 @@ AMDLowerPipeBuiltins::CreatePipeLibraryCall(Module &M, CallInst *CI)
   std::vector<llvm::Type*> ArgumentTypes;
   int newNumParams=numParams;
   bool AddAlign  = false;
-  bool AddAccess = false;
 
-  if (GetLibraryName(CI,FunctionName,LibraryName,AddAlign,AddAccess)) {
+  if (GetLibraryName(CI,FunctionName,LibraryName,AddAlign)) {
 
   // SPIR 2.0 specifies that there will be extra argument specifying the
-  // pipe size. In case of generic pipe types, the packet size will be 
-  // part of library function (e.g read_pipe_internal_1 specifies 
-  // packetsize is 1 byte. 
+  // pipe size. In case of generic pipe types, the packet size will be
+  // part of library function (e.g read_pipe_internal_1 specifies
+  // packetsize is 1 byte.
 
   // In case of basic pipe types we have to remove one argument from the
   // call and function declaration.
 
   // for pipe functions with user defined type, we have to add additional
-  // alignment parameter. 
+  // alignment parameter.
   //   e.g read_pipe_internal_user(...,pipesize,pipealignment)
 
     unsigned PipeDataSize = 0;
     unsigned PipeDataAlignment = 0;
     unsigned PipeDataAccess = 0;
     int params = 0;
-    GetPipeProperties(CI,PipeDataSize,PipeDataAlignment,PipeDataAccess);
+    GetPipeProperties(CI,PipeDataSize,PipeDataAlignment);
 
-    // If the pipedata size and the pipe data alignements are same, 
+    // If the pipedata size and the pipe data alignements are same,
     // we would use the internal_<size> functions which will be
     // implemented efficiently by the library.
-    if (PipeDataAlignment == PipeDataSize *8) {
+    if (PipeDataAlignment == PipeDataSize ) {
        newNumParams-=2;  // the packetsize will be part of library name and
                          // alignment field is not needed.
        LibraryName += APInt(32,PipeDataSize).toString(10,false);
@@ -258,18 +248,9 @@ AMDLowerPipeBuiltins::CreatePipeLibraryCall(Module &M, CallInst *CI)
     for (int i=0; i<newNumParams; i++)
       NewArgs.push_back(CI->getArgOperand(i));
 
-    for (llvm::Function::arg_iterator AI = CF->arg_begin(), E = CF->arg_end(); 
+    for (llvm::Function::arg_iterator AI = CF->arg_begin(), E = CF->arg_end();
                                (params++ < newNumParams) && (AI != E); ++AI)  {
         ArgumentTypes.push_back(AI->getType());
-    }
-
-    // for get_pipe_num_packets function, we need to know if the pipe is 
-    // for reading or for writing. This additional information is passed
-    // to this function.
-    if (AddAccess) {
-      llvm::Type *Int32Type = llvm::IntegerType::get(CI->getContext(), 32);
-      ArgumentTypes.push_back(Int32Type);
-      NewArgs.push_back(llvm::ConstantInt::get(Int32Type, PipeDataAccess));
     }
 
     llvm::Function *NF ;
@@ -307,13 +288,9 @@ AMDLowerPipeBuiltins::CreatePipeLibraryCall(Module &M, CallInst *CI)
 
 // e.g @_Z10write_pipePvS_j will return "__write_pipe_internal_"
 
-// AddAccess will be set to true, if the new call instruction need
-// to add the pipe access attribute (for get_pipe_num_packets and
-// similar functions)
-
 bool AMDLowerPipeBuiltins::GetLibraryName(llvm::CallInst *CI,
                       std::string FunctionName,std::string &LibraryName,
-                      bool &AddAlign, bool &AddAccess)
+                      bool &AddAlign)
 {
    int numParams = CI->getNumArgOperands();
    IRBuilder<> B(CI);
@@ -325,9 +302,7 @@ bool AMDLowerPipeBuiltins::GetLibraryName(llvm::CallInst *CI,
       if (numParams != PipeBuiltinLoweringDescr[i].numParams) continue;
 
       LibraryName = PipeBuiltinLoweringDescr[i].internalFunction;
-
       AddAlign = PipeBuiltinLoweringDescr[i].addAlign;
-      AddAccess= PipeBuiltinLoweringDescr[i].addAccess;
 
       return true;
      }
@@ -335,40 +310,25 @@ bool AMDLowerPipeBuiltins::GetLibraryName(llvm::CallInst *CI,
    return false;
 }
 
-// The properties of pipe <alignment, read/write access
-// are returned by this function. The access information 
-// is expected to be stored as metadata by the front-end.
+// The properties of pipe <alignment, packet size)
+// are returned by this function.
 
-// ToDo: The metadata and alignment fields are discussed
-// in SPIR WG. incase, the proposal is not accepted
-// additional pass is needed to consume the external
-// spir binaries.
-
-void AMDLowerPipeBuiltins::GetPipeProperties(llvm::CallInst *CI, 
+void AMDLowerPipeBuiltins::GetPipeProperties(llvm::CallInst *CI,
                        unsigned &PipeDataSize,
-                       unsigned &PipeDataAlign, unsigned &PipeDataAccess)
+                       unsigned &PipeDataAlign)
 {
-   MDNode *AccessNode = CI->getMetadata(PipeAccessQualString);
-
-   if (AccessNode && AccessNode->getNumOperands()) {
-     MDString *Access = dyn_cast<MDString>(AccessNode->getOperand(0));
-     StringRef accessString="read_only";
-     if (Access) accessString = Access->getString();
-     PipeDataAccess = accessString.compare("read_only")?0:1;
-   }
-
    int numParams = CI->getNumArgOperands();
    // packetsize is the last-1 argument of the library call added by frontend
-   ConstantInt *CIntPacketDataSize 
+   ConstantInt *CIntPacketDataSize
                   = dyn_cast<ConstantInt>(CI->getArgOperand(numParams-2));
-   if (CIntPacketDataSize) 
+   if (CIntPacketDataSize)
       PipeDataSize  = CIntPacketDataSize->getSExtValue();
 
-   // packet data alignment is the last argument of the library call 
+   // packet data alignment is the last argument of the library call
    // added by frontend
    ConstantInt *CIntPacketDataAlign
                   = dyn_cast<ConstantInt>(CI->getArgOperand(numParams-1));
-   if (CIntPacketDataAlign) 
+   if (CIntPacketDataAlign)
       PipeDataAlign  = CIntPacketDataAlign->getSExtValue();
 
 }
@@ -376,7 +336,7 @@ void AMDLowerPipeBuiltins::GetPipeProperties(llvm::CallInst *CI,
 // Function to create a new llvm function with given name and argument types
 // ToDo: This function can be moved to AMDArgumentUtils.cpp
 
-llvm::Function *AMDLowerPipeBuiltins::CreateFunctionWithArguments(Module &M, 
+llvm::Function *AMDLowerPipeBuiltins::CreateFunctionWithArguments(Module &M,
                                       StringRef FunctionName,
                                       std::vector<llvm::Type*> ArgumentTypes,
                                       llvm::Type *ReturnType)
@@ -388,7 +348,7 @@ llvm::Function *AMDLowerPipeBuiltins::CreateFunctionWithArguments(Module &M,
                                             llvm::Function::ExternalLinkage,
                                             FunctionName, &M);
   return NewFunction;
-  
+
 }
 
 

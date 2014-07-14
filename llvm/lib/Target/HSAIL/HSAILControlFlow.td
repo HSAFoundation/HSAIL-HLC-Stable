@@ -1,9 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // call
 
-let isNotDuplicable = 1, isCall = 1, 
-    Uses = [include "HSAILPARAMREG.td", include "HSAILRETREG.td"], Defs = [include "HSAILRETREG.td"]
-      in { 
+let isNotDuplicable = 1, isCall = 1 in {
          def target_call : HSAILInst<(outs ), (ins calltarget:$dst, variable_ops),
             "call $dst", []>;
 }

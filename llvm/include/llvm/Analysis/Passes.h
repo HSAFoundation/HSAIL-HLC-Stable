@@ -239,7 +239,7 @@ namespace llvm {
   FunctionPass *createAMDLivenessPrinterPass();
 
   // Add kernel nature as external symbols
-  ModulePass *createAMDExportKernelNaturePass(bool WorkGroupLevel = false);
+  ModulePass *createAMDExportKernelNaturePass();
 
   ModulePass *createAMDAliasAnalysisPass(bool BarrierClobberAllMem);
   ModulePass *createAMDFenceInfoAnalysisPass();

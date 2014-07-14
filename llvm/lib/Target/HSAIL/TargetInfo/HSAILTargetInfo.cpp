@@ -16,9 +16,9 @@ Target llvm::TheHSAIL_32Target, llvm::TheHSAIL_64Target;
 
 extern "C" void LLVMInitializeHSAILTargetInfo()
 {
-  RegisterTarget<Triple::hsail, /*HasJIT=*/true>
+  RegisterTarget<Triple::hsail, /*HasJIT=*/false>
     X(TheHSAIL_32Target, "hsail", "32-bit HSAIL: small machine model, addresses are 32 bit");
 
-  RegisterTarget<Triple::hsail_64, /*HasJIT=*/true>
+  RegisterTarget<Triple::hsail_64, /*HasJIT=*/false>
     Y(TheHSAIL_64Target, "hsail-64", "64-bit HSAIL: large machine model, addresses are 64 bit");
 }

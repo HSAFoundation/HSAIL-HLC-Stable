@@ -17,6 +17,9 @@ using std::string;
 using Brig::BrigMachineModel;
 using Brig::BRIG_MACHINE_SMALL;
 using Brig::BRIG_MACHINE_LARGE;
+using Brig::BrigProfile;
+using Brig::BRIG_PROFILE_BASE;
+using Brig::BRIG_PROFILE_FULL;
 
 namespace TESTGEN {
 
@@ -80,6 +83,7 @@ extern llvm::cl::opt<TestType>            testType;
 extern llvm::cl::opt<PackageType>         testPackage;
 extern llvm::cl::opt<SearchType>          searchType;
 extern llvm::cl::opt<BrigMachineModel>    machineModel;
+extern llvm::cl::opt<BrigProfile>         profile;
 extern llvm::cl::bits<InstSubsetType>     instSubset;
 extern llvm::cl::opt<DataType>            dataType;
 extern llvm::cl::opt<InstVariantsType>    instVariants;

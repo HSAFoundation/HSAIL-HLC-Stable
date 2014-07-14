@@ -87,13 +87,13 @@ void AMDILCIIOExpansionImpl::expandFlatLoad(MachineInstr *MI) {
             AMDIL::FLDv4i32P32U), DataReg).addReg(AddyReg);
       break;
     case 1:
-      BuildMI(*mBB, MI, DL, mTII->get(isSWSExtLoadInst(MI) ?
+      BuildMI(*mBB, MI, DL, mTII->get(isSExtLoadInst(MI) ?
             (is64bit) ?  AMDIL::FLDi8P64U : AMDIL::FLDi8P32U :
             (is64bit) ?  AMDIL::FLDu8P64U : AMDIL::FLDu8P32U),
           DataReg).addReg(AddyReg);
       break;
     case 2:
-      BuildMI(*mBB, MI, DL, mTII->get(isSWSExtLoadInst(MI) ?
+      BuildMI(*mBB, MI, DL, mTII->get(isSExtLoadInst(MI) ?
             (is64bit) ?  AMDIL::FLDi16P64U : AMDIL::FLDi16P32U :
             (is64bit) ?  AMDIL::FLDu16P64U : AMDIL::FLDu16P32U),
           DataReg).addReg(AddyReg);
@@ -115,7 +115,6 @@ void AMDILCIIOExpansionImpl::expandFlatLoad(MachineInstr *MI) {
       break;
   }
   expandPackedData(MI, DataReg, DataReg);
-  expandExtendLoad(MI, DataReg, DataReg);
   MI->getOperand(0).setReg(DataReg);
 }
 

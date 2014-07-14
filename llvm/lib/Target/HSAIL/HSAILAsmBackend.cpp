@@ -152,49 +152,13 @@ HSAILAsmBackend::writeNopData(uint64_t Count, MCObjectWriter *OW) const
 ASM_BACKEND_CLASS*
 llvm::createHSAIL_32AsmBackend(const ASM_BACKEND_CLASS &T,
                                const std::string &TT) {
-  switch (Triple(TT).getOS()) {
-  case Triple::Darwin:
-    return new DarwinHSAIL_32AsmBackend(T);
-  case Triple::MinGW32:
-  case Triple::Cygwin:
-  case Triple::Win32:
-    if (Triple(TT).getEnvironment() == Triple::MachO)
-      return new DarwinHSAIL_32AsmBackend(T);
-    else
-      return new WindowsHSAILAsmBackend(T, false);
-  default:
-    return new ELFHSAIL_32AsmBackend(T, Triple(TT).getOS());
-  }
+  return new ELFHSAIL_32AsmBackend(T, Triple(TT).getOS());
 }
 
 ASM_BACKEND_CLASS *
 llvm::createHSAIL_64AsmBackend(const ASM_BACKEND_CLASS &T,
                                const std::string &TT) {
-  switch (Triple(TT).getOS()) {
-  case Triple::Darwin:
-    return new DarwinHSAIL_64AsmBackend(T);
-  case Triple::MinGW32:
-  case Triple::Cygwin:
-  case Triple::Win32:
-    if (Triple(TT).getEnvironment() == Triple::MachO)
-      return new DarwinHSAIL_64AsmBackend(T);
-    else
-      return new WindowsHSAILAsmBackend(T, true);
-  default:
-    return new ELFHSAIL_64AsmBackend(T, Triple(TT).getOS());
-  }
-}
-
-MCAsmBackend* llvm::createHSAIL_32AsmBackendForLLVM30(const Target &T, StringRef TT)
-{
-  HSAILAsmBackend dummy(0);
-  return new ELFHSAIL_32AsmBackend(dummy, Triple(TT).getOS());
-}
-
-MCAsmBackend* llvm::createHSAIL_64AsmBackendForLLVM30(const Target &T, StringRef TT)
-{
-  HSAILAsmBackend dummy(0);
-  return new ELFHSAIL_64AsmBackend(dummy, Triple(TT).getOS());
+  return new ELFHSAIL_64AsmBackend(T, Triple(TT).getOS());
 }
 
 MCAsmBackend* llvm::createHSAIL_32AsmBackendForLLVM32(const Target &T, StringRef TT, StringRef CPU)

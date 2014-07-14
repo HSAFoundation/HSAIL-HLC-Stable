@@ -159,8 +159,8 @@ let Predicates = [Has64BitPtr], addr64 = 1 in {
   let addr64 = 1 in {
     defm UAVRAW64 : UAVRawLSInst<GPR_XY_64, "_addr(64)_id($id)">;
     defm SCRATCH64 : ScratchLSInst<GPR_XY_64>;
-    defm GDS64 : GDSLSInst<GPR_32>;
-    defm LDS64 : LDSLSInst<GPR_32>;
+    defm GDS64 : GDSLSInst<GPR_X_32>;
+    defm LDS64 : LDSLSInst<GPR_X_32>;
 
     let image = 1, txld = 1, load = 1 in {
       def TXLD641D : ILFormat<IL_OP_LOAD, (outs GPRV4I32:$dst),

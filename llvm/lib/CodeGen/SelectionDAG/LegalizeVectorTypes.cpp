@@ -25,10 +25,6 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 
-#if defined(AMD_OPENCL) || 1
-#include "llvm/AMDLLVMContextHook.h"
-#endif
-
 using namespace llvm;
 
 //===----------------------------------------------------------------------===//
@@ -2314,11 +2310,12 @@ SDValue DAGTypeLegalizer::WidenVecOp_SETCC(SDNode *N) {
 //  TLI:       Target lowering used to determine legal types.
 //  Width:     Width left need to load/store.
 //  WidenVT:   The widen vector type to load to/store from
+//  N:         Load or store SDNode.
 //  Align:     If 0, don't allow use of a wider type
 //  WidenEx:   If Align is not 0, the amount additional we can load/store from.
 
 static EVT FindMemType(SelectionDAG& DAG, const TargetLowering &TLI,
-                       unsigned Width, EVT WidenVT,
+                       unsigned Width, EVT WidenVT, const MemSDNode *N,
                        unsigned Align = 0, unsigned WidenEx = 0) {
   EVT WidenEltVT = WidenVT.getVectorElementType();
   unsigned WidenWidth = WidenVT.getSizeInBits();
@@ -2333,17 +2330,7 @@ static EVT FindMemType(SelectionDAG& DAG, const TargetLowering &TLI,
   // See if there is larger legal integer than the element type to load/store
   unsigned VT;
 #if defined(AMD_OPENCL) || 1
-  // In HSAIL we have _v3 loads and stores, and in case of not even vector size
-  // it is more effective to use one _v3 load instead of several _v1 loads
-  // For example for vector load of 3 integers:
-  //   ld_v1_u64
-  //   ld_v1_u32
-  // Is worse than:
-  //   ld_v3_u32
-  // TODO_HSA: Patch TargetLowering with reasonable callback
-  //           instead of checking target.
-  //           Bug 9476
-  if (!AMDOptions::isTargetHSAIL(DAG.getTarget().getTargetTriple()))
+  if (TLI.isVectorToScalarLoadStoreWidenBeneficial(Width, WidenVT, N))
 #endif
   for (VT = (unsigned)MVT::LAST_INTEGER_VALUETYPE;
        VT >= (unsigned)MVT::FIRST_INTEGER_VALUETYPE; --VT) {
@@ -2437,7 +2424,11 @@ SDValue DAGTypeLegalizer::GenWidenVectorLoads(SmallVector<SDValue, 16> &LdChain,
   unsigned LdAlign = (isVolatile) ? 0 : Align; // Allow wider loads
 
   // Find the vector type that can load from.
-  EVT NewVT = FindMemType(DAG, TLI, LdWidth, WidenVT, LdAlign, WidthDiff);
+  EVT NewVT = FindMemType(DAG, TLI, LdWidth, WidenVT,
+#if defined(AMD_OPENCL) || 1
+                          LD,
+#endif
+                          LdAlign, WidthDiff);
   int NewVTWidth = NewVT.getSizeInBits();
   SDValue LdOp = DAG.getLoad(NewVT, dl, Chain, BasePtr, LD->getPointerInfo(),
                              isVolatile, isNonTemporal, isInvariant, Align);
@@ -2481,7 +2472,11 @@ SDValue DAGTypeLegalizer::GenWidenVectorLoads(SmallVector<SDValue, 16> &LdChain,
     SDValue L;
     if (LdWidth < NewVTWidth) {
       // Our current type we are using is too large, find a better size
-      NewVT = FindMemType(DAG, TLI, LdWidth, WidenVT, LdAlign, WidthDiff);
+      NewVT = FindMemType(DAG, TLI, LdWidth, WidenVT,
+#if defined(AMD_OPENCL) || 1
+                          LD,
+#endif
+                          LdAlign, WidthDiff);
       NewVTWidth = NewVT.getSizeInBits();
       L = DAG.getLoad(NewVT, dl, Chain, BasePtr,
                       LD->getPointerInfo().getWithOffset(Offset), isVolatile,
@@ -2638,7 +2633,11 @@ void DAGTypeLegalizer::GenWidenVectorStores(SmallVector<SDValue, 16>& StChain,
   unsigned Offset = 0;  // offset from base to store
   while (StWidth != 0) {
     // Find the largest vector type we can store with
-    EVT NewVT = FindMemType(DAG, TLI, StWidth, ValVT);
+    EVT NewVT = FindMemType(DAG, TLI, StWidth, ValVT
+#if defined(AMD_OPENCL) || 1
+                          , ST
+#endif
+                           );
     unsigned NewVTWidth = NewVT.getSizeInBits();
     unsigned Increment = NewVTWidth / 8;
     if (NewVT.isVector()) {

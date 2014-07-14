@@ -68,7 +68,7 @@ const char *amd::CompilerErrorMessage[NUM_ERROR_MESSAGES] = {
   "E011:Insufficient Resources Detected!",
   "E012:Insufficient Local Resources!   ",
   "E013:Insufficient Private Resources! ",
-  "E014:Images not currently supported! ",
+  "E014:Insufficient Image Resources!   ",
   "E015:Double precision not supported! ",
   "E016:Invalid Constant Memory Write!  ",
   "E017:Max number Constant Ptr reached!",

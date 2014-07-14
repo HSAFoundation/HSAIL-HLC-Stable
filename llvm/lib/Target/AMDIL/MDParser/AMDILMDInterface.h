@@ -185,6 +185,7 @@ namespace llvm
         AccessType type;
         unsigned volatile_;
         unsigned restrict_;
+        unsigned pipe_;
       } pointer;
     } arg;
     std::string reflectStr;
@@ -205,6 +206,8 @@ namespace llvm
       lws = 0;
       cws[0] = cws[1] = cws[2] = 0;
       crs[0] = crs[1] = crs[2] = 0;
+      enqueue_kernel = false;
+      kernel_index = 0;
     }
     std::string kernelName;
     unsigned major, minor, revision;
@@ -237,6 +240,8 @@ namespace llvm
     unsigned lws;
     unsigned gws;
     unsigned swgws;
+    bool enqueue_kernel;
+    unsigned kernel_index;
   };
 
   // The struct that stores the data section for a specific data

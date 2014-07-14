@@ -65,7 +65,8 @@ def RetCC_AMDIL32 : CallingConv<[
   CCIfType<[i64, f64, v2f32], CCBitConvertToType<v2i32>>,
   CCIfType<[v2i64, v4f32, v2f64], CCBitConvertToType<v4i32>>,
 
-  CCIfType<[i1, i8, i16, i32], CCAssignToReg<
+  CCIfType<[i1, i8, i16], CCPromoteToType<i32>>,
+  CCIfType<[i32], CCAssignToReg<
     [OUTx0, OUTy0, OUTz0, OUTw0, OUTx1, OUTy1, OUTz1, OUTw1,
      OUTx2, OUTy2, OUTz2, OUTw2, OUTx3, OUTy3, OUTz3, OUTw3,
      OUTx4, OUTy4, OUTz4, OUTw4, OUTx5, OUTy5, OUTz5, OUTw5,
@@ -96,7 +97,8 @@ def CC_AMDIL32 : CallingConv<[
   CCIfType<[v2i64, v4f32, v2f64], CCBitConvertToType<v4i32>>,
 //  CCIfType<[f16], CCBitConvertToType<i16>>,
 
-  CCIfType<[i1, i8, i16, i32], CCAssignToReg<
+  CCIfType<[i1, i8, i16], CCPromoteToType<i32>>,
+  CCIfType<[i32], CCAssignToReg<
     [ include "AMDILRegisterUsesINScalar.td" ]>>,
 
   CCIfType<[i32], CCAssignToStack<4, 4>>,
@@ -125,7 +127,8 @@ def Call_CC_AMDIL32 : CallingConv<[
 
 //CCIfType<[f16], CCBitConvertToType<i16>>,
 
-  CCIfType<[i1, i8, i16, i32], CCAssignToReg<
+  CCIfType<[i1, i8, i16], CCPromoteToType<i32>>,
+  CCIfType<[i32], CCAssignToReg<
     [ include "AMDILRegisterUsesScalar.td" ]> >,
 
  CCIfType<[v2i1, v2i8, v2i16, v2i32], CCAssignToReg<
@@ -146,8 +149,9 @@ def Call_RetCC_AMDIL32 : CallingConv<[
     CCBitConvertToType<v4i32>>,
 //  CCIfType<[f16], CCBitConvertToType<i16>>,
   CCIfType<[v8i8], CCPromoteToType<v8i32>>,
- CCIfType<[i1, i8, i16, i32], CCAssignToReg<
- [ include "AMDILRegisterUsesScalar.td" ]> >,
+  CCIfType<[i1, i8, i16], CCPromoteToType<i32>>,
+  CCIfType<[i32], CCAssignToReg<
+  [ include "AMDILRegisterUsesScalar.td" ]> >,
 
  CCIfType<[v2i1, v2i8, v2i16, v2i32], CCAssignToReg<
  [ include "AMDILRegisterUsesV2.td" ]> >,

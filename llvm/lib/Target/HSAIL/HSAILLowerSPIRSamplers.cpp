@@ -12,7 +12,6 @@
 
 #define DEBUG_TYPE "hsail-lower-samplers"
 
-#include "HSAILMetadataUtils.h"
 #include "HSAILUtilityFunctions.h"
 
 #include <llvm/GlobalVariable.h>
@@ -20,6 +19,7 @@
 #include <llvm/ADT/SmallBitVector.h>
 #include <llvm/Support/Debug.h>
 #include <llvm/Support/raw_ostream.h>
+#include "llvm/Transforms/AMDMetadataUtils.h"
 
 #include <map>
 
@@ -323,6 +323,7 @@ void HSAILLowerSPIRSamplers::clearState(Module &M) {
 }
 
 bool HSAILLowerSPIRSamplers::runOnModule(Module &M) {
+
   bool Changed = false;
   clearState(M);
   DIManager.collectFunctionDIs(M);

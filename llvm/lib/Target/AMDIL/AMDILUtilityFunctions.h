@@ -57,15 +57,12 @@
 
 #include "AMDIL.h"
 #include "AMDILTargetMachine.h"
-#include "llvm/ADT/SmallVector.h"
 
 // Utility functions from ID
 //
 namespace llvm {
 class TargetRegisterClass;
 class TargetMachine;
-class SDValue;
-class SDNode;
 class Value;
 class Type;
 class TypeSymbolTable;
@@ -144,12 +141,6 @@ const char *getDstSwizzle(unsigned);
 // get the vector register which is the super register of the given register
 unsigned getVectorReg(unsigned Reg, const TargetRegisterInfo *TRI);
 
-unsigned int getTargetIndependentMoveFromType(unsigned Type);
-
-// Debug functions for SDNode and SDValue.
-void printSDValue(const llvm::SDValue &Op, int level);
-void printSDNode(const llvm::SDNode *Node);
-
 // Function to check address space
 bool check_type(const llvm::Value *Ptr, unsigned int AddrSpace);
 
@@ -167,15 +158,11 @@ size_t getNumElements(llvm::OpaqueType *const OT);
 const llvm::Value *getMemOpUnderlyingObject(const llvm::MachineInstr *MI,
                                             const DataLayout *DL = 0);
 
-
-
 const char *getTypeName(llvm::Type *Ptr,
     const char *SymTab,
     llvm::AMDILMachineFunctionInfo *MFI,
     bool SignedType);
 bool isImageType(const Type *Ty);
-
-int64_t GET_SCALAR_SIZE(llvm::Type *A);
 
 // Helper functions that check the opcode for status information
 bool isLoadInst(const llvm::MachineInstr *MI);
@@ -239,11 +226,6 @@ inline bool isAddriInst(const llvm::MachineInstr *MI) {
   return MI->getOpcode() == llvm::AMDIL::ADDrp
       || MI->getOpcode() == llvm::AMDIL::ADDi64rp;
 }
-inline bool isAddInst(const llvm::MachineInstr *MI) {
-  unsigned OpCode = MI->getOpcode();
-  return OpCode >= llvm::AMDIL::ADDf32rr
-      && OpCode <= llvm::AMDIL::ADDv4i8rr;
-}
 inline bool isLoadConstInst(const llvm::MachineInstr *MI) {
   return (MI->getDesc().TSFlags & (1ULL << AMDID::LOADCONST));
 }
@@ -258,179 +240,6 @@ bool isWComponentReg(unsigned);
 bool isXYComponentReg(unsigned);
 bool isZWComponentReg(unsigned);
 
-// Macros that are used to help with switch statements for various data types
-// However, these macro's do not return anything unlike the second set below.
-#define ExpandCaseTo32bitIntTypes(Instr) \
-case Instr##i8: \
-case Instr##i16: \
-case Instr##i32:
-
-#define ExpandCaseTo32bitIntTruncTypes(Instr) \
-case Instr##i16i8r: \
-case Instr##i32i8r: \
-case Instr##i32i16r:
-
-#define ExpandCaseToIntTypes(Instr) \
-    ExpandCaseTo32bitIntTypes(Instr) \
-case Instr##i64:
-
-#define ExpandCaseToIntTruncTypes(Instr) \
-    ExpandCaseTo32bitIntTruncTypes(Instr) \
-case Instr##i64i8r: \
-case Instr##i64i16r: \
-case Instr##i64i32r:
-
-#define ExpandCaseToFloatTypes(Instr) \
-    case Instr##f32: \
-case Instr##f64:
-
-#define ExpandCaseToFloatTruncTypes(Instr) \
-case Instr##f64f32r:
-
-#define ExpandCaseTo32bitScalarTypes(Instr) \
-    ExpandCaseTo32bitIntTypes(Instr) \
-case Instr##f32:
-
-#define ExpandCaseToAllScalarTypes(Instr) \
-    ExpandCaseToFloatTypes(Instr) \
-ExpandCaseToIntTypes(Instr)
-
-#define ExpandCaseToAllScalarTruncTypes(Instr) \
-    ExpandCaseToFloatTruncTypes(Instr) \
-ExpandCaseToIntTruncTypes(Instr)
-
-// Vector versions of above macros
-#define ExpandCaseToVectorIntTypes(Instr) \
-    case Instr##v2i8: \
-case Instr##v4i8: \
-case Instr##v2i16: \
-case Instr##v4i16: \
-case Instr##v2i32: \
-case Instr##v4i32: \
-case Instr##v2i64:
-
-#define ExpandCaseToVectorIntTruncTypes(Instr) \
-case Instr##v2i16i8r: \
-case Instr##v4i16i8r: \
-case Instr##v2i32i8r: \
-case Instr##v4i32i8r: \
-case Instr##v2i32i16r: \
-case Instr##v4i32i16r: \
-case Instr##v2i64i8r: \
-case Instr##v2i64i16r: \
-case Instr##v2i64i32r:
-
-#define ExpandCaseToVectorFloatTypes(Instr) \
-    case Instr##v2f32: \
-case Instr##v4f32: \
-case Instr##v2f64:
-
-#define ExpandCaseToVectorFloatTruncTypes(Instr) \
-case Instr##v2f64f32r:
-
-#define ExpandCaseToVectorByteTypes(Instr) \
-  case Instr##v4i8: \
-case Instr##v2i16: \
-case Instr##v4i16:
-
-#define ExpandCaseToAllVectorTypes(Instr) \
-    ExpandCaseToVectorFloatTypes(Instr) \
-ExpandCaseToVectorIntTypes(Instr)
-
-#define ExpandCaseToAllVectorTruncTypes(Instr) \
-    ExpandCaseToVectorFloatTruncTypes(Instr) \
-ExpandCaseToVectorIntTruncTypes(Instr)
-
-#define ExpandCaseToAllTypes(Instr) \
-    ExpandCaseToAllVectorTypes(Instr) \
-ExpandCaseToAllScalarTypes(Instr)
-
-#define ExpandCaseToAllTruncTypes(Instr) \
-    ExpandCaseToAllVectorTruncTypes(Instr) \
-ExpandCaseToAllScalarTruncTypes(Instr)
-
-#define ExpandCaseToPackedTypes(Instr) \
-    case Instr##v2i8: \
-    case Instr##v4i8: \
-    case Instr##v2i16: \
-    case Instr##v4i16:
-
-#define ExpandCaseToByteShortScalarTypes(Instr) \
-    case Instr##i8: \
-    case Instr##i16:
-
-#define ExpandCaseToByteShortTypes(Instr) \
-    ExpandCaseToByteShortScalarTypes(Instr) \
-    ExpandCaseToPackedTypes(Instr)
-
-#define ExpandCaseToI8Types(Instr) \
-    case Instr##v2i8: \
-    case Instr##v4i8:
-
-#define ExpandCaseToI16Types(Instr) \
-    case Instr##i16: \
-    case Instr##v2i16: \
-    case Instr##v4i16:
-
-// Macros that expand into case statements with return values
-#define ExpandCaseTo32bitIntReturn(Instr, Return) \
-case Instr##i8: return Return##i8; \
-case Instr##i16: return Return##i16; \
-case Instr##i32: return Return##i32;
-
-#define ExpandCaseToIntReturn(Instr, Return) \
-    ExpandCaseTo32bitIntReturn(Instr, Return) \
-case Instr##i64: return Return##i64;
-
-#define ExpandCaseToFloatReturn(Instr, Return) \
-    case Instr##f32: return Return##f32; \
-case Instr##f64: return Return##f64;
-
-#define ExpandCaseToAllScalarReturn(Instr, Return) \
-    ExpandCaseToFloatReturn(Instr, Return) \
-ExpandCaseToIntReturn(Instr, Return)
-
-// These macros expand to common groupings of RegClass ID's
-#define ExpandCaseTo1CompRegID \
-case AMDIL::GPRI8RegClassID: \
-case AMDIL::GPRI16RegClassID: \
-case AMDIL::GPRI32RegClassID: \
-case AMDIL::GPRF32RegClassID:
-
-#define ExpandCaseTo2CompRegID \
-    case AMDIL::GPRI64RegClassID: \
-case AMDIL::GPRF64RegClassID: \
-case AMDIL::GPRV2I8RegClassID: \
-case AMDIL::GPRV2I16RegClassID: \
-case AMDIL::GPRV2I32RegClassID: \
-case AMDIL::GPRV2F32RegClassID:
-
-// Macros that expand to case statements for specific bitlengths
-#define ExpandCaseTo8BitType(Instr) \
-    case Instr##i8:
-
-#define ExpandCaseTo16BitType(Instr) \
-    case Instr##v2i8: \
-case Instr##i16:
-
-#define ExpandCaseTo32BitType(Instr) \
-    case Instr##v4i8: \
-case Instr##v2i16: \
-case Instr##i32: \
-case Instr##f32:
-
-#define ExpandCaseTo64BitType(Instr) \
-    case Instr##v4i16: \
-case Instr##v2i32: \
-case Instr##v2f32: \
-case Instr##i64: \
-case Instr##f64:
-
-#define ExpandCaseTo128BitType(Instr) \
-    case Instr##v4i32: \
-case Instr##v4f32: \
-case Instr##v2i64: \
-case Instr##v2f64:
 
 bool commaPrint(int I, raw_ostream &O);
 /// Helper function to get the currently get/set flags.

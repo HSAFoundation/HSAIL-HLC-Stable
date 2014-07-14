@@ -154,25 +154,15 @@ void PassManagerBuilder::AMDpopulateModulePassManager(
   if (!DisableSimplifyLibCalls)
     MPM.add(createSimplifyLibCallsPass());    // Library Call Optimizations
 
-  if (!amdopts->IsGPU && amdopts->WGLevelExecution) {
-    MPM.add(createCFGSimplificationPass());
-    MPM.add(createLoopRotatePass());
-#if 0
-    MPM.add(createSinkingPass());
-#endif
-    MPM.add(createLoopInstSimplifyPass());
-    MPM.add(createLCSSAPass());
-    MPM.add(createAMDWorkGroupLevelExecutionPass());
-  }
-
   MPM.add(createInstructionCombiningPass(amdopts->UnsafeMathOpt)); // Cleanup for scalarrepl.
   MPM.add(createJumpThreadingPass());         // Thread jumps.
   MPM.add(createCorrelatedValuePropagationPass()); // Propagate conditionals
   MPM.add(createCFGSimplificationPass());     // Merge & remove BBs
   MPM.add(createInstructionCombiningPass(amdopts->UnsafeMathOpt));  // Combine silly seq's
 
+  int BankWidth = (amdopts->GPUArch >= amd::GPU_Library_SI) ? 8 : 4;
   if (amdopts->IsGPU && OptLevel > 1 && amdopts->SRAEThreshold > 0 && !isHsail) {
-    MPM.add(createAMDScalarReplArrayElemPass(4, 32, amdopts->SRAEThreshold));
+    MPM.add(createAMDScalarReplArrayElemPass(BankWidth, 32, amdopts->SRAEThreshold));
   }
 
   MPM.add(createTailCallEliminationPass());   // Eliminate tail calls
@@ -194,13 +184,11 @@ void PassManagerBuilder::AMDpopulateModulePassManager(
     if (isHsail) {
       MPM.add(createLoopUnrollPass(HLC_Unroll_Threshold,
                                    HLC_Unroll_Count,
-                                   HLC_Unroll_Allow_Partial,
-                                   HLC_Unroll_Scratch_Threshold));
+                                   HLC_Unroll_Allow_Partial));
     } else {
       MPM.add(createLoopUnrollPass(amdopts->LUThreshold,
                                    amdopts->LUCount,
-                                   amdopts->LUAllowPartial,
-                                   amdopts->UnrollScratchThreshold));
+                                   amdopts->LUAllowPartial));
     }
   }
   addExtensionsToPM(EP_LoopOptimizerEnd, MPM);

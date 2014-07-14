@@ -21,7 +21,7 @@ let needSpecialProcessing = 1, hasAddress = 1, addressOpNum = 1 in {
 /// atomic_binary <atomic opcode, address space, memory order, memory scope, ptr, val>
 /// atomic_ternary <atomic opcode, address space, memory order, memory scope, ptr, val1, val2>
 
-let needSpecialProcessing = 1, hasAddress = 1, addressOpNum = 5 in {
+let needSpecialProcessing = 1, hasAddress = 1, addressOpNum = 5, hasPostISelHook = 1 in {
   def atomic_unary_b32 : HSAILInst<(outs GPR32:$dst), (ins i32imm:$op,
                                     i32imm:$as, i32imm:$mo, i32imm:$ms,
                                     MEMOP:$ptr) , "",[]>;
@@ -90,7 +90,7 @@ let needSpecialProcessing = 1, hasAddress = 1, addressOpNum = 4 in {
                                               MEMOP:$ptr, GPR32:$src0, GPR32:$src1) , "",[]>;
 }
 
-let needSpecialProcessing = 1, hasAddress = 1, addressOpNum = 5 in {
+let needSpecialProcessing = 1, hasAddress = 1, addressOpNum = 5, hasPostISelHook = 1 in {
   def atomic_unary_b64 : HSAILInst<(outs GPR64:$dst), (ins i32imm:$op,
                                     i32imm:$as, i32imm:$mo, i32imm:$ms,
                                     MEMOP:$ptr) , "",[]>;

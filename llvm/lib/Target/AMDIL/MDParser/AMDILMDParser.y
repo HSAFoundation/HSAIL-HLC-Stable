@@ -636,6 +636,29 @@ MDStmt
         delete $13;
         delete $19;
     }
+    | MD_POINTER ':' CompoundToken ':' CompoundToken ':' INT_TOKEN ':' INT_TOKEN ':' INT_TOKEN ':' STR_TOKEN ':' INT_TOKEN ':' INT_TOKEN ':' STR_TOKEN ':' INT_TOKEN ':' INT_TOKEN ':' INT_TOKEN
+    {
+        MATCH(MDStmt/MD_POINTER ':' CompoundToken ':' CompoundToken ':' INT_TOKEN ':' INT_TOKEN ':' INT_TOKEN ':' STR_TOKEN ':' INT_TOKEN ':' INT_TOKEN ':' STR_TOKEN ':' INT_TOKEN ':' INT_TOKEN':' INT_TOKEN);
+        MDPointer* pointerNode = new MDPointer(*$1);
+        pointerNode->Arg_ = *$3;
+        pointerNode->Type_ = *$5;
+        pointerNode->Size_ = $7;
+        pointerNode->CBNum_ = $9;
+        pointerNode->CBOffset_ = $11;
+        pointerNode->MemType_ = *$13;
+        pointerNode->BufNum_ = $15;
+        pointerNode->Alignment_ = $17;
+        pointerNode->AccessType_ = *$19;
+        pointerNode->Volatile_ = $21;
+        pointerNode->Restrict_ = $23;
+        pointerNode->Pipe_ = $25;
+        $$ = pointerNode;
+        delete $1;
+        delete $3;
+        delete $5;
+        delete $13;
+        delete $19;
+    }
     | MD_INTLIST ':' IntList
     {
         MATCH(MDStmt/MD_INTLIST ':' IntList);

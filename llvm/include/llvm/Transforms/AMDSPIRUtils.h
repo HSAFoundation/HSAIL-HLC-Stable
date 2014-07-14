@@ -15,8 +15,20 @@
 namespace llvm {
 
   class Function;
+  class Module;
 
   bool isOpenCLBuiltinFunction(Function *Fn);
+  bool isOpenCL20Module(Module &M);
+//OpenCL addresspaces
+  namespace OpenCLLangAS {
+   enum OpenCLAddrSpace {
+     opencl_private = 0, // 0
+     opencl_global ,     // 1
+     opencl_local ,      // 2
+     opencl_constant ,   // 3
+     opencl_generic      // 4
+   };
+  };
 } // End llvm namespace
 
 #endif

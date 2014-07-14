@@ -1,6 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // conversion routines
 // 1bit => 32bit
+let isConv = 1 in {
 def cvt_b1_u32 : HSAILInst<(outs GPR32:$dst), (ins CR:$src),
                  "cvt_u32_b1\t$dst, $src",
                  [(set (i32 GPR32:$dst),
@@ -420,3 +421,4 @@ def bitcvt_u32_f32 : HSAILInst<(outs GPR32:$dst), (ins GPR32:$src),
 def bitcvt_u64_f64 : HSAILInst<(outs GPR64:$dst), (ins GPR64:$src),
                      "mov_b64\t$dst, $src",
                      [(set (f64 GPR64:$dst), (bitconvert (i64 GPR64:$src)))]>;
+}

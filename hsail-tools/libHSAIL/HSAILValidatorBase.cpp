@@ -271,13 +271,13 @@ const char* PropValidator::val2str(unsigned prop, unsigned val)
     case PROP_SOURCETYPE:
     case PROP_IMAGETYPE:
     case PROP_COORDTYPE:
-    case PROP_SIGNALTYPE:      res = (val == BRIG_TYPE_NONE)?         "none" : typeX2str(val);          break;
-    case PROP_PACK:            res = (val == BRIG_PACK_NONE)?         "none" : pack2str(val);           break;
-    case PROP_ROUND:           res = (val == BRIG_ROUND_NONE)?        "none" : round2str(val);          break;
-    case PROP_WIDTH:           res = (val == BRIG_WIDTH_NONE)?        "none" : width2str(val);          break;
-    case PROP_SEGMENTS:        res = (val == BRIG_MEMORY_FENCE_NONE)? "none" : memoryFenceSeg2str(val); break; 
-    case PROP_MEMORYORDER:     res = (val == BRIG_MEMORY_ORDER_NONE)? "none" : memoryOrder2str(val);    break;
-    case PROP_MEMORYSCOPE:     res = (val == BRIG_MEMORY_SCOPE_NONE)? "none" : memoryScope2str(val);    break;
+    case PROP_SIGNALTYPE:      res = (val == BRIG_TYPE_NONE)?         "none" : typeX2str(val);               break;
+    case PROP_PACK:            res = (val == BRIG_PACK_NONE)?         "none" : pack2str(val);                break;
+    case PROP_ROUND:           res = (val == BRIG_ROUND_NONE)?        "none" : round2str(val);               break;
+    case PROP_WIDTH:           res = (val == BRIG_WIDTH_NONE)?        "none" : width2str(val);               break;
+    case PROP_SEGMENTS:        res = (val == BRIG_MEMORY_FENCE_NONE)? "none" : memoryFenceSegments2str(val); break; 
+    case PROP_MEMORYORDER:     res = (val == BRIG_MEMORY_ORDER_NONE)? "none" : memoryOrder2str(val);         break;
+    case PROP_MEMORYSCOPE:     res = (val == BRIG_MEMORY_SCOPE_NONE)? "none" : memoryScope2str(val);         break;
     case PROP_SEGMENT:         res = (val == BRIG_SEGMENT_NONE)?      "none" : (val == BRIG_SEGMENT_FLAT)? "flat" : segment2str(val); break;
     case PROP_ALIGN:           res = (val == BRIG_ALIGNMENT_NONE)?    "none" : (val == BRIG_ALIGNMENT_1)?  "1"    : align2str(val);   break;
                                
@@ -289,6 +289,8 @@ const char* PropValidator::val2str(unsigned prop, unsigned val)
     case PROP_ATOMICOPERATION: res = atomicOperation2str(val);  break;
     case PROP_SIGNALOPERATION: res = atomicOperation2str(val);  break;
     case PROP_GEOMETRY:        res = imageGeometry2str(val);    break;
+    case PROP_IMAGEQUERY:      res = imageQuery2str(val);       break;
+    case PROP_SAMPLERQUERY:    res = samplerQuery2str(val);     break;
     case PROP_EQUIVCLASS:      res = "";  break; // no sense printing as any value would be valid
                                
     case PROP_OPCODE:          res = opcode2str(val); break;
@@ -386,6 +388,8 @@ string PropValidator::prop2str(unsigned prop) //F reuse prop2key where possible
     case PROP_MEMORYSCOPE:     return "memory scope";
     case PROP_SEGMENTS:        return "fence segment";
     case PROP_GEOMETRY:        return "geom";
+    case PROP_IMAGEQUERY:      return "image query";
+    case PROP_SAMPLERQUERY:    return "sampler query";
     case PROP_SEGMENT:         return "storage class";
     case PROP_WIDTH:           return "width";
     case PROP_EQUIVCLASS:      return "equivalence class";
@@ -1024,11 +1028,14 @@ bool PropValidator::validateAtomicTypeSize(Inst inst, bool isAssert)
 {
     assert(inst);
 
+    // \todo olsemenov 20140512 temporary solution: unconditionally enable 64-bit atomics in small model
+    /*
     if (getTypeSize(inst.type()) == 64 && !isLargeModel())
     {
         if (isAssert) validate(inst, -1, false, "Instruction type size 64 is not allowed with small machine model");
         return false;
     }
+    */
     return true;
 }
 

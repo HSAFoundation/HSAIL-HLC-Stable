@@ -50,9 +50,10 @@ void DAGWalker::ProcessIntrinsic( DefInit * def ) {
   assert( 0 == sIntrnName.compare(0, sHSAILIntrnPrefix.length(), sHSAILIntrnPrefix) );
   if ( ( sIntrnName.find("img") != sIntrnName.npos ) || ( sIntrnName.find("image") != sIntrnName.npos ) ) 
   {  
-    /* image load, store or read */
+    /* image load, store or read and readonly sampler load for 0.98+ hsail spec*/
     printer << "\t\tBrigEmitImageInst(MI, inst, 0);\n";
-  } else if  ( sIntrnName.find("query") != sIntrnName.npos ) {
+  } else if  ( (sIntrnName.find("query") != sIntrnName.npos) ||
+               ( sIntrnName.find("readonly_samp") != sIntrnName.npos) ) {
     /* query width, height, order etc */
     printer << "\t\t{\n";
     printer << "\t\t\tunsigned MONum=1, BRIGopNum=1;\n"; 
@@ -122,17 +123,6 @@ void DAGWalker::ProcessDef( DefInit * def ) {
         printer << " BrigEmitQualifiers( MI, " << m_opNum + 3 << ", inst );\n\t";
         m_state = PS_EXPECT_LDST_ADDR;
         break;
-      case LOAD_PARAM_U8:
-      case LOAD_PARAM_U16:
-      case LOAD_PARAM_PTR:
-      case LOAD_PARAM_PTR_STRUCT_BY_VAL:
-      case LOAD_PARAM:
-      case LOAD_PARAM_IMAGE:
-      case LOAD_PARAM_SAMP:
-        printer << "  BrigEmitOperandAddress( MI, " << m_opNum << ", inst, " << m_offset << " );\n\t";
-        m_opNum++;
-        m_state = PS_END;
-        break;
       case STORE:	
         m_state = PS_EXPECT_STORE_DST;
         break;
@@ -153,171 +143,6 @@ void DAGWalker::ProcessDef( DefInit * def ) {
           ProcessIntrinsic(def);
         }
         break;
-      case ST_SCALAR_ARG_U8:
-      case ST_SCALAR_ARG_U16:
-      case ST_SCALAR_ARG:
-        m_state = PS_ST_ARG_EXPECT_SRC;
-        break;
-      case LD_SCALAR_RET_U8:
-      case LD_SCALAR_RET_U16:
-      case LD_SCALAR_RET:
-        m_state = PS_LD_RET_EXPECT_SRC;
-        break;
-      case ST_SCALAR_RET_U8:
-      case ST_SCALAR_RET_U16:
-      case ST_SCALAR_RET:
-        m_state = PS_ST_RET_EXPECT_SRC;
-        break;
-      case LD_SCALAR_ARG_U8:
-      case LD_SCALAR_ARG_U16:
-      case LD_SCALAR_ARG:
-        m_state = PS_LD_ARG_EXPECT_SRC;
-        break;
-      case ARG_DECL_U8:
-      case ARG_DECL_U16:
-      case ARG_DECL_U32:
-      case ARG_DECL_U64:
-      case ARG_DECL_F32:
-      case ARG_DECL_F64:
-        m_state = PS_VEC_ARG_DECL_EXPECT_PARAMREG;
-        break;
-      case RET_DECL_U8:
-      case RET_DECL_U16:
-      case RET_DECL_U32:
-      case RET_DECL_U64:
-      case RET_DECL_F32:
-      case RET_DECL_F64:
-        m_state = PS_VEC_RET_DECL_EXPECT_PARAMREG;
-        break;
-      }
-    }
-    break;
-  case PS_VEC_ARG_DECL_EXPECT_PARAMREG:
-    {
-      switch(Node[getOpcode(def)]) {
-      case Constant:
-        m_state = PS_VEC_DECL_EXPECT_SIZE;
-        printer << m_opNum++ << ", \"%param_\", ";
-        break;
-      case VALUETYPE: 
-        printer << "BrigEmitVecArgDeclaration( MI, ";
-      break;
-      default:
-        printf("PATTERN DAG HAS INCORRECT FORMAT \n");
-        exit(1);
-      }
-    }
-    break;
-  case PS_VEC_RET_DECL_EXPECT_PARAMREG:
-    {
-      switch(Node[getOpcode(def)]) {
-      case Constant:
-        m_state = PS_VEC_DECL_EXPECT_SIZE;
-        printer << m_opNum++ << ", \"%ret_\", ";
-        break;
-      case VALUETYPE:  
-        printer << "BrigEmitVecArgDeclaration( MI, ";
-      break;
-      default:
-        printf("PATTERN DAG HAS INCORRECT FORMAT \n");
-        exit(1);
-      }
-    }
-    break;
-  case PS_VEC_DECL_EXPECT_SIZE:
-    {
-      switch(Node[getOpcode(def)]) {
-      case Constant:
-        printer << m_opNum++ << " );\n";
-        m_state = PS_END;
-        break;
-      case VALUETYPE:  // do nothing, expect value itself 
-      break;
-      default:
-        printf("PATTERN DAG HAS INCORRECT FORMAT \n");
-        exit(1);
-      }
-    }
-    break;
-  case PS_ST_ARG_EXPECT_SRC:
-    {
-      switch(Node[getOpcode(def)]) {
-      case Register:
-        m_state = PS_ST_ARG_EXPECT_DST;
-        printer << "  BrigEmitOperand( MI, " << m_opNum++ << ", inst);\n\t";
-        break;
-      case VALUETYPE:  // do nothing, expect value itself 
-      break;
-      default:
-        printf("PATTERN DAG HAS INCORRECT FORMAT \n");
-        exit(1);
-      }
-    }
-    break;
-  case PS_ST_RET_EXPECT_SRC:
-    {
-      switch(Node[getOpcode(def)]) {
-      case Register:
-        m_state = PS_ST_RET_EXPECT_DST;
-        printer << "  BrigEmitOperand( MI, " << m_opNum++ << ", inst );\n\t";
-        break;
-      case VALUETYPE:  // do nothing, expect value itself 
-      break;
-      default:
-        printf("PATTERN DAG HAS INCORRECT FORMAT \n");
-        exit(1);
-      }
-    }
-    break;
-  case PS_ST_RET_EXPECT_DST:
-  case PS_LD_RET_EXPECT_SRC:
-    {
-      switch(Node[getOpcode(def)]) {
-      case Register:
-        {
-          printer << "  BrigEmitOperandArgRef( MI, " << m_opNum++ << ", \"%ret_\", inst, " << m_offset << " );\n\t";
-          m_state = PS_END;
-        }
-        break;
-      case VALUETYPE:  // do nothing, expect value itself 
-      break;
-      default:
-        printf("PATTERN DAG HAS INCORRECT FORMAT \n");
-        exit(1);
-      }
-    }
-    break;
-  case PS_ST_ARG_EXPECT_DST:
-    {
-      switch(Node[getOpcode(def)]) {
-      case Register:
-        {
-          printer << "  BrigEmitOperandArgRef( MI, " << m_opNum++ << ", \"%param_\", inst, " << m_offset << " );\n\t";
-          m_state = PS_END;
-        }
-        break;
-      case VALUETYPE:  // do nothing, expect value itself 
-      break;
-      default:
-        printf("PATTERN DAG HAS INCORRECT FORMAT \n");
-        exit(1);
-      }
-    }
-    break;
-  case PS_LD_ARG_EXPECT_SRC:
-    {
-      switch(Node[getOpcode(def)]) {
-      case Register:
-        {
-          printer << "  BrigEmitOperandArgRef( MI, " << m_opNum++ << ", \"%arg_\", inst, " << m_offset << " );\n\t";
-          m_state = PS_END;
-        }
-        break;
-      case VALUETYPE:  // do nothing, expect value itself 
-      break;
-      default:
-        printf("PATTERN DAG HAS INCORRECT FORMAT \n");
-        exit(1);
       }
     }
     break;

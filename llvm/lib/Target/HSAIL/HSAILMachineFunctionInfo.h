@@ -168,8 +168,6 @@ namespace llvm
     // argument or not
     bool GDSArg;
 
-    bool hasStructByVal;
-
     // The size in bytes required to host all of the kernel arguments.
     // -1 means this value has not been determined yet.
     int32_t mArgSize;
@@ -222,30 +220,6 @@ namespace llvm
     /// Set of all intrinsics that this function calls.
     DenseSet<uint32_t> mIntrs;
 
-    /// Set of all write only 1D images.
-    DenseSet<uint32_t> mWO1D;
-    /// Set of all read only 1D images.
-    DenseSet<uint32_t> mRO1D;
-    /// Set of all write only 1D image arrays.
-    DenseSet<uint32_t> mWO1DA;
-    /// Set of all read only 1D image arrays.
-    DenseSet<uint32_t> mRO1DA;
-    /// Set of all write only 1D image buffers.
-    DenseSet<uint32_t> mWO1DB;
-    /// Set of all read only 1D image buffers.
-    DenseSet<uint32_t> mRO1DB;
-    /// Set of all write only 2D images.
-    DenseSet<uint32_t> mWO2D;
-    /// Set of all read only 2D images.
-    DenseSet<uint32_t> mRO2D;
-    /// Set of all write only 2D image arrays.
-    DenseSet<uint32_t> mWO2DA;
-    /// Set of all read only 2D image arrays.
-    DenseSet<uint32_t> mRO2DA;
-    /// Set of all read only 3D images.
-    DenseSet<uint32_t> mRO3D;
-    /// Set of all write only 3D images.
-    DenseSet<uint32_t> mWO3D;
     /// Set of all the raw uavs.
     DenseSet<uint32_t> mRawUAV;
     /// Set of all the arena uavs.
@@ -297,9 +271,6 @@ namespace llvm
     int getRAIndex() const;
     void setRAIndex(int Index);
 
-    bool getHasStructByVal();
-    void setHasStructByVal(bool b);
-    
     int getTCReturnAddrDelta() const;
     void setTCReturnAddrDelta(int delta);
 
@@ -429,80 +400,6 @@ namespace llvm
     bool intr_empty() { return mIntrs.empty(); }
     intr_iterator intr_begin() { return mIntrs.begin(); }
     intr_iterator intr_end() { return mIntrs.end(); }
-
-    /// Add a 1D read_only image id.
-    void addROImage1D(uint32_t id) { mRO1D.insert(id); }
-    size_t read_image1d_size() { return mRO1D.size(); }
-    read_image1d_iterator read_image1d_begin() { return mRO1D.begin(); }
-    read_image1d_iterator read_image1d_end() { return mRO1D.end(); }
-
-    /// Add a 1D write_only image id.
-    void addWOImage1D(uint32_t id) { mWO1D.insert(id); }
-    size_t write_image1d_size() { return mWO1D.size(); }
-    write_image1d_iterator write_image1d_begin() { return mWO1D.begin(); }
-    write_image1d_iterator write_image1d_end() { return mWO1D.end(); }
-
-    /// Add a 1D read_only image id.
-    void addROImage1DArray(uint32_t id) { mRO1DA.insert(id); }
-    size_t read_image1d_array_size() { return mRO1DA.size(); }
-    read_image1d_array_iterator read_image1d_array_begin() { return mRO1DA.begin(); }
-    read_image1d_array_iterator read_image1d_array_end() { return mRO1DA.end(); }
-
-    /// Add a 1D write_only image id.
-    void addWOImage1DArray(uint32_t id) { mWO1DA.insert(id); }
-    size_t write_image1d_array_size() { return mWO1DA.size(); }
-    write_image1d_array_iterator write_image1d_array_begin() { return mWO1DA.begin(); }
-    write_image1d_array_iterator write_image1d_array_end() { return mWO1DA.end(); }
-
-    /// Add a 1D read_only image id.
-    void addROImage1DBuffer(uint32_t id) { mRO1DB.insert(id); }
-    size_t read_image1d_buffer_size() { return mRO1DB.size(); }
-    read_image1d_buffer_iterator read_image1d_buffer_begin() { return mRO1DB.begin(); }
-    read_image1d_buffer_iterator read_image1d_buffer_end() { return mRO1DB.end(); }
-
-    /// Add a 1D write_only image id.
-    void addWOImage1DBuffer(uint32_t id) { mWO1DB.insert(id); }
-    size_t write_image1d_buffer_size() { return mWO1DB.size(); }
-    write_image1d_buffer_iterator write_image1d_buffer_begin() { return mWO1DB.begin(); }
-    write_image1d_buffer_iterator write_image1d_buffer_end() { return mWO1DB.end(); }
-
-    /// Add a 2D read_only image id.
-    void addROImage2D(uint32_t id) { mRO2D.insert(id); }
-    size_t read_image2d_size() { return mRO2D.size(); }
-    read_image2d_iterator read_image2d_begin() { return mRO2D.begin(); }
-    read_image2d_iterator read_image2d_end() { return mRO2D.end(); }
-
-    /// Add a 2D write_only image id.
-    void addWOImage2D(uint32_t id) { mWO2D.insert(id); }
-    size_t write_image2d_size() { return mWO2D.size(); }
-    write_image2d_iterator write_image2d_begin() { return mWO2D.begin(); }
-    write_image2d_iterator write_image2d_end() { return mWO2D.end(); }
-
-    /// Add a 2D read_only image array id.
-    void addROImage2DArray(uint32_t id) { mRO2DA.insert(id); }
-    size_t read_image2d_array_size() { return mRO2DA.size(); }
-    read_image2d_array_iterator read_image2d_array_begin() { return mRO2DA.begin(); }
-    read_image2d_array_iterator read_image2d_array_end() { return mRO2DA.end(); }
-
-    /// Add a 2D write_only image id.
-    void addWOImage2DArray(uint32_t id) { mWO2DA.insert(id); }
-    size_t write_image2d_array_size() { return mWO2DA.size(); }
-    write_image2d_array_iterator write_image2d_array_begin() { return mWO2DA.begin(); }
-    write_image2d_array_iterator write_image2d_array_end() { return mWO2D.end(); }
-
-    /// Add a 3D read_only image id.
-    void addROImage3D(uint32_t id) { mRO3D.insert(id); }
-    size_t read_image3d_size() { return mRO3D.size(); }
-    read_image3d_iterator read_image3d_begin() { return mRO3D.begin(); }
-    read_image3d_iterator read_image3d_end() { return mRO3D.end(); }
-
-       /// Add a 3D write_only image id.
-    void addWOImage3D(uint32_t id) { mWO3D.insert(id); }
-    size_t write_image3d_size() { return mWO3D.size(); }
-    write_image3d_iterator write_image3d_begin() { return mWO3D.begin(); }
-    write_image3d_iterator write_image3d_end() { return mWO3D.end(); }
-
-    size_t get_num_write_images();
 
     /// Add a semaphore
     void sema_insert(uint32_t id) { mSemaphore.insert(id); }

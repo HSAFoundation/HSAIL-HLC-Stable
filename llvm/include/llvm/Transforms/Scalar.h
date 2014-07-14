@@ -144,14 +144,7 @@ Pass *createLoopInstSimplifyPass();
 //
 // LoopUnroll - This pass is a simple loop unrolling pass.
 //
-#if 1|| defined(AMD_OPENCL)
-Pass *createLoopUnrollPass(int Threshold = -1,
-                           int Count = -1,
-                           int AllowPartial = -1,
-                           int ScratchThreshold = -1);
-#else
 Pass *createLoopUnrollPass(int Threshold = -1, int Count = -1, int AllowPartial = -1);
-#endif
 
 //===----------------------------------------------------------------------===//
 //
@@ -421,10 +414,14 @@ ModulePass *createAMDLowerPipeBuiltinsPass();
 ModulePass *createOpenCLIRTransform();
 ModulePass *createHSAILFixImageIntrinsicsPass();
 ModulePass *createAMDX86AdapterPass();
+ModulePass *createAMDGenerateDevEnqMetadataPass();
+ModulePass *createAMDLowerEnqueueKernelPass();
+ModulePass *createAMDLowerToPreciseBuiltinsPass();
+ModulePass *createAMDPrintfRuntimeBinding(bool cpuLowering);
 #endif
 
 #if defined(AMD_SPIR_LOADER) || 1
-ModulePass *createSPIRLoader(StringRef TripleStr, bool demangleBuiltin = true);
+ModulePass *createSPIRLoader(bool demangleBuiltin = true);
 #endif
 
 } // End llvm namespace

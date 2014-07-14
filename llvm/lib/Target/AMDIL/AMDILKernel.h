@@ -139,8 +139,8 @@ namespace llvm {
       AMDILLocalArg reservedLocals;
       llvm::SmallVector<struct _AMDILConstPtrRec, DEFAULT_VEC_SLOTS> constPtr; // vector containing constant pointer information
       uint32_t constSizes[HW_MAX_NUM_CB]; // Size of each constant buffer
-      llvm::SmallSet<uint32_t, OPENCL_MAX_READ_IMAGES> readOnly; // set that specifies the read-only images for the kernel
-      llvm::SmallSet<uint32_t, OPENCL_MAX_WRITE_IMAGES> writeOnly; // set that specifies the write-only images for the kernel
+      llvm::SmallSet<uint32_t, 8> readOnly; // set that specifies the read-only images for the kernel
+      llvm::SmallSet<uint32_t, 8> writeOnly; // set that specifies the write-only images for the kernel
       llvm::SmallVector<std::pair<uint32_t, const llvm::Constant *>,
         DEFAULT_VEC_SLOTS> CPOffsets; // Vector of constant pool offsets
 

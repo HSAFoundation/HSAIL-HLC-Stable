@@ -1,11 +1,11 @@
 #include "HSAIL.h"
-#include "HSAILMetadataUtils.h"
 #include "HSAILUtilityFunctions.h"
 
 #include "llvm/Function.h"
 #include "llvm/Module.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/AMDMetadataUtils.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
 using namespace llvm;
@@ -15,9 +15,6 @@ namespace {
   const std::string GlobalOffset0 = "global_offset_0";
   const std::string GlobalOffset1 = "global_offset_1";
   const std::string GlobalOffset2 = "global_offset_2";
-
-  const std::string GlobalOffsetIntrinsic = "__hsail_get_global_offset";
-  const std::string GlobalIDIntrinsic = "__hsail_get_global_id";
 
   /// \brief Modify all kernels in a module to accept global offsets
   class HSAILGlobalOffsetInsertionPass : public ModulePass {
@@ -47,55 +44,6 @@ INITIALIZE_PASS(HSAILGlobalOffsetInsertionPass, "hsail-global-offsets",
 
 ModulePass* llvm::createHSAILGlobalOffsetInsertionPass(HSAILTargetMachine &HSATM) {
   return new HSAILGlobalOffsetInsertionPass(&HSATM);
-}
-
-/// \brief Force inlining even if optimizations are off.
-///
-/// This is a workaround used by debugger tests when inlining is
-/// disabled. It allows us to insert additional arguments into the
-/// kernel by first inlining the two function. The workaround assumes
-/// that these functions are only called from a kernel, and not from a
-/// user function.
-static void inlineGlobalIDFuncs(Module &M)
-{
-  InlineFunctionInfo ignored;
-  Function *Func = NULL;
-
-  // Look for the function under both mangling schemes: EDG and SPIR
-  Func = M.getFunction("get_global_offset");
-  if (!Func) Func = M.getFunction("_Z17get_global_offsetj");
-  if (Func) {
-    assert(!Func->empty() &&
-           "missing definition for get_global_offset()");
-    while (!Func->use_empty()) {
-      CallInst *Call = cast<CallInst>(Func->use_back());
-      Function *Caller = Call->getParent()->getParent();
-      assert(isKernelFunc(Caller) &&
-             "debugger workaround when inlining is disabled: "
-             "can't call get_global_offset() from non-kernel function");
-      bool success = InlineFunction(Call, ignored, false);
-      assert(success && "Unable to inline get_global_offset()");
-    }
-    Func->eraseFromParent();
-  }
-
-  // Look for the function under both mangling schemes: EDG and SPIR
-  Func = M.getFunction("get_global_id");
-  if (!Func) Func = M.getFunction("_Z13get_global_idj");
-  if (Func) {
-    assert(!Func->empty() &&
-           "missing definition for get_global_id()");
-    while (!Func->use_empty()) {
-      CallInst *Call = cast<CallInst>(Func->use_back());
-      Function *Caller = Call->getParent()->getParent();
-      assert(isKernelFunc(Caller) &&
-             "debugger workaround when inlining is disabled: "
-             "can't call get_global_id() from non-kernel function");
-      bool success = InlineFunction(Call, ignored, false);
-      assert(success && "Unable to inline get_global_id()");
-    }
-    Func->eraseFromParent();
-  }
 }
 
 /// \brief Copy attributes from old function to new
@@ -169,74 +117,6 @@ static Function* insertNewArguments(Function *F, Type *SizeTType)
 
   NewF->takeName(F);
   return NewF;
-}
-
-static void addOffsetToID(Function *IDF, Function *OFF)
-{
-  for (Function::use_iterator UI = IDF->use_begin(), UE = IDF->use_end();
-       UI != UE; ++UI) {
-    CallInst *Call = cast<CallInst>(*UI);
-    BasicBlock *BB = Call->getParent();
-    Function *F = BB->getParent();
-
-    ConstantInt *CallArg = cast<ConstantInt>(Call->getArgOperand(0));
-    unsigned Dim = CallArg->getZExtValue();
-    assert(Dim < NumOffsets);
-
-    Value *Args[] = { CallArg };
-    CallInst *CallOffset = CallInst::Create(OFF, Args, "", Call);
-
-
-    BinaryOperator  *GID;
-    if (Call->getType() != CallOffset->getType()) {
-      // workaround for EPR# 383087.
-      // Fixes the mismatch between the return type of get_global_id(), 
-      // which is 64-bit for large models, while the extra kernel argument 
-      // to store global offset is 32-bit.
-      // A typecast for the argument is inserted as a workaround.
-      CastInst *CI = CastInst::CreateIntegerCast(CallOffset, Call->getType(),
-                                                          false, "", Call);
-      GID = BinaryOperator::Create(Instruction::Add,Call, CI);
-    }
-    else {
-     GID = BinaryOperator::Create(Instruction::Add,Call, CallOffset);
-    }
-
-    BB->getInstList().insertAfter(Call, GID);
-    Call->replaceAllUsesWith(GID);
-    GID->setOperand(0, Call);
-  }
-}
-
-/// \brief Replace calls get_global_offset() with access to
-///        appropriate kernel arguments
-///
-/// The kernel argument to access is identified by the argument to
-/// get_global_offset(), which must be a constant in the range [0..2].
-/// 
-/// Assumption: The only use of the function is in call instructions.
-static void replaceCallsWithKernelArgument(Function *GF)
-{
-  while (!GF->use_empty()) {
-    CallInst *Call = cast<CallInst>(GF->use_back());
-    Function *F = Call->getParent()->getParent();
-
-    assert(isKernelFunc(F));
-
-    ConstantInt *CallArg0 = cast<ConstantInt>(Call->getArgOperand(0));
-    unsigned Dim = CallArg0->getZExtValue();
-    assert(Dim < NumOffsets);
-
-    // Pretty lousy way to access the i'th Argument of a Function.
-    Function::arg_iterator AI = F->arg_begin();
-    for (unsigned i = 0; i < Dim; ++i)
-      ++AI;
-
-    CastInst *CI = CastInst::CreateIntegerCast(AI, Call->getType(),
-                                               false, "", Call);
-    Call->replaceAllUsesWith(CI);
-    Call->eraseFromParent();
-  }
 }
 
 /// \brief Update the "argtypenames" variable for the new function
@@ -346,8 +226,6 @@ bool HSAILGlobalOffsetInsertionPass::runOnModule(Module &M)
 {
   DIManager.collectFunctionDIs(M);
 
-  inlineGlobalIDFuncs(M);
-
   Type *SizeT = HSATM->Subtarget.is64Bit()
     ? Type::getInt64Ty(M.getContext())
     : Type::getInt32Ty(M.getContext());
@@ -374,21 +252,5 @@ bool HSAILGlobalOffsetInsertionPass::runOnModule(Module &M)
     F->eraseFromParent();
   }
 
-  Function *OffsetFunc = M.getFunction(GlobalOffsetIntrinsic);
-  Function *IDFunc = M.getFunction(GlobalIDIntrinsic);
-
-  if (IDFunc) {
-    if (!OffsetFunc) {
-      OffsetFunc = cast<Function>(M.getOrInsertFunction(GlobalOffsetIntrinsic,
-                                                        IDFunc->getFunctionType(),
-                                                        IDFunc->getAttributes()));
-    }
-    addOffsetToID(IDFunc, OffsetFunc);
-  }
-
-  if (OffsetFunc)
-    replaceCallsWithKernelArgument(OffsetFunc);
-
   return true;
 }
-

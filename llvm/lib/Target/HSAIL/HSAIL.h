@@ -29,11 +29,6 @@
 #define GLOBAL_RETURN_RAW_UAV_ID 11
 #define HW_MAX_NUM_CB 8
 #define MAX_NUM_UNIQUE_UAVS 8
-#define OPENCL_MAX_NUM_ATOMIC_COUNTERS 8
-#define OPENCL_MAX_READ_IMAGES 128
-#define OPENCL_MAX_WRITE_IMAGES 8
-#define OPENCL_MAX_SAMPLERS 16
-#define OPENCL_MAX_NUM_SEMAPHORES 15
 
 // The next two values can never be zero, as zero is the ID that is
 // used to assert against.
@@ -52,7 +47,6 @@ namespace llvm {
 
 class FunctionPass;
 class LoopPass;
-class JITCodeEmitter;
 class MCCodeEmitter;
 class MCContext;
 class MCObjectWriter;
@@ -103,7 +97,16 @@ createHSAILSyntaxCleanupPass();
 /// Insert OpenCL global offsets as HSAIL kernargs
 ModulePass* createHSAILGlobalOffsetInsertionPass(HSAILTargetMachine &TM);
 
-ModulePass *createHSAILPrintfConvert(HSAILTargetMachine &TM);
+/// Insert kernel index metadata for device enqueue.
+ModulePass* createHSAILInsertKernelIndexMetadataPass();
+
+/// Optimize and lower AddrSpaceCast
+FunctionPass *createHSAILAddrSpaceCastPass();
+
+ModulePass *createHSAILPrintfRuntimeBindingKernArg(HSAILTargetMachine &TM);
+FunctionPass *createHSAILPrintfRuntimeBindingMetadata(HSAILTargetMachine &TM);
+
+ModulePass *createHSAILNullPtrInsertionPass();
 
 /// createHSAILEarlyCFGOpts - HSAIL specific control flow optimizations
 LoopPass *
@@ -132,24 +135,10 @@ createHSAILFloatingPointStackifierPass();
 FunctionPass*
 createSSEDomainFixPass();
 
-/// createHSAILCodeEmitterPass - Return a pass that emits the collected HSAIL
-/// code to the specified MCE object.
-FunctionPass*
-createHSAILJITCodeEmitterPass(HSAILTargetMachine &TM,
-                              JITCodeEmitter &JCE);
-
 MCCodeEmitter*
 createHSAIL_32MCCodeEmitter(const Target &T,
                             TargetMachine &TM,
                             MCContext &Ctx);
-
-MCCodeEmitter* createHSAIL_32MCCodeEmitterForLLVM30(const MCInstrInfo &II, const MCSubtargetInfo &STI, MCContext &Ctx);
-
-MCAsmBackend* createHSAIL_32AsmBackendForLLVM30(const Target &T, StringRef TT);
-
-MCCodeEmitter* createHSAIL_64MCCodeEmitterForLLVM30(const MCInstrInfo &II, const MCSubtargetInfo &STI, MCContext &Ctx);
-
-MCAsmBackend* createHSAIL_64AsmBackendForLLVM30(const Target &T, StringRef TT);
 
 MCStreamer* createHSAILMCStreamer(const Target &T, StringRef TT, MCContext &Ctx, MCAsmBackend &TAB,
                                   raw_ostream &_OS, MCCodeEmitter *_Emitter,
@@ -192,13 +181,6 @@ createHSAILMaxStackAlignmentHeuristicPass();
 FunctionPass *
 createHSAILFuncArgScopeEmitter(TargetMachine &tm, CodeGenOpt::Level OL);
 
-/// createHSAILMachObjectWriter - Construct an HSAIL Mach-O object writer.
-MCObjectWriter*
-createHSAILMachObjectWriter(raw_ostream &OS,
-                            bool Is64Bit,
-                            uint32_t CPUType,
-                            uint32_t CPUSubtype);
-
 extern Target TheHSAIL_32Target, TheHSAIL_64Target;
 
 } // End llvm namespace
@@ -221,16 +203,18 @@ extern Target TheHSAIL_32Target, TheHSAIL_64Target;
 
 namespace llvm {
   namespace HSAILAS {
-   
+
     enum AddressSpaces {
-      PRIVATE_ADDRESS  = 0, 
-      GLOBAL_ADDRESS   = 1, 
+      PRIVATE_ADDRESS  = 0,
+      GLOBAL_ADDRESS   = 1,
       CONSTANT_ADDRESS = 2, // TODO_HSA: rename to READONLY_ADDRESS
-      GROUP_ADDRESS    = 3, 
-      FLAT_ADDRESS     = 4, 
-      REGION_ADDRESS   = 5, 
-      SPILL_ADDRESS    = 6, 
-      ADDRESS_NONE     = 7
+      GROUP_ADDRESS    = 3,
+      FLAT_ADDRESS     = 4,
+      REGION_ADDRESS   = 5,
+      SPILL_ADDRESS    = 6,
+      KERNARG_ADDRESS  = 7,
+      ARG_ADDRESS      = 8,
+      ADDRESS_NONE     = 9
      };
   }
 
@@ -243,7 +227,8 @@ namespace llvm {
       ADDRESS_OP_NUM1 = 2,
       ADDRESS_OP_NUM2 = 3,
       IS_LOAD         = 4,
-      IS_STORE        = 5
+      IS_STORE        = 5,
+      IS_CONV = 6
     };
   }
 

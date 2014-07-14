@@ -154,7 +154,16 @@ ETokens Scanner::scanModifier(EScanContext ctx, Scanner::Token &t)
     "_2ddepth"   { brigId = Brig::BRIG_GEOMETRY_2DDEPTH; return EMGeom; }
     "_2dadepth"  { brigId = Brig::BRIG_GEOMETRY_2DADEPTH; return EMGeom; }
 
-    "_width"     { brigId = 0; return EMWidth;  }
+    "_height"       { brigId = Brig::BRIG_IMAGE_QUERY_HEIGHT;       return EMImageQuery; }
+    "_depth"        { brigId = Brig::BRIG_IMAGE_QUERY_DEPTH;        return EMImageQuery; }
+    "_array"        { brigId = Brig::BRIG_IMAGE_QUERY_ARRAY;        return EMImageQuery; }
+    "_channelorder" { brigId = Brig::BRIG_IMAGE_QUERY_CHANNELORDER; return EMImageQuery; }
+    "_channeltype"  { brigId = Brig::BRIG_IMAGE_QUERY_CHANNELTYPE;  return EMImageQuery; }
+    "_width"        { switch(ctx) {
+                      case EInstModifierInstQueryContext: brigId = Brig::BRIG_IMAGE_QUERY_WIDTH; return EMImageQuery; 
+                      default:                            brigId = 0;                            return EMWidth;
+                      } 
+                    }
     "_align"     { brigId = 0; return EMAlign;  }
     "_v2"        { brigId = 2; return EMVector; }
     "_v3"        { brigId = 3; return EMVector; }
@@ -228,16 +237,14 @@ ETokens Scanner::scanDefault(EScanContext ctx, Scanner::Token &t)
     "width"              { return EKWImageWidth; }
     "height"             { return EKWImageHeight; }
     "depth"              { switch(ctx) {
-                           case EImageOrderContext: brigId = Brig::BRIG_ORDER_DEPTH; return EImageOrder; 
+                           case EImageOrderContext: brigId = Brig::BRIG_CHANNEL_ORDER_DEPTH; return EImageOrder; 
                            default: return EKWImageDepth;
                            } }
-    "format"             { return EKWImageFormat; }
-    "order"              { return EKWImageOrder; }
+    "channel_type"       { return EKWImageChannelType; }
+    "channel_order"      { return EKWImageChannelOrder; }
     "geometry"           { return EKWImageGeometry; }
     "array"              { return EKWImageArray; }
-    "boundaryu"          { return EKWSamplerBoundaryU; }
-    "boundaryv"          { return EKWSamplerBoundaryV; }
-    "boundaryw"          { return EKWSamplerBoundaryW; }
+    "addressing"         { return EKWSamplerAddressing; }
     "coord"              { return EKWSamplerCoord; }
     "filter"             { return EKWSamplerFilter; }
     "align"              { return EKWAlign; }
@@ -250,8 +257,6 @@ ETokens Scanner::scanDefault(EScanContext ctx, Scanner::Token &t)
 
     "WAVESIZE"           { return EWaveSizeMacro; }
 
-    "normalized"         { brigId = 1;                            return ESamplerCoord;  }
-    "unnormalized"       { brigId = 0;                            return ESamplerCoord;  }
     "nearest"            { brigId = Brig::BRIG_FILTER_NEAREST;    return ESamplerFilter; }
     "linear"             { brigId = Brig::BRIG_FILTER_LINEAR;     return ESamplerFilter; }
 
@@ -292,10 +297,10 @@ ETokens Scanner::scanDefault(EScanContext ctx, Scanner::Token &t)
     "_s64x2"             { brigId = Brig::BRIG_TYPE_S64X2; return EPackedLiteral; }
     "_f64x2"             { brigId = Brig::BRIG_TYPE_F64X2; return EPackedLiteral; }
 
-    "rwimg"              { brigId = Brig::BRIG_TYPE_RWIMG; return EKWRWImg; }
-    "roimg"              { brigId = Brig::BRIG_TYPE_ROIMG; return EKWROImg; }
-    "woimg"              { brigId = Brig::BRIG_TYPE_WOIMG; return EKWWOImg; }
-    "samp"               { brigId = Brig::BRIG_TYPE_SAMP;  return EKWSamp; }
+    "_rwimg"             { brigId = Brig::BRIG_TYPE_RWIMG; return EKWRWImg; }
+    "_roimg"             { brigId = Brig::BRIG_TYPE_ROIMG; return EKWROImg; }
+    "_woimg"             { brigId = Brig::BRIG_TYPE_WOIMG; return EKWWOImg; }
+    "_samp"              { brigId = Brig::BRIG_TYPE_SAMP;  return EKWSamp; }
 
 @print $scanner{EControl}
 
@@ -305,7 +310,9 @@ ETokens Scanner::scanDefault(EScanContext ctx, Scanner::Token &t)
 
 @print $scanner{EImageGeometry}
 
-@print $scanner{ESamplerBoundaryMode}
+@print $scanner{ESamplerAddressingMode}
+
+@print $scanner{ESamplerCoord}
 
 @print $scanner{Instructions}
 

@@ -36,13 +36,16 @@ protected:
                                uint64_t Offset,
                                uint64_t Value,
                                uint32_t Type,
-                               int64_t Addend);
+                               int64_t  Addend,
+                               uint64_t SymOffset);
+
 
   void resolveX86Relocation(const SectionEntry &Section,
                             uint64_t Offset,
                             uint32_t Value,
                             uint32_t Type,
-                            int32_t Addend);
+                            int32_t Addend,
+                            uint32_t SymOffset);
 
   void resolveARMRelocation(const SectionEntry &Section,
                             uint64_t Offset,
@@ -66,6 +69,13 @@ protected:
                                  uint64_t Offset,
                                  uint64_t Value,
                                  uint32_t Type,
+                                 int64_t Addend,
+                                 uint64_t SymOffset);
+
+  virtual void resolveRelocation(const SectionEntry &Section,
+                                 uint64_t Offset,
+                                 uint64_t Value,
+                                 uint32_t Type,
                                  int64_t Addend);
 
   virtual void processRelocationRef(const ObjRelocationInfo &Rel,
@@ -83,10 +93,20 @@ protected:
                            ObjSectionToIDMap &LocalSections,
                            RelocationValueRef &Rel);
 
-public:
-  RuntimeDyldELF(RTDyldMemoryManager *mm)
-      : RuntimeDyldImpl(mm) {}
+  uint64_t findGOTEntry(uint64_t LoadAddr, uint64_t Offset);
+  size_t getGOTEntrySize();
 
+  virtual void updateGOTEntries(StringRef Name, uint64_t Addr);
+
+  SmallVector<RelocationValueRef, 2>  GOTEntries;
+  unsigned GOTSectionID;
+
+ public:
+  RuntimeDyldELF(RTDyldMemoryManager *mm) : RuntimeDyldImpl(mm),
+                                            GOTSectionID(0)
+                                          {}
+
+  virtual void finalizeLoad();
   virtual ~RuntimeDyldELF();
 
   bool isCompatibleFormat(const ObjectBuffer *Buffer) const;

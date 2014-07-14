@@ -44,6 +44,8 @@ class HSAILInst<dag outs, dag ins, string asmstr, list<dag> pattern>
   let TSFlags{4} = isLoad;
   bit isStore = 0;
   let TSFlags{5} = isStore;
+  bit isConv = 0;
+  let TSFlags{6} = isConv;
 }
 
 let TargetPrefix = "HSAIL", isTarget = 1 in {
@@ -175,6 +177,15 @@ let TargetPrefix = "HSAIL", isTarget = 1 in {
         llvm_ptr_ty, 
         llvm_i32_ty, llvm_i32_ty, llvm_i32_ty, llvm_i32_ty], []>;
 
+    class StoreImage2dDepthFloat :
+      Intrinsic<[], [llvm_float_ty,
+	llvm_ptr_ty,
+	llvm_i32_ty, llvm_i32_ty], []>;
+
+    class StoreImage2dArrayDepthFloat :
+      Intrinsic<[], [llvm_float_ty,
+        llvm_ptr_ty,
+        llvm_i32_ty, llvm_i32_ty, llvm_i32_ty, llvm_i32_ty], []>;
 }
 
 def target : Operand<OtherVT> {}

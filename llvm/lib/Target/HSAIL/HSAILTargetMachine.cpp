@@ -37,6 +37,8 @@ using namespace llvm;
 static cl::opt<bool> DisableHSAILCFGOpts("disable-hsail-cfg-opts",
   cl::desc("Disable hsail control flow optimizations"));
 
+extern llvm::cl::opt<TargetMachine::CodeGenFileType> FileType;
+
 // TODO_HSA: As soon as -enable-experimetal llc option is not needed anymore
 //           the code block below shall be removed.
 namespace llvm {
@@ -79,15 +81,7 @@ namespace llvm {
 template<bool Is64Bit> static MCAsmInfo*
 createMCAsmInfo(const Target &T, StringRef TT) {
   Triple TheTriple(TT);
-  switch (TheTriple.getOS()) {
-  case Triple::Darwin:
-  case Triple::MinGW32:
-  case Triple::Cygwin:
-  case Triple::Win32:
-      //FIXME: Currently we only have ELF, not Dwarf or COFF.
-    default:
-      return new HSAILELFMCAsmInfo(TheTriple, Is64Bit);
-  }
+  return new HSAILELFMCAsmInfo(TheTriple, Is64Bit);
 }
 
 // MC related code probably should be in MCTargetDesc subdir
@@ -116,14 +110,7 @@ createMCStreamer(const Target &T,
   // this stream will be deleted in the destructor of BRIGAsmPrinter
   RawVectorOstream *rvos = new RawVectorOstream(&_OS); 
 
-  switch (TheTriple.getOS()) {
-  case Triple::Darwin:
-  case Triple::MinGW32:
-  case Triple::Cygwin:
-  case Triple::Win32:
-  default:
-    return createBRIGDwarfStreamer(Ctx, TAB, *rvos, _Emitter, RelaxAll, NoExecStack);
-  }
+  return createBRIGDwarfStreamer(Ctx, TAB, *rvos, _Emitter, RelaxAll, NoExecStack);
 }
 
 MCStreamer* llvm::createHSAILMCStreamer(const Target &T,
@@ -174,10 +161,19 @@ HSAILTargetMachine::HSAILTargetMachine(const Target &T, StringRef TT,
   //  DLInfo(Subtarget.getDataLayout()),
   FrameLowering(TargetFrameLowering::StackGrowsUp,
       Subtarget.getStackAlignment(), 0),
-  //  InstrInfo(*this), //JITInfo(*this),
+  //  InstrInfo(*this),
   //  TLInfo(*this), 
   IntrinsicInfo(this)
  {
+     if (FileType == CGFT_AssemblyFile) {
+       if (FileType.getNumOccurrences() == 0) {
+         // LLVM's default is CGFT_AssemblyFile. HSAIL default is binary BRIG,
+         // thus we need to change output to CGFT_AssemblyFile, unless text
+         // assembly was explicitly requested by the command line switch.
+         HSAILFileType = FileType = CGFT_ObjectFile;
+       }
+     }
+
      setAsmVerbosityDefault(true);
 
      // disable use of the .loc directive, because only by 
@@ -189,9 +185,32 @@ HSAILTargetMachine::HSAILTargetMachine(const Target &T, StringRef TT,
      setRequiresStructuredCFG(false);
 }
 
+bool HSAILTargetMachine::addPassesToEmitFile(PassManagerBase &PM,
+                                             formatted_raw_ostream &Out,
+                                             CodeGenFileType FT,
+                                             bool DisableVerify,
+                                             AnalysisID StartAfter,
+                                             AnalysisID StopAfter) {
+  HSAILFileType = FT;
+
+  // Use CGFT_ObjectFile regardless on the output format.
+  // To process CGFT_AssemblyFile we will later disassemble generated BRIG.
+  return LLVMTargetMachine::addPassesToEmitFile(PM, Out, CGFT_ObjectFile,
+    DisableVerify, StartAfter, StopAfter);
+}
+
 TargetPassConfig*
 HSAILTargetMachine::createPassConfig(PassManagerBase &PM) {
   return new HSAILPassConfig(this, PM);
+}
+
+void HSAILPassConfig::addIRPasses() {
+  // AddrSpaceCast optimization and lowering. Add dead code elimination
+  // to eliminate dead instructions (AddrSpaceCast, etc.).
+  addPass(createHSAILAddrSpaceCastPass());
+  addPass(createDeadCodeEliminationPass());
+
+  TargetPassConfig::addIRPasses();
 }
 
 bool HSAILPassConfig::addPreISel(){
@@ -205,19 +224,19 @@ bool HSAILPassConfig::addPreISel(){
   if ( !EnableExperimentalFeatures ) {
     addPass(createHSAILPropagateImageOperandsPass());
   }
-  
   addPass(createHSAILSyntaxCleanupPass());
+  addPass(createHSAILPrintfRuntimeBindingKernArg(HSATM));
   addPass(createHSAILGlobalOffsetInsertionPass(HSATM));
 
   if (HSATM.getOptLevel()!= CodeGenOpt::None && !DisableHSAILCFGOpts) {
     addPass(createLCSSAPass()); // Required by early CFG opts
     addPass(createHSAILEarlyCFGOpts());
-    addPass(createHSAILPrintfConvert(HSATM));
     if (HSATM.Options.PrintMachineCode) {
       addPass(createMachineFunctionPrinterPass(errs(), "After HSAILEarlyCFGOpts"));
     }
   }
-
+  addPass(createHSAILInsertKernelIndexMetadataPass());
+  addPass(createHSAILNullPtrInsertionPass());
   return true;
 }
 
@@ -226,6 +245,7 @@ bool HSAILPassConfig::addInstSelector() {
 	//return HSAILTargetMachine::addInstSelector(*PM,HSATM.Options,HSATM.getOptLevel());
     //mOptLevel = OptLevel;
   // Install an instruction selector.
+  addPass(createHSAILPrintfRuntimeBindingMetadata(HSATM));
   addPass(createHSAILISelDag(HSATM, HSATM.getOptLevel()));
 
   if (EnableUniformOps) {
@@ -255,11 +275,10 @@ bool HSAILPassConfig::addPostRegAlloc()
 HSAIL_32TargetMachine::HSAIL_32TargetMachine(const Target &T, StringRef TT,
     StringRef CPU, StringRef FS,const TargetOptions &Options, Reloc::Model RM, CodeModel::Model CM,CodeGenOpt::Level OL)
   : HSAILTargetMachine(T, TT, CPU, FS,Options, RM, CM,OL, false /* is64bitTarget */),
-    DLInfo("e-p:32:32-f64:32:64-i64:32:64-f80:32:32-f128:128:128-n32"),
+    DLInfo("e-p:32:32-f64:64:64-i64:64:64-f80:32:32-f128:128:128-n32"),
     InstrInfo(*this),
     TSInfo(*this),
-    TLInfo(*this),
-    JITInfo(*this) {
+    TLInfo(*this) {
 
         Triple TheTriple(TT);
 
@@ -283,8 +302,7 @@ HSAIL_64TargetMachine::HSAIL_64TargetMachine(const Target &T, StringRef TT,
     DLInfo("e-p:64:64-s:64-f64:64:64-i64:64:64-f80:128:128-f128:128:128-n32:64"),
     InstrInfo(*this),
     TSInfo(*this),
-    TLInfo(*this),
-    JITInfo(*this) {
+    TLInfo(*this) {
 
         Triple TheTriple(TT);
 

@@ -44,8 +44,8 @@ ifdef ATI_OS_LINUX
     endif
 
     ifneq ($(filter $(BUILD_TYPE),rel)$(BUILD_DBG_OPT),)
-        GCOPTS += -Wno-uninitialized
-        GCXXOPTS += -Wno-uninitialized
+        GCOPTS += -Wno-uninitialized -Wno-maybe-uninitialized
+        GCXXOPTS += -Wno-uninitialized -Wno-maybe-uninitialized
     endif
 
     GCDEFS := $(filter-out -DDEBUG,$(GCDEFS))

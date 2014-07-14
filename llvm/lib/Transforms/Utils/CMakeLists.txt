@@ -35,6 +35,7 @@ add_llvm_library(LLVMTransformUtils
   AMDDbgmovePass.cpp
   AMDLibCalls.cpp
   AMDArgumentUtils.cpp
+  AMDIntrinsicInfo.cpp
   HSAILFixSpecialIntrinsics.cpp
   )
 

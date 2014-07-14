@@ -1,4 +1,4 @@
-//===-- X86TargetMachine.cpp - Define TargetMachine for the X86 -----------===//
+//===-- AMDX86TargetMachine.cpp - Define TargetMachine for the X86 --------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -139,6 +139,9 @@ public:
     return *getX86TargetMachine().getSubtargetImpl();
   }
 
+#if 1 || defined(AMD_OPENCL)
+  virtual bool addPreISel();
+#endif
   virtual bool addInstSelector();
   virtual bool addPreRegAlloc();
   virtual bool addPostRegAlloc();
@@ -154,6 +157,16 @@ TargetPassConfig *X86TargetMachine::createPassConfig(PassManagerBase &PM) {
 
   return PC;
 }
+
+#if 1 || defined(AMD_OPENCL)
+bool X86PassConfig::addPreISel() {
+  // Generic address builtin handling. Add dead code elimination
+  // to eliminate dead instructions.
+  addPass(createAMDX86AddrSpaceCastPass());
+
+  return false;
+}
+#endif
 
 bool X86PassConfig::addInstSelector() {
   // Install an instruction selector.

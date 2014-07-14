@@ -22,13 +22,9 @@ add_llvm_library(LLVMipo
   StripSymbols.cpp
   AMDOptOptions.cpp
   AMDInlineAll.cpp
-  AMDWorkGroupLevelExecution.cpp
-  AMDLowerThreadInfoBlock.cpp
-  AMDWorkGroupValuesInfo.cpp
   AMDSymbolLinkage.cpp
   AMDPassManagerBuilder.cpp
   AMDRemoveNoalias.cpp
-  AMDBarrierRegionInfo.cpp
   AMDSimplifyCall.cpp
   )
 

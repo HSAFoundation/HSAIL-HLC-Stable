@@ -1,15 +1,11 @@
 LOCAL_PATH:= $(call my-dir)
 
 transforms_ipo_SRC_FILES := \
-  AMDBarrierRegionInfo.cpp \
   AMDInlineAll.cpp \
-  AMDLowerThreadInfoBlock.cpp \
   AMDOptOptions.cpp \
   AMDPassManagerBuilder.cpp \
   AMDSimplifyCall.cpp \
   AMDSymbolLinkage.cpp \
-  AMDWorkGroupLevelExecution.cpp \
-  AMDWorkGroupValuesInfo.cpp \
   ArgumentPromotion.cpp \
   BarrierNoopPass.cpp \
   ConstantMerge.cpp \

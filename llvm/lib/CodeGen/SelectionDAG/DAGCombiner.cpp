@@ -2475,7 +2475,7 @@ SDValue DAGCombiner::visitAND(SDNode *N) {
       return SDValue(N, 0);   // Return N so it doesn't get rechecked!
     }
   }
-  // similarly fold (and (X (load ([non_ext|any_ext|zero_ext] V))), c) -> 
+  // similarly fold (and (X (load ([non_ext|any_ext|zero_ext] V))), c) ->
   // (X (load ([non_ext|zero_ext] V))) if 'and' only clears top bits which must
   // already be zero by virtue of the width of the base type of the load.
   //
@@ -2529,8 +2529,8 @@ SDValue DAGCombiner::visitAND(SDNode *N) {
     // If we want to change an EXTLOAD to a ZEXTLOAD, ensure a ZEXTLOAD is
     // actually legal and isn't going to get expanded, else this is a false
     // optimisation.
-    bool CanZextLoadProfitably = TLI.isLoadExtLegal(ISD::ZEXTLOAD,
-                                                    Load->getMemoryVT());
+    bool CanZextLoadProfitably = TLI.isLoadExtLegalOrCustom(ISD::ZEXTLOAD,
+                                                            Load->getMemoryVT());
 
     // Resize the constant to the same size as the original memory access before
     // extension. If it is still the AllOnesValue then this AND is completely
@@ -2772,7 +2772,7 @@ SDValue DAGCombiner::visitAND(SDNode *N) {
       }
     }
   }
-      
+
 
   return SDValue();
 }
@@ -4313,32 +4313,38 @@ SDValue DAGCombiner::visitSIGN_EXTEND(SDNode *N) {
     }
   }
 
-  // fold (sext (load x)) -> (sext (truncate (sextload x)))
-  // None of the supported targets knows how to perform load and sign extend
-  // on vectors in one instruction.  We only perform this transformation on
-  // scalars.
-  if (ISD::isNON_EXTLoad(N0.getNode()) && !VT.isVector() &&
-      ((!LegalOperations && !cast<LoadSDNode>(N0)->isVolatile()) ||
-       TLI.isLoadExtLegal(ISD::SEXTLOAD, N0.getValueType()))) {
-    bool DoXform = true;
-    SmallVector<SDNode*, 4> SetCCs;
-    if (!N0.hasOneUse())
-      DoXform = ExtendUsesToFormExtLoad(N, N0, ISD::SIGN_EXTEND, SetCCs, TLI);
-    if (DoXform) {
-      LoadSDNode *LN0 = cast<LoadSDNode>(N0);
-      SDValue ExtLoad = DAG.getExtLoad(ISD::SEXTLOAD, N->getDebugLoc(), VT,
-                                       LN0->getChain(),
-                                       LN0->getBasePtr(), LN0->getPointerInfo(),
-                                       N0.getValueType(),
-                                       LN0->isVolatile(), LN0->isNonTemporal(),
-                                       LN0->getAlignment());
-      CombineTo(N, ExtLoad);
-      SDValue Trunc = DAG.getNode(ISD::TRUNCATE, N0.getDebugLoc(),
-                                  N0.getValueType(), ExtLoad);
-      CombineTo(N0.getNode(), Trunc, ExtLoad.getValue(1));
-      ExtendSetCCUses(SetCCs, Trunc, ExtLoad, N->getDebugLoc(),
-                      ISD::SIGN_EXTEND);
-      return SDValue(N, 0);   // Return N so it doesn't get rechecked!
+  // None of the supported targets knows how to perform load and sign extend on
+  // vectors in one instruction. We only perform this transformation on scalars,
+  // or for vectors with a custom sextload.
+  if (ISD::isNON_EXTLoad(N0.getNode())) {
+    LoadSDNode *LN0 = cast<LoadSDNode>(N0);
+    EVT N0VT = N0.getValueType();
+    if ((!N0VT.isVector() || TLI.isLoadExtCustom(ISD::SEXTLOAD, N0VT)) &&
+        ((!LegalOperations && !cast<LoadSDNode>(N0)->isVolatile()) ||
+         TLI.isLoadExtLegalOrCustom(ISD::SEXTLOAD, N0VT))) {
+      bool DoXform = true;
+      SmallVector<SDNode*, 4> SetCCs;
+      if (!N0.hasOneUse())
+        DoXform = ExtendUsesToFormExtLoad(N, N0, ISD::SIGN_EXTEND, SetCCs, TLI);
+      if (DoXform) {
+        SDValue ExtLoad = DAG.getLoad(
+          LN0->getAddressingMode(),
+          ISD::SEXTLOAD,
+          VT,
+          LN0->getDebugLoc(),
+          LN0->getChain(),
+          LN0->getBasePtr(),
+          LN0->getOffset(),
+          LN0->getMemoryVT(),
+          LN0->getMemOperand());
+        CombineTo(N, ExtLoad);
+        SDValue Trunc = DAG.getNode(ISD::TRUNCATE, N0->getDebugLoc(),
+                                    N0.getValueType(), ExtLoad);
+        CombineTo(N0.getNode(), Trunc, ExtLoad.getValue(1));
+        ExtendSetCCUses(SetCCs, Trunc, ExtLoad, N->getDebugLoc(),
+                        ISD::SIGN_EXTEND);
+        return SDValue(N, 0);   // Return N so it doesn't get rechecked!
+      }
     }
   }
 
@@ -4619,7 +4625,7 @@ SDValue DAGCombiner::visitZERO_EXTEND(SDNode *N) {
   // scalars.
   if (ISD::isNON_EXTLoad(N0.getNode()) && !VT.isVector() &&
       ((!LegalOperations && !cast<LoadSDNode>(N0)->isVolatile()) ||
-       TLI.isLoadExtLegal(ISD::ZEXTLOAD, N0.getValueType()))) {
+       TLI.isLoadExtLegalOrCustom(ISD::ZEXTLOAD, N0.getValueType()))) {
     bool DoXform = true;
     SmallVector<SDNode*, 4> SetCCs;
     if (!N0.hasOneUse())
@@ -4649,7 +4655,7 @@ SDValue DAGCombiner::visitZERO_EXTEND(SDNode *N) {
        N0.getOpcode() == ISD::XOR) &&
       isa<LoadSDNode>(N0.getOperand(0)) &&
       N0.getOperand(1).getOpcode() == ISD::Constant &&
-      TLI.isLoadExtLegal(ISD::ZEXTLOAD, N0.getValueType()) &&
+      TLI.isLoadExtLegalOrCustom(ISD::ZEXTLOAD, N0.getValueType()) &&
       (!LegalOperations && TLI.isOperationLegal(N0.getOpcode(), VT))) {
     LoadSDNode *LN0 = cast<LoadSDNode>(N0.getOperand(0));
     if (LN0->getExtensionType() != ISD::SEXTLOAD) {
@@ -5192,7 +5198,7 @@ SDValue DAGCombiner::visitSIGN_EXTEND_INREG(SDNode *N) {
       ISD::isUNINDEXEDLoad(N0.getNode()) &&
       EVT == cast<LoadSDNode>(N0)->getMemoryVT() &&
       ((!LegalOperations && !cast<LoadSDNode>(N0)->isVolatile()) ||
-       TLI.isLoadExtLegal(ISD::SEXTLOAD, EVT))) {
+       TLI.isLoadExtLegalOrCustom(ISD::SEXTLOAD, EVT))) {
     LoadSDNode *LN0 = cast<LoadSDNode>(N0);
     SDValue ExtLoad = DAG.getExtLoad(ISD::SEXTLOAD, N->getDebugLoc(), VT,
                                      LN0->getChain(),
@@ -5979,7 +5985,7 @@ SDValue DAGCombiner::visitFSUB(SDNode *N) {
     }
 
     // fold (fsub (-(fmul, x, y)), z) -> (fma (fneg x), y, (fneg z))
-    if (N0.getOpcode() == ISD::FNEG && 
+    if (N0.getOpcode() == ISD::FNEG &&
         N0.getOperand(0).getOpcode() == ISD::FMUL &&
         N0->hasOneUse() && N0.getOperand(0).hasOneUse()) {
       SDValue N00 = N0.getOperand(0).getOperand(0);
@@ -6035,7 +6041,7 @@ SDValue DAGCombiner::visitFMUL(SDNode *N) {
   // fold (fmul (fneg X), (fneg Y)) -> (fmul X, Y)
   if (char LHSNeg = isNegatibleForFree(N0, LegalOperations, TLI,
                                        &DAG.getTarget().Options)) {
-    if (char RHSNeg = isNegatibleForFree(N1, LegalOperations, TLI, 
+    if (char RHSNeg = isNegatibleForFree(N1, LegalOperations, TLI,
                                          &DAG.getTarget().Options)) {
       // Both can be negated for free, check to see if at least one is cheaper
       // negated.
@@ -6463,7 +6469,7 @@ SDValue DAGCombiner::visitFP_EXTEND(SDNode *N) {
   // fold (fpext (load x)) -> (fpext (fptrunc (extload x)))
   if (ISD::isNON_EXTLoad(N0.getNode()) && N0.hasOneUse() &&
       ((!LegalOperations && !cast<LoadSDNode>(N0)->isVolatile()) ||
-       TLI.isLoadExtLegal(ISD::EXTLOAD, N0.getValueType()))) {
+       TLI.isLoadExtLegalOrCustom(ISD::EXTLOAD, N0.getValueType()))) {
     LoadSDNode *LN0 = cast<LoadSDNode>(N0);
     SDValue ExtLoad = DAG.getExtLoad(ISD::EXTLOAD, N->getDebugLoc(), VT,
                                      LN0->getChain(),
@@ -6585,7 +6591,7 @@ SDValue DAGCombiner::visitFABS(SDNode *N) {
 
   // Transform fabs(bitconvert(x)) -> bitconvert(x&~sign) to avoid loading
   // constant pool values.
-  if (!TLI.isFAbsFree(VT) && 
+  if (!TLI.isFAbsFree(VT) &&
       N0.getOpcode() == ISD::BITCAST && N0.getNode()->hasOneUse() &&
       N0.getOperand(0).getValueType().isInteger() &&
       !N0.getOperand(0).getValueType().isVector()) {
@@ -7021,7 +7027,7 @@ bool DAGCombiner::CombineToPostIndexedLoadStore(SDNode *N) {
           for (SDNode::use_iterator III = Use->use_begin(),
                  EEE = Use->use_end(); III != EEE; ++III) {
             SDNode *UseUse = *III;
-            if (!canFoldInAddressingMode(Use, UseUse, DAG, TLI)) 
+            if (!canFoldInAddressingMode(Use, UseUse, DAG, TLI))
               RealUse = true;
           }
 
@@ -7836,7 +7842,7 @@ bool DAGCombiner::MergeConsecutiveStores(StoreSDNode* St) {
     // All loads much share the same chain.
     if (LoadNodes[i].MemNode->getChain() != FirstChain)
       break;
-    
+
     int64_t CurrAddress = LoadNodes[i].OffsetFromBase;
     if (CurrAddress - StartAddress != (ElementSizeBytes * i))
       break;
@@ -8387,7 +8393,7 @@ SDValue DAGCombiner::visitEXTRACT_VECTOR_ELT(SDNode *N) {
     } else {
       Load = DAG.getLoad(LVT, N->getDebugLoc(), LN0->getChain(), NewPtr,
                          LN0->getPointerInfo().getWithOffset(PtrOff),
-                         LN0->isVolatile(), LN0->isNonTemporal(), 
+                         LN0->isVolatile(), LN0->isNonTemporal(),
                          LN0->isInvariant(), Align);
       Chain = Load.getValue(1);
       if (NVT.bitsLT(LVT))

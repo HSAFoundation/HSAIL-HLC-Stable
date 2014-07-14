@@ -138,16 +138,19 @@ bool HSAILOptimizeMemoryOps::IsMemOpsEqual(
   MachineMemOperand *memop1, 
   MachineMemOperand *memop2)
 {
-  if (memop1->getValue() == NULL ||  memop2->getValue() == NULL) 
-  {
+  if (memop1->getValue() == NULL ||  memop2->getValue() == NULL) {
+    return false;
+  }
+  if (isa<UndefValue>(memop1->getValue()) ||
+      isa<UndefValue>(memop2->getValue())) {
+    // Cannot conclude if one undef is the same as another one.
     return false;
   }
   if (memop1->getSize() != memop2->getSize() ||
       memop1->getPointerInfo().getAddrSpace() != 
         memop2->getPointerInfo().getAddrSpace() ||
       AA->alias(memop1->getValue(), memop2->getValue()) != 
-        AliasAnalysis::MustAlias)
-  {
+        AliasAnalysis::MustAlias) {
     return false;
   }
 
@@ -487,7 +490,11 @@ bool HSAILOptimizeMemoryOps::MoveKernargs(MachineFunction &F)
   {
     MachineInstr *kernarg_inst = &*it++;
 
-    if (!HSAILisKernargInst(TM, kernarg_inst))
+    if (!HSAILisArgInst(TM, kernarg_inst))
+      continue;
+
+    // Do not move glued loads in an argscope.
+    if (kernarg_inst->isInsideBundle() || kernarg_inst->isNotDuplicable())
       continue;
 
     // Do not bother with multiple uses

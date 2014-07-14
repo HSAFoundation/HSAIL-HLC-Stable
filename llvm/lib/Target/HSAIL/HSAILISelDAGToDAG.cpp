@@ -104,7 +104,9 @@ private:
   Select(SDNode *N);
 
   SDNode* SelectINTRINSIC_W_CHAIN(SDNode *Node);
+  SDNode* SelectINTRINSIC_WO_CHAIN(SDNode *Node);
   SDNode* SelectAtomic(SDNode *Node, bool bitwiseAtomicOp = true, bool sign = false);
+  SDNode* SelectLdKernargIntrinsic(SDNode *Node);
   SDValue getBRIGMemoryOrder(AtomicOrdering memOrder);
   SDValue getBRIGAtomicOpcode(unsigned atomicOp);
   SDValue getBRIGMemorySegment(unsigned memSeg);
@@ -173,18 +175,17 @@ private:
   bool isGroupStore(StoreSDNode *N) const;
   bool isPrivateStore(StoreSDNode *N) const;
   bool isSpillStore(StoreSDNode *N) const;
+  bool isArgStore(StoreSDNode *N) const;
   bool isFlatStore(StoreSDNode *N) const;
 
   bool isGlobalLoad(LoadSDNode *N) const;
   bool isConstantLoad(LoadSDNode *N, int cbID) const;
   bool isGroupLoad(LoadSDNode *N) const;
   LoadSDNode* getAncestorLoad(SDNode *N) const;
-  bool isAncestorLoadParamPtrStructByVal(SDNode *N, 
-                                         const Value *Val) const;
-  bool isLoadFromStructByVal(LoadSDNode *N) const;
-  bool isStoreToStructByVal(StoreSDNode *N) const;
   bool isPrivateLoad(LoadSDNode *N) const;
   bool isSpillLoad(LoadSDNode *N) const;
+  bool isKernargLoad(LoadSDNode *N) const;
+  bool isArgLoad(LoadSDNode *N) const;
   bool isFlatLoad(LoadSDNode *N) const;
   unsigned getPointerSize(void) const;
   bool isKernelFunc(void) const;
@@ -397,13 +398,25 @@ SDNode* HSAILDAGToDAGISel::SelectINTRINSIC_W_CHAIN(SDNode *Node)
 {
   unsigned IntNo = cast<ConstantSDNode>(Node->getOperand(1))->getZExtValue();
   if (HSAILIntrinsicInfo::isReadImage((HSAILIntrinsic::ID)IntNo) ||
-      HSAILIntrinsicInfo::isLoadImage((HSAILIntrinsic::ID)IntNo )) {
+      HSAILIntrinsicInfo::isLoadImage((HSAILIntrinsic::ID)IntNo ))
     return SelectImageIntrinsic(Node);
-  } else if (HSAILIntrinsicInfo::isCrossLane((HSAILIntrinsic::ID)IntNo)) {
+  if (HSAILIntrinsicInfo::isCrossLane((HSAILIntrinsic::ID)IntNo))
     return SelectCrossLaneIntrinsic(Node);
-  } else {
-    return SelectCode(Node);
-  }
+  if (IntNo == HSAILIntrinsic::HSAIL_ld_kernarg_u32 ||
+      IntNo == HSAILIntrinsic::HSAIL_ld_kernarg_u64)
+    return SelectLdKernargIntrinsic(Node);
+
+  return SelectCode(Node);
+}
+
+SDNode* HSAILDAGToDAGISel::SelectINTRINSIC_WO_CHAIN(SDNode *Node)
+{
+  unsigned IntNo = cast<ConstantSDNode>(Node->getOperand(0))->getZExtValue();
+  if (IntNo == HSAILIntrinsic::HSAIL_ld_kernarg_u32 ||
+      IntNo == HSAILIntrinsic::HSAIL_ld_kernarg_u64)
+    return SelectLdKernargIntrinsic(Node);
+
+  return SelectCode(Node);
 }
 
 SDNode* HSAILDAGToDAGISel::SelectImageIntrinsic(SDNode *Node)
@@ -498,6 +511,65 @@ SDNode* HSAILDAGToDAGISel::SelectCrossLaneIntrinsic(SDNode *Node)
   ResNode = CurDAG->SelectNodeTo(Node, getCrossLaneInstr((HSAILIntrinsic::ID)IntNo),
                                  Node->getVTList(), NewOps.data(), NewOps.size());
   return ResNode;
+}
+
+SDNode* HSAILDAGToDAGISel::SelectLdKernargIntrinsic(SDNode *Node) {
+  bool hasChain = Node->getNumOperands() > 2;
+  unsigned opShift = hasChain ? 1 : 0;
+  unsigned IntNo = (unsigned) Node->getConstantOperandVal(opShift);
+
+  unsigned opc;
+  EVT VT;
+  Type *Ty;
+  if (IntNo == HSAILIntrinsic::HSAIL_ld_kernarg_u32) {
+    opc = HSAIL::kernarg_ld_u32_v1;
+    VT = MVT::i32;
+    Ty = Type::getInt32Ty(*CurDAG->getContext());
+  } else {
+    opc = HSAIL::kernarg_ld_u64_v1;
+    VT = MVT::i64;
+    Ty = Type::getInt64Ty(*CurDAG->getContext());
+  }
+  SDValue Addr = Node->getOperand(1 + opShift);
+  unsigned size = VT.getStoreSize();
+  unsigned alignment = size;
+  int64_t offset = 0;
+  SDValue Base = CurDAG->getRegister(0, HSAILLowering.getPointerTy());
+  SDValue Reg  = Base;
+  // TODO_HSA: match a constant address argument to the parameter through
+  //           functions's argument map (taking argument alignment into account).
+  //           Match is not possible if we are accesing beyond a known kernel
+  //           argument space, or if we accessing from a non-inlined function.
+  //           If no match is possible a kernargbaseptr instruction has to be
+  //           used as a base address instead on NoReg value.
+  if (isa<ConstantSDNode>(Addr)) {
+    offset = Node->getConstantOperandVal(1 + opShift);
+    if (offset & (size - 1))
+      alignment = 1;
+  }
+  else if (Addr.isTargetOpcode())
+    Base = Addr;
+  else
+    Reg = Addr;
+  SDValue Offset = CurDAG->getTargetConstant(offset, VT);
+  SDValue OneDw = CurDAG->getTargetConstant(1, MVT::i1);
+  SDValue OneBit = CurDAG->getTargetConstant(1, MVT::i1);
+  SDValue Align = CurDAG->getTargetConstant(alignment, MVT::i32);
+  SDValue Ops[] = { Base, Reg, Offset,              /* Address */
+                    OneDw, Align, OneBit,           /* Width, Align, Const */
+                    hasChain ? Node->getOperand(0) : CurDAG->getEntryNode()  };
+  SDNode *Load = CurDAG->SelectNodeTo(Node, opc, VT, MVT::Other, Ops,
+                                      array_lengthof(Ops));
+
+  // Set machine memory operand
+  PointerType *ArgPT = PointerType::get(Ty, HSAILAS::KERNARG_ADDRESS);
+  MachinePointerInfo MPtrInfo(UndefValue::get(ArgPT));
+  MachineFunction &MF = CurDAG->getMachineFunction();
+  MachineSDNode::mmo_iterator MemOp = MF.allocateMemRefsArray(1);
+  MemOp[0] = MF.getMachineMemOperand(MPtrInfo, MachineMemOperand::MOLoad,
+                                     size, alignment);
+  cast<MachineSDNode>(Load)->setMemRefs(MemOp, MemOp + 1);
+  return Load;
 }
 
 SDValue HSAILDAGToDAGISel::getBRIGMemorySegment(unsigned memSeg) {
@@ -685,7 +757,9 @@ SDNode* HSAILDAGToDAGISel::SelectAtomic(SDNode *Node, bool bitwiseAtomicOp,
   SDNode *ResNode;
   MemSDNode *Mn = dyn_cast<MemSDNode>(Node);
   SDValue memOrder = getBRIGMemoryOrder(Mn->getOrdering());
-  SDValue memScope = CurDAG->getTargetConstant(Mn->getMemoryScope(),
+  unsigned brigMemScopeVal = Mn->getAddressSpace() == HSAILAS::GROUP_ADDRESS ?
+      Brig::BRIG_MEMORY_SCOPE_WORKGROUP : Mn->getMemoryScope();
+  SDValue memScope = CurDAG->getTargetConstant(brigMemScopeVal,
                                                MVT::getIntegerVT(32));
   SDValue atomicOpcode = getBRIGAtomicOpcode(Node->getOpcode());
   SDValue addrSpace = getBRIGMemorySegment(Mn->getAddressSpace());
@@ -750,6 +824,9 @@ HSAILDAGToDAGISel::Select(SDNode *Node)
     }
     break;
 
+  case ISD::INTRINSIC_WO_CHAIN:
+    ResNode = SelectINTRINSIC_WO_CHAIN(Node);
+    break;
   case ISD::INTRINSIC_W_CHAIN:
     ResNode = SelectINTRINSIC_W_CHAIN(Node);
     break;
@@ -879,6 +956,15 @@ bool  HSAILDAGToDAGISel::SelectAddrCommon(SDValue Addr,
     }
     break;
   }  
+  case ISD::TargetExternalSymbol:
+  {
+    if (Base.getNode() == 0)
+    {
+      Base = Addr;
+      return true;
+    }
+    break;
+  }
   case ISD::OR: // Treat OR as ADD when Op1 & Op2 == 0
     if (IsOREquivalentToADD(Addr))
     {
@@ -999,13 +1085,7 @@ bool HSAILDAGToDAGISel::isGlobalStore(StoreSDNode *N) const {
   const Value *V = N->getSrcValue();
   if (V == NULL) return false;
 
-  if (check_type(V, Subtarget->getGlobalAS()))
-    return true;
-
-  if (isStoreToStructByVal(N) && isKernelFunc())
-    return true;
-
-  return false;
+  return check_type(V, Subtarget->getGlobalAS());
 }
 
 bool HSAILDAGToDAGISel::isGroupStore(StoreSDNode *N) const {
@@ -1013,23 +1093,24 @@ bool HSAILDAGToDAGISel::isGroupStore(StoreSDNode *N) const {
 }
 
 bool HSAILDAGToDAGISel::isPrivateStore(StoreSDNode *N) const {
-  if (!isStoreToStructByVal(N)) {
-    return check_type(N->getSrcValue(), Subtarget->getPrivateAS());
-  } else {
-    return check_type(N->getSrcValue(), Subtarget->getPrivateAS()) && !isKernelFunc();
-  }
+  return check_type(N->getSrcValue(), Subtarget->getPrivateAS());
 }
 
 bool HSAILDAGToDAGISel::isSpillStore(StoreSDNode *N) const {
   return check_type(N->getSrcValue(), Subtarget->getSpillAS());
 }
 
+bool HSAILDAGToDAGISel::isArgStore(StoreSDNode *N) const {
+  return check_type(N->getSrcValue(), Subtarget->getArgAS());
+}
+
 bool HSAILDAGToDAGISel::isFlatStore(StoreSDNode *N) const {
-  return (!check_type(N->getSrcValue(), Subtarget->getGlobalAS()) && 
-          !check_type(N->getSrcValue(), Subtarget->getConstantAS()) && 
-          !check_type(N->getSrcValue(), Subtarget->getGroupAS()) && 
-          !check_type(N->getSrcValue(), Subtarget->getPrivateAS()) &&
-          !check_type(N->getSrcValue(), Subtarget->getSpillAS()));
+  return !check_type(N->getSrcValue(), Subtarget->getGlobalAS()) &&
+         !check_type(N->getSrcValue(), Subtarget->getConstantAS()) &&
+         !check_type(N->getSrcValue(), Subtarget->getGroupAS()) &&
+         !check_type(N->getSrcValue(), Subtarget->getPrivateAS()) &&
+         !check_type(N->getSrcValue(), Subtarget->getSpillAS()) &&
+         !check_type(N->getSrcValue(), Subtarget->getArgAS());
 }
 
 LoadSDNode* HSAILDAGToDAGISel::getAncestorLoad(SDNode *N) const{
@@ -1044,43 +1125,11 @@ LoadSDNode* HSAILDAGToDAGISel::getAncestorLoad(SDNode *N) const{
   return NULL;
 }
 
-bool HSAILDAGToDAGISel::isStoreToStructByVal(StoreSDNode *N) const {
-    
-  MachineFunction &MF = CurDAG->getMachineFunction();
-  HSAILMachineFunctionInfo *FuncInfo = MF.getInfo<HSAILMachineFunctionInfo>();
-  if ( !FuncInfo->getHasStructByVal()) return false;
-  
-  LoadSDNode *N1; SDNode* N2;
-  SDNode *N3;
-  N2 = N->getOperand(2).getNode();
-  N1 = dyn_cast<LoadSDNode>(N2);
-  if (N1) 
-    return isAncestorLoadParamPtrStructByVal(N1->getOperand(1).getNode(), 
-      N1->getSrcValue());
-  for (unsigned i =0; i < N2->getNumOperands(); i++) {
-    N3 = N2->getOperand(i).getNode();
-    N1 = dyn_cast<LoadSDNode>(N3);
-    if (N1) 
-      return isAncestorLoadParamPtrStructByVal(N1->getOperand(1).getNode(), 
-                                               N1->getSrcValue());
-    if (N3->getOpcode() == ISD::CopyFromReg)
-      return check_type(N->getSrcValue(), Subtarget->getPrivateAS());
-  }
-
-  return false;
-}
-
 bool HSAILDAGToDAGISel::isGlobalLoad(LoadSDNode *N) const {
   const Value *V = N->getSrcValue();
   if (V == NULL) return false;
 
-  if (check_type(V, Subtarget->getGlobalAS()))
-    return true;
-
-  if (isLoadFromStructByVal(N) && isKernelFunc())
-    return true;
-
-  return false;
+  return check_type(V, Subtarget->getGlobalAS());
 }
 
 bool HSAILDAGToDAGISel::isConstantLoad(LoadSDNode *N, int cbID) const {
@@ -1097,56 +1146,30 @@ bool HSAILDAGToDAGISel::isGroupLoad(LoadSDNode *N) const {
   return check_type(N->getSrcValue(), Subtarget->getGroupAS());
 }
 
-
-bool HSAILDAGToDAGISel::isAncestorLoadParamPtrStructByVal(SDNode *N, 
-  const Value *Val) const 
-{
-  if (N->getOpcode() == HSAILISD::LOAD_PARAM_PTR_STRUCT_BY_VAL) 
-    return true;
-  else if (isa<RegisterSDNode>(N))
-    return check_type(Val, Subtarget->getPrivateAS());
-  else if (LoadSDNode *N2 = dyn_cast<LoadSDNode>(N))
-    return isAncestorLoadParamPtrStructByVal(N2->getOperand(1).getNode(), 
-                                             Val);
-  else if (N->getNumOperands() ==0)
-    return false;
-  else {
-    bool b = false;
-    for (unsigned i =0; i < N->getNumOperands(); i++)
-      b = (b || isAncestorLoadParamPtrStructByVal(N->getOperand(i).getNode(), 
-                                                  Val));
-
-    return b;
-  }
-}
-
-bool HSAILDAGToDAGISel::isLoadFromStructByVal(LoadSDNode *N) const {
-  MachineFunction &MF = CurDAG->getMachineFunction();
-  HSAILMachineFunctionInfo *FuncInfo = MF.getInfo<HSAILMachineFunctionInfo>();
-  if ( !FuncInfo->getHasStructByVal()) return false;
-  bool b = isAncestorLoadParamPtrStructByVal(
-    N->getOperand(1).getNode(), N->getSrcValue());
-  return b;
-}
-
 bool HSAILDAGToDAGISel::isPrivateLoad(LoadSDNode *N) const {
-  if (!isLoadFromStructByVal(N)) {
-    return check_type(N->getSrcValue(), Subtarget->getPrivateAS());
-  } else {
-    return check_type(N->getSrcValue(), Subtarget->getPrivateAS()) && !isKernelFunc();
-  }
+  return check_type(N->getSrcValue(), Subtarget->getPrivateAS());
 }
 
 bool HSAILDAGToDAGISel::isSpillLoad(LoadSDNode *N) const {
   return check_type(N->getSrcValue(), Subtarget->getSpillAS());
 }
 
+bool HSAILDAGToDAGISel::isKernargLoad(LoadSDNode *N) const {
+  return check_type(N->getSrcValue(), Subtarget->getKernargAS());
+}
+
+bool HSAILDAGToDAGISel::isArgLoad(LoadSDNode *N) const {
+  return check_type(N->getSrcValue(), Subtarget->getArgAS());
+}
+
 bool HSAILDAGToDAGISel::isFlatLoad(LoadSDNode *N) const {
-  return (!check_type(N->getSrcValue(), Subtarget->getGlobalAS()) && 
-          !check_type(N->getSrcValue(), Subtarget->getConstantAS()) && 
-          !check_type(N->getSrcValue(), Subtarget->getGroupAS()) && 
-          !check_type(N->getSrcValue(), Subtarget->getPrivateAS()) &&
-          !check_type(N->getSrcValue(), Subtarget->getSpillAS()));
+  return !check_type(N->getSrcValue(), Subtarget->getGlobalAS()) &&
+         !check_type(N->getSrcValue(), Subtarget->getConstantAS()) &&
+         !check_type(N->getSrcValue(), Subtarget->getGroupAS()) &&
+         !check_type(N->getSrcValue(), Subtarget->getPrivateAS()) &&
+         !check_type(N->getSrcValue(), Subtarget->getSpillAS()) &&
+         !check_type(N->getSrcValue(), Subtarget->getKernargAS()) &&
+         !check_type(N->getSrcValue(), Subtarget->getArgAS());
 }
 
 /// Query the target data for target pointer size as defined in datalayout

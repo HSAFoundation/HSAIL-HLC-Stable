@@ -171,13 +171,13 @@ static unsigned getOperandAttr(InstValidator& prop, Inst inst, unsigned operandI
     }
 }
 
-unsigned getOperandType(Inst inst, unsigned operandIdx, unsigned machineModel)
+unsigned getOperandType(Inst inst, unsigned operandIdx, unsigned machineModel, unsigned profile)
 {
     using namespace Brig;
     assert(operandIdx < 5);
     assert(machineModel == BRIG_MACHINE_SMALL || machineModel == BRIG_MACHINE_LARGE);
 
-    InstValidator prop(machineModel);
+    InstValidator prop(machineModel, profile);
     unsigned attr = getOperandAttr(prop, inst, operandIdx, machineModel);
 
     switch(attr)
@@ -195,13 +195,13 @@ unsigned getOperandType(Inst inst, unsigned operandIdx, unsigned machineModel)
 }
 
 // Validate values of instruction fields which affect possible operand types
-static const char* validateOperandDeps(Inst inst, unsigned operandIdx, unsigned machineModel)
+static const char* validateOperandDeps(Inst inst, unsigned operandIdx, unsigned machineModel, unsigned profile)
 {
     using namespace Brig;
     assert(operandIdx < 5);
     assert(machineModel == BRIG_MACHINE_SMALL || machineModel == BRIG_MACHINE_LARGE);
 
-    InstValidator prop(machineModel);
+    InstValidator prop(machineModel, profile);
     unsigned attr = getOperandAttr(prop, inst, operandIdx, machineModel);
 
     switch(attr)
@@ -237,11 +237,11 @@ static const char* validateOperandDeps(Inst inst, unsigned operandIdx, unsigned 
     return 0;
 }
 
-const char* preValidateInst(Inst inst, unsigned machineModel)
+const char* preValidateInst(Inst inst, unsigned machineModel, unsigned profile)
 {
     for (unsigned idx = 0; idx < 5; ++idx)
     {
-        const char* err = validateOperandDeps(inst, idx, machineModel);
+        const char* err = validateOperandDeps(inst, idx, machineModel, profile);
         if (err) return err;
     }
     return 0;
@@ -251,12 +251,12 @@ const char* preValidateInst(Inst inst, unsigned machineModel)
 //============================================================================
 //============================================================================
 
-unsigned getDefWidth(Inst inst, unsigned machineModel)
+unsigned getDefWidth(Inst inst, unsigned machineModel, unsigned profile)
 {
     using namespace Brig;
     assert(machineModel == BRIG_MACHINE_SMALL || machineModel == BRIG_MACHINE_LARGE);
 
-    InstValidator prop(machineModel);
+    InstValidator prop(machineModel, profile);
     unsigned attr = prop.getWidthAttr(inst);
 
     switch(attr)
@@ -276,12 +276,12 @@ unsigned getDefWidth(Inst inst, unsigned machineModel)
     }
 }
 
-unsigned getDefRounding(Inst inst, unsigned machineModel)
+unsigned getDefRounding(Inst inst, unsigned machineModel, unsigned profile)
 {
     using namespace Brig;
     assert(machineModel == BRIG_MACHINE_SMALL || machineModel == BRIG_MACHINE_LARGE);
 
-    InstValidator prop(machineModel);
+    InstValidator prop(machineModel, profile);
     unsigned attr = prop.getRoundAttr(inst);
 
     switch(attr)
@@ -1342,8 +1342,9 @@ private:
     vector<unsigned> map[BRIG_NUM_SECTIONS];
     set<Offset> usedInst;
 
-    unsigned machineModel;
-    unsigned profile;
+    bool imageExtEnabled;
+    unsigned mModel;
+    unsigned mProfile;
     unsigned major;
     unsigned minor;
 
@@ -1356,7 +1357,7 @@ public:
     //-------------------------------------------------------------------------
     // Public API Implementation
 
-    ValidatorImpl(BrigContainer &c) : brig(c), machineModel(BRIG_MACHINE_LARGE), disasmOnError(false) {}
+    ValidatorImpl(BrigContainer &c) : brig(c), mModel(BRIG_MACHINE_LARGE), mProfile(BRIG_PROFILE_FULL), imageExtEnabled(false), disasmOnError(false) {}
 
     bool validate(const Validator::ValidationMode vMode, bool disasm)
     {
@@ -1424,12 +1425,27 @@ private:
     //-------------------------------------------------------------------------
     // Validation of individual item fields
 
-    void validateBrigFields() const
+    void validateBrigFields()
     {
+        bool versionFound = false;
+
         for(Directive d = brig.directives().begin(); d != brig.directives().end(); d = d.next())
         {
             validate(d, ValidateBrigDirectiveFields(d) || ValidateBrigBlockFields(d), "Invalid directive kind");
+            
+            // Init profile, model and extension to validate limitations on some HSAIL types. See validate_BrigType
+            if (DirectiveExtension ext = d) imageExtEnabled |= (ext.name() == "IMAGE");
+
+            if (DirectiveVersion ver = d) 
+            {
+                validate(d, !versionFound, "Duplicate version directive");
+
+                mProfile     = ver.profile(); 
+                mModel       = ver.machineModel(); 
+                versionFound = true;
+            }
         }
+        validate(brig.directives().begin(), versionFound, "Missing version directive");
 
         for(Inst i = brig.insts().begin(); i != brig.insts().end(); i = i.next())
         {
@@ -1455,8 +1471,6 @@ private:
 
         major        = v.hsailMajor();
         minor        = v.hsailMinor();
-        machineModel = v.machineModel();
-        profile      = v.profile();
 
         validate(d, major         == Brig::BRIG_VERSION_HSAIL_MAJOR, "Unsupported major HSAIL version");
         validate(d, minor         <= Brig::BRIG_VERSION_HSAIL_MINOR, "Unsupported minor HSAIL version");
@@ -1469,9 +1483,9 @@ private:
         // TBD: Spec is contradictory about minor hsail versions, but I believe the following check is sane.
         validate(v, v.hsailMinor() <= Brig::BRIG_VERSION_HSAIL_MINOR, "Unsupported minor HSAIL version");
 
-        validate(v, major        == v.hsailMajor(),   "Version statements have incompatible major numbers");
-        validate(v, machineModel == v.machineModel(), "Version statements have incompatible machine models");
-        validate(v, profile      == v.profile(),      "Version statements have incompatible profiles");
+        validate(v, major    == v.hsailMajor(),   "Version statements have incompatible major numbers");
+        validate(v, mModel   == v.machineModel(), "Version statements have incompatible machine models");
+        validate(v, mProfile == v.profile(),      "Version statements have incompatible profiles");
     }
 
     //-------------------------------------------------------------------------
@@ -1479,7 +1493,7 @@ private:
 
     void validateBrigItems()
     {
-        InstValidator instValidator(machineModel);
+        InstValidator instValidator(mModel, mProfile);
 
         validateDirectivesOrder();
 
@@ -2777,16 +2791,20 @@ private:
 
     void validateSamplerProperties(DirectiveVariable sym, DirectiveSamplerProperties init) const
     {
-        // Wrap, mirror and mirroronce require normalized coordinates
-        uint8_t u = init.boundaryU();
-        uint8_t v = init.boundaryV();
-        uint8_t w = init.boundaryW();
-        
-        if (u == Brig::BRIG_BOUNDARY_WRAP || u == Brig::BRIG_BOUNDARY_MIRROR || u == Brig::BRIG_BOUNDARY_MIRRORONCE ||
-            v == Brig::BRIG_BOUNDARY_WRAP || v == Brig::BRIG_BOUNDARY_MIRROR || v == Brig::BRIG_BOUNDARY_MIRRORONCE ||
-            w == Brig::BRIG_BOUNDARY_WRAP || w == Brig::BRIG_BOUNDARY_MIRROR || w == Brig::BRIG_BOUNDARY_MIRRORONCE)
+        // If coord is BRIG_COORD_UNNORMALIZED:
+        // - filter must be BRIG_FILTER_NEAREST.
+        // - addressing must be BRIG_ADDRESSING_UNDEFINED, BRIG_ADDRESSING_CLAMP_TO_EDGE or BRIG_ADDRESSING_CLAMP_TO_BORDER.
+
+        if (init.coord() == Brig::BRIG_COORD_UNNORMALIZED)
         {
-            validate(sym, !init.modifier().isUnnormalized(), "Wrap, mirror and mirroronce require normalized coordinates");
+            uint8_t addr = init.addressing();
+
+            // validate(sym, init.filter() == Brig::BRIG_FILTER_NEAREST, "Unnormalized coordinates mode requires 'nearest' filter");
+
+            validate(sym, addr == Brig::BRIG_ADDRESSING_UNDEFINED     ||
+                          addr == Brig::BRIG_ADDRESSING_CLAMP_TO_EDGE ||
+                          addr == Brig::BRIG_ADDRESSING_CLAMP_TO_BORDER,
+                          "Unnormalized coordinates mode requires 'edge', 'border' or 'undefined' addressing");
         }
     }
 
@@ -3136,6 +3154,9 @@ private:
     template<class T> void validate_BrigType(T item, unsigned val, const char* structName, const char* fieldName) const 
     {
         validate(item, typeX2str(val) != NULL, "Invalid data type value", val);
+
+        const char* err = validateProp(PROP_TYPE, val, mModel, mProfile, imageExtEnabled);
+        if (err) validate(item, false, SRef(err));
     }
 
     template<class T> void validate_BrigSegment(T item, unsigned val, const char* structName, const char* fieldName) const
@@ -3186,14 +3207,6 @@ private:
         validateLinkage(item, linkage);
     }
 
-    void validate_BrigSamplerModifier(Directive item, Brig::BrigSamplerModifier val, const char* structName, const char* fieldName) const
-    {
-        using namespace Brig;
-
-        unsigned mod = val.allBits;
-        validate(item, (mod & ~(BRIG_SAMPLER_FILTER | BRIG_SAMPLER_COORD)) == 0, "Invalid sampler modifier value", mod);
-    }
-
     void validate_BrigAluModifier(Inst item, Brig::BrigAluModifier val, const char* structName, const char* fieldName) const
     {
         using namespace Brig;
@@ -3223,24 +3236,24 @@ private:
         validate(item, controlDirective2str(val) != NULL, "Invalid control type value", val);
     }
 
-    void validate_BrigImageOrder(Directive item, unsigned val, const char* structName, const char* fieldName) const
+    void validate_BrigImageChannelOrder(Directive item, unsigned val, const char* structName, const char* fieldName) const
     {
-        const char* s = imageOrder2str(val);
-        validate(item, s != NULL , "Invalid image order value", val);
-        validate(item, *s != 0,    "Unspecified image order");
+        const char* s = imageChannelOrder2str(val);
+        validate(item, s != NULL , "Invalid image channel order value", val);
+        validate(item, *s != 0,    "Unspecified image channel order");
 
         using namespace Brig;
         DirectiveImageProperties prop = item;
         bool depthGeometry = (prop.geometry() == BRIG_GEOMETRY_2DDEPTH || prop.geometry() == BRIG_GEOMETRY_2DADEPTH);
-        bool depthOrder    = (val == BRIG_ORDER_DEPTH || val == BRIG_ORDER_DEPTH_STENCIL);
-        validate(item, depthGeometry == depthOrder, "Incompatible image order and geometry");
+        bool depthOrder    = (val == BRIG_CHANNEL_ORDER_DEPTH || val == BRIG_CHANNEL_ORDER_DEPTH_STENCIL);
+        validate(item, depthGeometry == depthOrder, "Incompatible image channel order and geometry");
     }
 
-    void validate_BrigImageFormat(Directive item, unsigned val, const char* structName, const char* fieldName) const
+    void validate_BrigImageChannelType(Directive item, unsigned val, const char* structName, const char* fieldName) const
     {
-        const char* s = imageFormat2str(val);
-        validate(item, s != NULL, "Invalid image format value", val);
-        validate(item, *s != 0,   "Unspecified image format");
+        const char* s = imageChannelType2str(val);
+        validate(item, s != NULL, "Invalid image channel type value", val);
+        validate(item, *s != 0,   "Unspecified image channel type");
     }
 
     void validate_BrigProfile(Directive item, unsigned val, const char* structName, const char* fieldName) const
@@ -3253,9 +3266,19 @@ private:
         validate(item, machineModel2str(val) != NULL, "Invalid machine model value", val);
     }
 
-    void validate_BrigSamplerBoundaryMode(Directive item, unsigned val, const char* structName, const char* fieldName) const
+    void validate_BrigSamplerCoordNormalization(Directive item, Brig::BrigSamplerCoordNormalization8_t val, const char* structName, const char* fieldName) const
     {
-        validate(item, samplerBoundaryMode2str(val) != NULL, "Invalid sampler boundary value", val);
+        validate(item, samplerCoordNormalization2str(val) != NULL, "Invalid sampler coord value", val);
+    }
+
+    void validate_BrigSamplerFilter(Directive item, Brig::BrigSamplerFilter8_t val, const char* structName, const char* fieldName) const
+    {
+        validate(item, samplerFilter2str(val) != NULL, "Invalid sampler filter value", val);
+    }
+
+    void validate_BrigSamplerAddressing(Directive item, unsigned val, const char* structName, const char* fieldName) const
+    {
+        validate(item, samplerAddressing2str(val) != NULL, "Invalid sampler boundary value", val);
     }
 
     void validate_BrigOpcode(Inst item, unsigned val, const char* structName, const char* fieldName) const
@@ -3295,7 +3318,7 @@ private:
 
     void validate_BrigMemoryFenceSegments(Inst item, unsigned val, const char* structName, const char* fieldName) const
     {
-        validate(item, memoryFenceSeg2str(val) != NULL, "Invalid memoryFence value", val);
+        validate(item, memoryFenceSegments2str(val) != NULL, "Invalid memoryFence value", val);
     }
 
     void validate_ImageDim(DirectiveImageProperties item, unsigned dim, const char* name,  bool isPositive) const
@@ -3334,6 +3357,20 @@ private:
             geom == Brig::BRIG_GEOMETRY_1DA     ||
             geom == Brig::BRIG_GEOMETRY_2DA     ||
             geom == Brig::BRIG_GEOMETRY_2DADEPTH);
+    }
+
+    void validate_BrigImageQuery(Inst item, unsigned val, const char* structName, const char* fieldName) const
+    {
+        const char* s = imageQuery2str(val);
+        validate(item, s != NULL, "Invalid image query value", val);
+        validate(item, *s != 0,   "Unspecified image query");
+    }
+
+    void validate_BrigSamplerQuery(Inst item, unsigned val, const char* structName, const char* fieldName) const
+    {
+        const char* s = samplerQuery2str(val);
+        validate(item, s != NULL, "Invalid sampler query value", val);
+        validate(item, *s != 0,   "Unspecified sampler query");
     }
 
     template<class T> void validate_fld_Reserved(T item, unsigned val, const char* structName, const char* fieldName) const
@@ -3492,17 +3529,17 @@ private:
             if (section == BRIG_SEC_DIRECTIVES && offset >= BRIG_NUM_BYTES_RESERVED)
             {
                 Directive d(&brig, offset);
-                s << ": " << disasm.get(d, machineModel);
+                s << ": " << disasm.get(d, mModel, mProfile);
             }
             else if (section == BRIG_SEC_CODE && offset >= BRIG_NUM_BYTES_RESERVED)
             {
                 Inst inst(&brig, offset);
-                s << ": " << disasm.get(inst, machineModel);
+                s << ": " << disasm.get(inst, mModel, mProfile);
             }
             else if (section == BRIG_SEC_OPERANDS && offset >= BRIG_NUM_BYTES_RESERVED)
             {
                 Operand opr(&brig, offset);
-                s << ": " << disasm.get(opr, machineModel);
+                s << ": " << disasm.get(opr, mModel, mProfile);
             }
         }
         return s.str();
@@ -3519,7 +3556,7 @@ private:
     //-------------------------------------------------------------------------
     // Helpers
 
-    bool isLargeModel()                   const { return machineModel == Brig::BRIG_MACHINE_LARGE; }
+    bool isLargeModel()                   const { return mModel == Brig::BRIG_MACHINE_LARGE; }
     bool isTopLevelStatement(Directive d) const { return !isBodyOnly(d);     }
     bool isBodyStatement(Directive d)     const { return !isToplevelOnly(d); }
 
@@ -3582,11 +3619,11 @@ int    Validator::getErrorCode()                 const { return impl->getErrorCo
 
 
 //F EXTENSIONS:
-//F - BrigImageFormat: Values 16 through 64 are available for extensions
+//F - BrigImageChannelType: Values 16 through 64 are available for extensions
 //F - BrigImageGeometry: Values 6 through 255 are available for extensions
-//F - BrigImageOrder: Values 17 through 255 are available for extensions
-//F - BrigSamplerBoundaryMode: Values 5 through 255 are available for extensions.
-//F - BrigSamplerCoord: Values 5 through 255 are available for extensions.
+//F - BrigImageChannelOrder: Values 17 through 255 are available for extensions
+//F - BrigSamplerAddressing: Values 5 through 255 are available for extensions.
+//F - BrigSamplerCoordNormalization: Values 5 through 255 are available for extensions.
 //F - BrigSamplerFilter: Values 2 through 63 are available for extensions
 //F - BrigSegment: Values 9 through 16 are available for extensions
 //F MISC:

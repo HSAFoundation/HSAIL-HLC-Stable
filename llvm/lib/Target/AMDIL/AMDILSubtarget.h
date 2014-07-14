@@ -161,6 +161,17 @@ class AMDILSubtarget : public AMDILGenSubtargetInfo {
       return mHalfOps;
     }
 
+    bool hasBFE() const {
+      // TODO: Wire up to a proper subtarget feature.
+      return true;
+    }
+
+#if 0
+    bool hasGlobalExtLoads() const {
+      return getGeneration() >= SOUTHERN_ISLANDS;
+    }
+#endif
+
     bool isTargetELF() const {
       return false;
     }
@@ -189,6 +200,14 @@ class AMDILSubtarget : public AMDILGenSubtargetInfo {
     // are supported by this device.
     size_t getMaxNumCBs() const {
       return MaxNumCBs;
+    }
+
+    unsigned getMaxNumReadImages() const {
+      return 128;
+    }
+
+    unsigned getMaxNumWriteImages() const {
+      return getGeneration() >= AMDIL::SOUTHERN_ISLANDS ? 64 : 8;
     }
 
     // Returns the max number of bytes a single hardware constant buffer
@@ -271,6 +290,9 @@ class AMDILSubtarget : public AMDILGenSubtargetInfo {
     static const unsigned int FullWavefrontSize = 64;
     static const unsigned int HalfWavefrontSize = 32;
     static const unsigned int QuarterWavefrontSize = 16;
+
+    unsigned getMaxStoreSizeInBits(unsigned AS) const;
+    unsigned getMaxLoadSizeInBits(unsigned AS) const;
 
     std::string getDataLayout() const;
 

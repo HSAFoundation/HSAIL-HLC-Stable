@@ -212,7 +212,7 @@ private:
         {
             if (navigator.isTestEnabled(inst)) 
             {
-                Context* ctx = new Context(getFullTestName(), positiveSample);
+                Context* ctx = new Context(getFullTestName(), positiveSample, true);
                 ctx->defineTestKernel();
                 ctx->cloneSample(positiveSample);
                 validateContext(ctx);
@@ -230,7 +230,7 @@ private:
 
             for (;;)
             {
-                Context* ctx = new Context(getFullTestName(), positiveSample);
+                Context* ctx = new Context(getFullTestName(), positiveSample, true);
                 if (backend->startTest(ctx, getTestPath(), getTestName(), BRIG_EXT))
                 {
                     ctx->defineTestKernel();
@@ -290,7 +290,7 @@ private:
             }
             else if (testPackage == PACKAGE_INTERNAL)
             {
-                Context* ctx = new Context(getFullTestName(), negativeSample);
+                Context* ctx = new Context(getFullTestName(), negativeSample, false);
                 ctx->defineTestKernel();
                 Sample invalid = ctx->cloneSample(negativeSample, id, val);
                 assert(!PropDesc::isValidInst(invalid.getInst()));

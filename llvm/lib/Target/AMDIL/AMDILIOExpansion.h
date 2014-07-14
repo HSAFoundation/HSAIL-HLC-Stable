@@ -120,9 +120,10 @@ namespace llvm {
       virtual void
         expandLocalLoad(MachineInstr *MI) = 0;
 
-      virtual void expandPrivateLoad(MachineInstr *MI);
-      virtual void expandPrivateStore(MachineInstr *MI);
-      virtual void expandConstantLoad(MachineInstr *MI);
+    virtual void expandPrivateLoad(MachineInstr *MI) = 0;
+    virtual void expandPrivateStore(MachineInstr *MI) = 0;
+
+      virtual void expandConstantLoad(MachineInstr *MI) = 0;
       virtual void expandConstantPoolLoad(MachineInstr *MI);
 
       bool
@@ -155,21 +156,6 @@ namespace llvm {
         expandStoreSetupCode(MachineInstr *MI, uint32_t &addyReg, uint32_t &dataReg);
       void
         expandAddressCalc(MachineInstr *MI, uint32_t &addyReg);
-      void
-        expandLongExtend(MachineInstr *MI, uint32_t numComponents,
-            uint32_t size, bool signedShift,
-            uint32_t SrcReg, uint32_t &DstReg);
-      void
-        expandLongExtendSub32(MachineInstr *MI,
-            unsigned SHLop, unsigned SHRop, unsigned USHRop,
-            unsigned SHLimm, uint64_t SHRimm, unsigned USHRimm,
-            unsigned LCRop, bool signedShift, bool vec2,
-            uint32_t SrcReg, uint32_t &DstReg);
-      void
-        expandIntegerExtend(MachineInstr *MI, unsigned SHLop, unsigned SHRop,
-            unsigned Offset, unsigned SrcReg, unsigned DstReg);
-      void
-        expandExtendLoad(MachineInstr *MI, uint32_t SrcReg, uint32_t &DstReg);
       virtual void
         expandPackedData(MachineInstr *MI, uint32_t SrcReg, uint32_t &DataReg)
           = 0;
@@ -231,18 +217,6 @@ namespace llvm {
       virtual void
         expandImageParam(MachineBasicBlock *BB, MachineInstr *MI);
 
-      //
-      // @param MI Insturction that points to the image
-      // @brief transforms __amdil_sample_data into a sequence of
-      // if/else that selects the correct sample instruction.
-      //
-      // @warning This function is inefficient and works with no
-      // inlining.
-      //
-      virtual void
-        expandInefficientImageLoad(MachineBasicBlock *BB, MachineInstr *MI);
-
-  private:
     void emitVectorAddressCalc(MachineInstr *MI,
                                bool is32bit,
                                bool needsSelect,
@@ -283,17 +257,34 @@ namespace llvm {
         expandLocalStore(MachineInstr *MI);
       void
         expandRegionStore(MachineInstr *MI);
-      virtual void
-        expandGlobalLoad(MachineInstr *MI);
+    virtual void expandGlobalLoad(MachineInstr *MI) LLVM_OVERRIDE;
+    virtual void expandConstantLoad(MachineInstr *MI) LLVM_OVERRIDE;
+
       void
         expandRegionLoad(MachineInstr *MI);
       void
         expandLocalLoad(MachineInstr *MI);
+    virtual void expandPrivateLoad(MachineInstr *MI) LLVM_OVERRIDE;
+    virtual void expandPrivateStore(MachineInstr *MI) LLVM_OVERRIDE;
+
       virtual bool
         isCacheableOp(MachineInstr *MI);
-      virtual void
-        expandPackedData(MachineInstr *MI, uint32_t SrcReg, uint32_t &DataReg)
-          LLVM_OVERRIDE;
+
+    void expandLongExtend(MachineInstr *MI, uint32_t numComponents,
+                          uint32_t size, bool signedShift,
+                          uint32_t SrcReg, uint32_t &DstReg);
+    void expandLongExtendSub32(MachineInstr *MI,
+                               unsigned SHLop, unsigned SHRop, unsigned USHRop,
+                               unsigned SHLimm, uint64_t SHRimm,
+                               unsigned USHRimm, unsigned LCRop,
+                               bool signedShift, bool vec2,
+                               uint32_t SrcReg, uint32_t &DstReg);
+    void expandIntegerExtend(MachineInstr *MI, unsigned SHLop, unsigned SHRop,
+                             unsigned Offset, unsigned SrcReg, unsigned DstReg);
+    void expandExtendLoad(MachineInstr *MI, uint32_t SrcReg, uint32_t &DstReg);
+
+    virtual void expandPackedData(MachineInstr *MI, uint32_t SrcReg,
+                                  uint32_t &DataReg) LLVM_OVERRIDE;
     private:
       bool
         isArenaOp(MachineInstr *MI);

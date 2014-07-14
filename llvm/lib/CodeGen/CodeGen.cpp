@@ -86,7 +86,11 @@ void llvm::initializeCodeGen(PassRegistry &Registry) {
   initializeHSAILEarlyCFGOptsPass(Registry);
   initializeHSAILSyntaxCleanupPassPass(Registry);
   initializeHSAILGlobalOffsetInsertionPassPass(Registry);
+  initializeHSAILInsertKernelIndexMetadataPass(Registry);
+  initializeHSAILPrintfRuntimeBindingKernArgPass(Registry);
+  initializeHSAILPrintfRuntimeBindingMetadataPass(Registry);
   initializeHSAILLowerSPIRSamplersPass(Registry);
+  initializeHSAILNullPtrInsertionPass(Registry);
 #endif // WITH_TARGET_HSAIL
 #endif // 1 || define(AMD_OPENCL)
 }

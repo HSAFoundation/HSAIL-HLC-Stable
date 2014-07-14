@@ -51,14 +51,18 @@
 // Custom memory operand
 //===----------------------------------------------------------------------===//
 
+// FIXME: MEM32/MEM64 should be removed. They are mostly redundant
+// with iPTR. This is also overly strict with the register class
+// requirement. LDS instructions require the address be in the x
+// component, but UAVs should be OK with a zw component address.
 def MEM32 : Operand<i32> {
   let PrintMethod = "printMemOperand";
-  let MIOperandInfo = (ops ptr_rc);
+  let MIOperandInfo = (ops GPR_X_32);
 }
 
 def MEM64 : Operand<i64> {
   let PrintMethod = "printMemOperand";
-  let MIOperandInfo = (ops ptr_rc);
+  let MIOperandInfo = (ops GPR_XY_64);
 }
 
 // Call target types

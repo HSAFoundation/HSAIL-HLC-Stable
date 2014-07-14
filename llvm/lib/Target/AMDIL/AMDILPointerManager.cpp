@@ -2425,7 +2425,7 @@ void AMDILEGPointerManagerImpl::annotateRawPtrs() {
         if (STM->getResourceID(AMDIL::RAW_UAV_ID) >
             STM->getResourceID(AMDIL::ARENA_UAV_ID)) {
           curRes.bits.ResourceID = STM->getResourceID(AMDIL::RAW_UAV_ID);
-        } else if (numWriteImages != OPENCL_MAX_WRITE_IMAGES) {
+        } else if (numWriteImages != STM->getMaxNumWriteImages()) {
           if (STM->getResourceID(AMDIL::RAW_UAV_ID)
               < numWriteImages) {
             curRes.bits.ResourceID = numWriteImages;
@@ -2678,7 +2678,7 @@ void AMDILEGPointerManagerImpl::allocateMultiUAVPointers() {
   bool increment = true;
   // If the RAW_UAV_ID is a value that is larger than the max number of write
   // images, then we use that UAV ID.
-  if (numWriteImages >= OPENCL_MAX_WRITE_IMAGES) {
+  if (numWriteImages >= STM->getMaxNumWriteImages()) {
     curUAV = STM->getResourceID(AMDIL::RAW_UAV_ID);
     increment = false;
   }
@@ -2805,7 +2805,7 @@ void AMDILEGPointerManagerImpl::allocateMultiUAVPointers() {
     // If we make it here, we can increment the uav counter if we are less
     // than the max write image count. Otherwise we set it to the default
     // UAV and leave it.
-    if (increment && curUAV < (OPENCL_MAX_WRITE_IMAGES - 1)) {
+    if (increment && curUAV < (STM->getMaxNumWriteImages() - 1)) {
       ++curUAV;
     } else {
       curUAV = STM->getResourceID(AMDIL::RAW_UAV_ID);
@@ -2975,8 +2975,8 @@ bool AMDILEGPointerManagerImpl::perform() {
     mMFI->addErrorMsg(
         amd::CompilerErrorMessage[INSUFFICIENT_SEMAPHORE_RESOURCES]);
   }
-  if (numWriteImages > OPENCL_MAX_WRITE_IMAGES
-      || (images.size() - numWriteImages > OPENCL_MAX_READ_IMAGES)) {
+  if (numWriteImages > STM->getMaxNumWriteImages()
+      || (images.size() - numWriteImages > STM->getMaxNumReadImages())) {
     mMFI->addErrorMsg(
         amd::CompilerErrorMessage[INSUFFICIENT_IMAGE_RESOURCES]);
   }

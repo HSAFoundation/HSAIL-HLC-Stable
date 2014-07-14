@@ -162,42 +162,13 @@ HSAILIntrinsicInfo::isOverloaded(unsigned IntrID) const {
 #undef GET_INTRINSIC_OVERLOAD_TABLE
 }
 
-/// This defines the "getAttributes(ID id)" method.
-#define GET_INTRINSIC_ATTRIBUTES
-#include "HSAILGenIntrinsics.inc"
-#undef GET_INTRINSIC_ATTRIBUTES
-
-
 Function*
 HSAILIntrinsicInfo::getDeclaration(Module *M,
                                    unsigned IntrID,
                                    Type ** Tys,
                                    unsigned int numTys) const
 {
-  assert(!isOverloaded(IntrID) && "HSAIL intrinsics are not overloaded");
-  LLVMContext& Context = M->getContext();
-  AttrListPtr AList = getAttributes(Context, (HSAILIntrinsic::ID) IntrID);
-  unsigned int id = IntrID;
-  Type *ResultTy = NULL;
-  std::vector<Type*> ArgTys;
-  bool IsVarArg = false;
+  llvm_unreachable("Not implemented");
 
-  switch (IntrID)
-  {
-   default:
-    llvm_unreachable("Not implemented");
- 
-   case HSAILIntrinsic::HSAIL_syscall:		// llvm.HSAIL.syscall
-    // syscall prototype
-    //     int32:$dst,int32:$src1,int32:$src2,int32:$src3,int32:$src4
-    ResultTy = IntegerType::get(Context, 32);
-    ArgTys.push_back(IntegerType::get(Context, 32));
-    ArgTys.push_back(IntegerType::get(Context, 32));
-    ArgTys.push_back(IntegerType::get(Context, 32));
-    ArgTys.push_back(IntegerType::get(Context, 32));
-    break;
-  }
-
-  return cast<Function>(M->getOrInsertFunction(getName(IntrID),
-         FunctionType::get(ResultTy, ArgTys, IsVarArg), AList));
+  return NULL;
 }

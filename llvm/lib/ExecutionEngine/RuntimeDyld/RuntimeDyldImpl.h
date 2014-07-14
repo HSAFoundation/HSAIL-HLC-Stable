@@ -80,17 +80,23 @@ public:
   unsigned SectionID;
 
   /// Offset - offset into the section.
-  uintptr_t Offset;
+  uint64_t Offset;
 
   /// RelType - relocation type.
   uint32_t RelType;
 
   /// Addend - the relocation addend encoded in the instruction itself.  Also
   /// used to make a relocation section relative instead of symbol relative.
-  intptr_t Addend;
+  int64_t Addend;
 
-  RelocationEntry(unsigned id, uint64_t offset, uint32_t type, int64_t addend)
-    : SectionID(id), Offset(offset), RelType(type), Addend(addend) {}
+  /// SymOffset - Section offset of the relocation entry's symbol (used for GOT
+  /// lookup).
+  uint64_t SymOffset;
+
+
+  RelocationEntry(unsigned id, uint64_t offset, uint32_t type, int64_t addend,
+                  uint64_t symoffset = 0)
+    : SectionID(id), Offset(offset), RelType(type), Addend(addend), SymOffset(symoffset) {}
 };
 
 /// ObjRelocationInfo - relocation information as read from the object file.
@@ -108,9 +114,10 @@ public:
 class RelocationValueRef {
 public:
   unsigned  SectionID;
-  intptr_t  Addend;
+  uint64_t  Offset;
+  int64_t   Addend;
   const char *SymbolName;
-  RelocationValueRef(): SectionID(0), Addend(0), SymbolName(0) {}
+  RelocationValueRef(): SectionID(0), Offset(0), Addend(0), SymbolName(0) {}
 
   inline bool operator==(const RelocationValueRef &Other) const {
     return std::memcmp(this, &Other, sizeof(RelocationValueRef)) == 0;
@@ -172,8 +179,14 @@ protected:
       return 16;
     else if (Arch == Triple::ppc64)
       return 44;
+     else if (Arch == Triple::x86_64)
+      return 6; // 2-byte jmp instruction + 32-bit relative address
     else
       return 0;
+  }
+
+  inline unsigned getStubAlignment() {
+    return 1;
   }
 
   bool HasError;
@@ -294,7 +307,19 @@ protected:
 
   /// \brief Resolve relocations to external symbols.
   void resolveExternalSymbols();
+
+  /// \brief Update GOT entries for external symbols.
+  // The base class does nothing.  ELF overrides this.
+  virtual void updateGOTEntries(StringRef Name, uint64_t Addr) {}
+
   virtual ObjectImage *createObjectImage(ObjectBuffer *InputBuffer);
+
+#if defined(AMD_OPENCL) || 1
+  virtual uint64_t computeSectionSize(const SectionRef &Section,
+                                      ObjSectionToIDMap &LocalSections);
+  virtual uint64_t computeTotalSize(const ObjectImage* obj);
+#endif
+
 public:
   RuntimeDyldImpl(RTDyldMemoryManager *mm) : MemMgr(mm), HasError(false) {}
 
@@ -336,6 +361,10 @@ public:
   StringRef getErrorString() { return ErrorStr; }
 
   virtual bool isCompatibleFormat(const ObjectBuffer *Buffer) const = 0;
+
+
+  virtual void finalizeLoad() {}
+
 };
 
 } // end namespace llvm

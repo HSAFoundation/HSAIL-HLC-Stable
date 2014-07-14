@@ -162,6 +162,7 @@ static unsigned MemoryScopeOpenCL2LLVM(Value *openclMemScope) {
    memory_scope_work_group,
    memory_scope_device,
    memory_scope_all_svm_devices,
+   memory_scope_sub_group
   };
   unsigned memScope = dyn_cast<ConstantInt>(openclMemScope)->getZExtValue();
   switch(memScope) {
@@ -170,6 +171,7 @@ static unsigned MemoryScopeOpenCL2LLVM(Value *openclMemScope) {
     case memory_scope_work_group: return MEM_SCOPE_WORKGROUP;
     case memory_scope_device: return MEM_SCOPE_COMPONENT;
     case memory_scope_all_svm_devices: return MEM_SCOPE_SYSTEM;
+    case memory_scope_sub_group: return MEM_SCOPE_WAVEFRONT;
     default: llvm_unreachable("unknown memory scope");
   }
 }
@@ -349,7 +351,8 @@ Value * AMDLowerAtomics::lowerAtomicRMW(IRBuilder<> llvmBuilder,
   }
   bool isSigned = true;
   // check if the arguments are unsigned
-  if(funcName.endswith("jj") || funcName.endswith("S_S_"))
+  if(funcName.find("U7_Atomicj") != StringRef::npos
+          || funcName.find("U7_Atomicm") != StringRef::npos)
     isSigned = false;
   AtomicRMWInst::BinOp BinOp = atomicFetchBinOp(funcName, isSigned);
   Value *atomicRMW = llvmBuilder.CreateAtomicRMW(BinOp, ptr, val,

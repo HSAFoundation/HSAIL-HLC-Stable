@@ -13,7 +13,12 @@
 
 #include "HSAIL.h"
 #include "HSAILParamManager.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/Twine.h"
+#include "llvm/Target/Mangler.h"
+#include <sstream>
 
 using namespace llvm;
 
@@ -30,40 +35,72 @@ HSAILParamManager::~HSAILParamManager() {
   ParamNames.clear();
 }
 
-unsigned HSAILParamManager::addArgumentParam(unsigned Size) {
+unsigned HSAILParamManager::addParam(HSAILParamType Type, unsigned Size, const StringRef ParamName) {
   HSAILParam Param;
-  Param.Type = HSAIL_PARAM_TYPE_ARGUMENT;
+  Param.Type = Type;
   Param.Size = Size;
+#ifndef ANDROID
+  SmallVector<unsigned, 4>* ParamList = nullptr;
+  const char* DefName = nullptr;
+#else
+  SmallVector<unsigned, 4>* ParamList = 0;
+  const char* DefName = 0;
+#endif
 
   std::string Name;
-  Name = "arg_p";
-  Name += utostr(ArgumentParams.size());
+
+  switch (Type) {
+  case HSAIL_PARAM_TYPE_ARGUMENT:
+    ParamList = &ArgumentParams;
+    DefName = "__arg_p";
+    break;
+  case HSAIL_PARAM_TYPE_RETURN:
+    ParamList = &ReturnParams;
+    DefName = "__ret_";
+    break;
+  case HSAIL_PARAM_TYPE_CALL_PARAM:
+    ParamList = &CallArgParams;
+    DefName = "__param_";
+    break;
+  case HSAIL_PARAM_TYPE_CALL_RET:
+    ParamList = &CallRetParams;
+    DefName = "__ret_";
+    break;
+
+  default:
+    llvm_unreachable("Unknown HSAIL parameter type");
+  }
+
+  if (ParamName.empty()) {
+    Name = DefName;
+    Name += utostr(ParamList->size());
+  } else {
+    Name = ParamName;
+  }
 
   unsigned Index = AllParams.size();
   AllParams[Index] = Param;
-  ArgumentParams.push_back(Index);
+  ParamList->push_back(Index);
 
   addParamName(Name, Index);
 
   return Index;
 }
 
-unsigned HSAILParamManager::addReturnParam(unsigned Size) {
-  HSAILParam Param;
-  Param.Type = HSAIL_PARAM_TYPE_RETURN;
-  Param.Size = Size;
+unsigned HSAILParamManager::addArgumentParam(unsigned Size, const StringRef ParamName) {
+  return addParam(HSAIL_PARAM_TYPE_ARGUMENT, Size, ParamName);
+}
 
-  std::string Name;
-  Name = "ret_val";
-  Name += utostr(ReturnParams.size());
+unsigned HSAILParamManager::addReturnParam(unsigned Size, const StringRef ParamName) {
+  return addParam(HSAIL_PARAM_TYPE_RETURN, Size, ParamName);
+}
 
-  unsigned Index = AllParams.size();
-  AllParams[Index] = Param;
-  ReturnParams.push_back(Index);
+unsigned HSAILParamManager::addCallArgParam(unsigned Size, const StringRef ParamName) {
+  return addParam(HSAIL_PARAM_TYPE_CALL_PARAM, Size, ParamName);
+}
 
-  addParamName(Name, Index);
-
-  return Index;
+unsigned HSAILParamManager::addCallRetParam(unsigned Size, const StringRef ParamName) {
+  return addParam(HSAIL_PARAM_TYPE_CALL_RET, Size, ParamName);
 }
 
 void HSAILParamManager::addParamName(std::string Name, unsigned Index) {
@@ -75,4 +112,13 @@ void HSAILParamManager::addParamName(std::string Name, unsigned Index) {
 
 void HSAILParamManager::addParamType(const Type * pTy, unsigned Index) {
   ParamTypes[Index] = pTy;
+}
+
+/// returns a unique argument name for flattened vector component.
+std::string HSAILParamManager::mangleArg(Mangler *Mang,
+                                         const StringRef argName) {
+  if (argName.empty()) return argName;
+  SmallString<256> NameStr;
+  Mang->getNameWithPrefix(NameStr, argName);
+  return NameStr.str();
 }

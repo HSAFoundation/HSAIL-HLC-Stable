@@ -1,7 +1,6 @@
-set(LLVM_LINK_COMPONENTS linker bitreader bitwriter asmparser ipo scalaropts)
+set(LLVM_LINK_COMPONENTS linker bitreader bitwriter asmparser ScalarOpts SPIRUtils)
 
 add_llvm_tool(llvm-link
-  bclinker.cpp
-  AMDFixUpModule.cpp
   llvm-link.cpp
+  AMDFixUpModule.cpp
   )

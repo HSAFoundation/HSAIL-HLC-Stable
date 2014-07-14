@@ -9,8 +9,8 @@ if(AMD_LLVM_INTERNAL)
 endif()
 
 include_directories(AsmPrinter)
-add_definitions(-DAMD_LLVM_INTERNAL)
-include_directories(Internal)
+
+
 
 set(LLVM_TARGET_DEFINITIONS AMDIL.td)
 
@@ -30,8 +30,10 @@ add_llvm_target(AMDILCodeGen
   AMDILAsmPrinter.cpp
   AMDILBarrierDetect.cpp
   AMDILCFGStructurizer.cpp
+  AMDILDevice.cpp
   AMDILEBBPass.cpp
   AMDILEGIOExpansion.cpp
+  AMDILEvergreenDevice.cpp
   AMDILFrameLowering.cpp
   AMDILInliner.cpp
   AMDILInstrInfo.cpp
@@ -53,6 +55,7 @@ add_llvm_target(AMDILCodeGen
   AMDILMCAsmInfo.cpp
   AMDILMCCodeEmitter.cpp
   AMDILModuleInfo.cpp
+  AMDILNIDevice.cpp
   AMDILPeepholeOptimizer.cpp
   AMDILPointerManager.cpp
   AMDILPrintfConvert.cpp
@@ -62,14 +65,12 @@ add_llvm_target(AMDILCodeGen
   AMDILTargetMachine.cpp
   AMDILUtilityFunctions.cpp
   AMDILSIPointerManager.cpp
+  AMDILSIDevice.cpp
   AMDILSIIOExpansion.cpp
+  AMDILTNDevice.cpp
+  AMDILDeviceInfo.cpp
   AMDILCompilerErrors.cpp
   AMDILCompilerWarnings.cpp
-  AMDILCIPointerManager.cpp
-  AMDILRegisterUseValidate.cpp
-  AMDILCreateKernelStub.cpp
-  AMDILCIIOExpansion.cpp
-  AMDILRenumberRegister.cpp
   )
 
 add_dependencies(LLVMAMDILCodeGen intrinsics_gen)

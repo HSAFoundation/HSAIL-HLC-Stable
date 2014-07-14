@@ -169,20 +169,18 @@ enum ETokens
     EKWImageWidth,
     EKWImageHeight,
     EKWImageDepth,
-    EKWImageFormat,
-    EKWImageOrder,
+    EKWImageChannelType,
+    EKWImageChannelOrder,
     EKWImageGeometry,
     EKWImageArray,
 
     ESamplerFirstProp,
-    EKWSamplerBoundaryU = ESamplerFirstProp,
-    EKWSamplerBoundaryV,
-    EKWSamplerBoundaryW,
+    EKWSamplerAddressing = ESamplerFirstProp,
     EKWSamplerCoord,
     EKWSamplerFilter,
     ESamplerLastProp = EKWSamplerFilter,
 
-    ESamplerBoundaryMode,
+    ESamplerAddressingMode,
     ESamplerCoord,
     ESamplerFilter,
 
@@ -253,7 +251,6 @@ enum ETokens
     EInstModAlu,
     EInstReadImage,
     EInstLdStImage,
-    EInstAtomicImage,
     EInstQueryImage,
 
     EInstSkip, // TBD remove
@@ -279,10 +276,11 @@ enum ETokens
     EMHi,
     EMCompare,
     EMGeom,
-    EMImageModifier,
     EMFBar,
     EMConst,
     EMMemoryFenceSegments,
+    EMImageQuery,
+    EMSamplerQuery,
     EMSkip, // TBD remove
     EMNone
 };
@@ -292,6 +290,8 @@ enum EScanContext {
     EImageOrderContext,
     EInstModifierContext,
     EInstModifierInstAtomicContext,   
+    EInstModifierInstQueryContext,   
+    EInstModifierInstFenceContext,   
 };
 
 class Scanner : public StreamScannerBase

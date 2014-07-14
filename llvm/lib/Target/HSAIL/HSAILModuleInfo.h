@@ -99,6 +99,9 @@ namespace llvm {
       /// Returns true if the image ID corresponds to a write only image.
       bool isWriteOnlyImage(const llvm::StringRef &name, uint32_t iID) const;
 
+      /// Returns true if the image ID corresponds to a read write image.
+      bool isReadWriteImage(const llvm::StringRef &name, uint32_t iID) const;
+
       /// Gets the group size of the kernel for the given dimension.
       uint32_t getRegion(const llvm::StringRef &name, uint32_t dim) const;
 

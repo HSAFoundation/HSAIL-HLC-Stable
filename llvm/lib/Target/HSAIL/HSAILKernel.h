@@ -123,16 +123,26 @@ namespace llvm {
     uint32_t constSizes[HW_MAX_NUM_CB]; // Size of each constant buffer
 
     // set that specifies the read-only images for the kernel
-    llvm::SmallSet<uint32_t, OPENCL_MAX_READ_IMAGES> readOnly;
+    llvm::SmallSet<uint32_t, 32> readOnly;
 
     // set that specifies the write-only images for the kernel
-    llvm::SmallSet<uint32_t, OPENCL_MAX_WRITE_IMAGES> writeOnly;
+    llvm::SmallSet<uint32_t, 32> writeOnly;
+
+    // set that specifies the read-write images for the kernel
+    llvm::SmallSet<uint32_t, 32> readWrite;
+
+    // set that specifies the access type qulifiers for the kernel arguments
+    std::vector<uint32_t> accessTypeQualifer;
 
     // Vector of constant pool offsets
     llvm::SmallVector<std::pair<uint32_t, const llvm::Constant *>, DEFAULT_VEC_SLOTS> CPOffsets;
 
     // Vector of kernel argument type names
     std::vector<std::string> ArgTypeNames;
+
+    // Fields required for device enqueue.
+    bool EnqueuesKernel;   // true if enqueues a kernel.
+    uint32_t KernelIndex;  // positive value which deonotes the kernel index
 
     HSAILKernel() {
       curSize = 0;
@@ -145,6 +155,8 @@ namespace llvm {
       sgv = NULL;
 
       memset(constSizes, 0, sizeof(constSizes));
+      EnqueuesKernel =false;
+      KernelIndex = -1;
     }
   };
 

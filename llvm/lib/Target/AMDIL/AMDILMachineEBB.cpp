@@ -40,14 +40,6 @@ static bool getRegClassSVT(int RegClassID, MVT::SimpleValueType& SVT)
   default:
     return false;
 
-  case AMDIL::GPRI8RegClassID:
-    SVT = MVT::i8;
-    return true;
-
-  case AMDIL::GPRI16RegClassID:
-    SVT = MVT::i16;
-    return true;
-
   case AMDIL::GPR_32RegClassID:
     SVT = MVT::i32;
     return true;
@@ -56,24 +48,8 @@ static bool getRegClassSVT(int RegClassID, MVT::SimpleValueType& SVT)
     SVT = MVT::i64;
     return true;
 
-  case AMDIL::GPRV4I8RegClassID:
-    SVT = MVT::v4i8;
-    return true;
-
-  case AMDIL::GPRV4I16RegClassID:
-    SVT = MVT::v4i16;
-    return true;
-
   case AMDIL::GPRV4I32RegClassID:
     SVT = MVT::v4i32;
-    return true;
-
-  case AMDIL::GPRV2I8RegClassID:
-    SVT = MVT::v2i8;
-    return true;
-
-  case AMDIL::GPRV2I16RegClassID:
-    SVT = MVT::v2i16;
     return true;
 
   case AMDIL::GPRV2I32RegClassID:

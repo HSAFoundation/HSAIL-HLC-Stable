@@ -893,10 +893,9 @@ void SelectionDAGLegalize::LegalizeLoadOps(SDNode *Node) {
       break;
     }
     case TargetLowering::Promote: {
-      // Only promote a load of vector type to another.
-      assert(VT.isVector() && "Cannot promote this load!");
-      // Change base type to a different vector type.
       EVT NVT = TLI.getTypeToPromoteTo(Node->getOpcode(), VT);
+      assert(NVT.getSizeInBits() == VT.getSizeInBits() &&
+             "Can only promote loads to same size type");
 
       SDValue Res = DAG.getLoad(NVT, dl, Chain, Ptr, LD->getPointerInfo(),
                          LD->isVolatile(), LD->isNonTemporal(),
@@ -1073,51 +1072,62 @@ void SelectionDAGLegalize::LegalizeLoadOps(SDNode *Node) {
              break;
     }
     case TargetLowering::Expand:
-             if (!TLI.isLoadExtLegal(ISD::EXTLOAD, SrcVT) && TLI.isTypeLegal(SrcVT)) {
-               SDValue Load = DAG.getLoad(SrcVT, dl, Chain, Ptr,
-                                          LD->getPointerInfo(),
-                                          LD->isVolatile(), LD->isNonTemporal(),
-                                          LD->isInvariant(), LD->getAlignment());
-               unsigned ExtendOp;
-               switch (ExtType) {
-               case ISD::EXTLOAD:
-                 ExtendOp = (SrcVT.isFloatingPoint() ?
-                             ISD::FP_EXTEND : ISD::ANY_EXTEND);
-                 break;
-               case ISD::SEXTLOAD: ExtendOp = ISD::SIGN_EXTEND; break;
-               case ISD::ZEXTLOAD: ExtendOp = ISD::ZERO_EXTEND; break;
-               default: llvm_unreachable("Unexpected extend load type!");
-               }
-               Value = DAG.getNode(ExtendOp, dl, Node->getValueType(0), Load);
-               Chain = Load.getValue(1);
-               break;
-             }
+      if (!TLI.isLoadExtLegal(ISD::EXTLOAD, SrcVT)) {
+        unsigned ExtendOp;
+        switch (ExtType) {
+        case ISD::EXTLOAD:
+          ExtendOp = (SrcVT.isFloatingPoint() ?
+                      ISD::FP_EXTEND : ISD::ANY_EXTEND);
+          break;
+        case ISD::SEXTLOAD:
+          ExtendOp = ISD::SIGN_EXTEND;
+          break;
+        case ISD::ZEXTLOAD:
+          ExtendOp = ISD::ZERO_EXTEND;
+          break;
+        default:
+          llvm_unreachable("Unexpected extend load type!");
+        }
 
-             assert(!SrcVT.isVector() &&
-                    "Vector Loads are handled in LegalizeVectorOps");
+        if (TLI.isTypeLegal(SrcVT) ||
+            TLI.isOperationLegalOrCustom(ExtendOp, SrcVT)) {
+          SDValue Load = DAG.getLoad(LD->getAddressingMode(),
+                                     ISD::NON_EXTLOAD,
+                                     SrcVT, dl, Chain, Ptr,
+                                     LD->getOffset(),
+                                     LD->getMemoryVT(),
+                                     LD->getMemOperand());
+          Value = DAG.getNode(ExtendOp, dl, Node->getValueType(0), Load);
+          Chain = Load.getValue(1);
+          break;
+        }
+      }
 
-             // FIXME: This does not work for vectors on most targets.  Sign- and
-             // zero-extend operations are currently folded into extending loads,
-             // whether they are legal or not, and then we end up here without any
-             // support for legalizing them.
-             assert(ExtType != ISD::EXTLOAD &&
-                    "EXTLOAD should always be supported!");
-             // Turn the unsupported load into an EXTLOAD followed by an explicit
-             // zero/sign extend inreg.
-             SDValue Result = DAG.getExtLoad(ISD::EXTLOAD, dl, Node->getValueType(0),
-                                             Chain, Ptr, LD->getPointerInfo(), SrcVT,
-                                             LD->isVolatile(), LD->isNonTemporal(),
-                                             LD->getAlignment());
-             SDValue ValRes;
-             if (ExtType == ISD::SEXTLOAD)
-               ValRes = DAG.getNode(ISD::SIGN_EXTEND_INREG, dl,
-                                    Result.getValueType(),
-                                    Result, DAG.getValueType(SrcVT));
-             else
-               ValRes = DAG.getZeroExtendInReg(Result, dl, SrcVT.getScalarType());
-             Value = ValRes;
-             Chain = Result.getValue(1);
-             break;
+      assert(!SrcVT.isVector() &&
+             "Vector Loads are handled in LegalizeVectorOps");
+
+      // FIXME: This does not work for vectors on most targets.  Sign- and
+      // zero-extend operations are currently folded into extending loads,
+      // whether they are legal or not, and then we end up here without any
+      // support for legalizing them.
+      assert(ExtType != ISD::EXTLOAD &&
+             "EXTLOAD should always be supported!");
+      // Turn the unsupported load into an EXTLOAD followed by an explicit
+      // zero/sign extend inreg.
+      SDValue Result = DAG.getExtLoad(ISD::EXTLOAD, dl, Node->getValueType(0),
+                                      Chain, Ptr, LD->getPointerInfo(), SrcVT,
+                                      LD->isVolatile(), LD->isNonTemporal(),
+                                      LD->getAlignment());
+      SDValue ValRes;
+      if (ExtType == ISD::SEXTLOAD)
+        ValRes = DAG.getNode(ISD::SIGN_EXTEND_INREG, dl,
+                             Result.getValueType(),
+                             Result, DAG.getValueType(SrcVT));
+      else
+        ValRes = DAG.getZeroExtendInReg(Result, dl, SrcVT.getScalarType());
+      Value = ValRes;
+      Chain = Result.getValue(1);
+      break;
     }
   }
 
@@ -3275,7 +3285,7 @@ void SelectionDAGLegalize::ExpandNode(SDNode *Node) {
                               LHS, RHS);
     Results.push_back(Sum);
     EVT ResultType = Node->getValueType(1);
-    EVT OType = getSetCCResultType(ResultType);
+    EVT OType = getSetCCResultType(Node->getValueType(0));
 
     SDValue Zero = DAG.getConstant(0, LHS.getValueType());
 
@@ -3300,7 +3310,7 @@ void SelectionDAGLegalize::ExpandNode(SDNode *Node) {
     SDValue Cmp = DAG.getNode(ISD::AND, dl, OType, SignsMatch, SumSignNE);
 
     Results.push_back(ResultType != OType ?
-                      DAG.getNode(ISD::TRUNCATE, dl, ResultType, Cmp) :
+                      DAG.getBoolExtOrTrunc(Cmp, dl, ResultType) :
                       Cmp);
     break;
   }
@@ -3313,13 +3323,13 @@ void SelectionDAGLegalize::ExpandNode(SDNode *Node) {
                               LHS, RHS);
     Results.push_back(Sum);
     EVT ResultType = Node->getValueType(1);
-    EVT TargetSetCCType = getSetCCResultType(ResultType);
+    EVT TargetSetCCType = getSetCCResultType(Node->getValueType(0));
     SDValue SetCC =
       DAG.getSetCC(dl, TargetSetCCType, Sum, LHS,
                    Node->getOpcode () == ISD::UADDO ? ISD::SETULT
                                                     : ISD::SETUGT);
     Results.push_back(ResultType != TargetSetCCType ?
-                      DAG.getNode(ISD::TRUNCATE, dl, ResultType, SetCC) :
+                      DAG.getBoolExtOrTrunc(SetCC, dl, ResultType) :
                       SetCC);
     break;
   }

@@ -75,9 +75,9 @@ LOCAL_MODULE:= AMDlibLLVMAnalysis
 LOCAL_MODULE_TAGS := optional
 LOCAL_SRC_FILES := $(analysis_SRC_FILES)
 
-include $(LLVM_HOST_BUILD_MK)
-include $(LLVM_GEN_INTRINSICS_MK)
-include $(BUILD_HOST_STATIC_LIBRARY)
+#include $(LLVM_HOST_BUILD_MK)
+#include $(LLVM_GEN_INTRINSICS_MK)
+#include $(BUILD_HOST_STATIC_LIBRARY)
 
 # For the device
 # =====================================================

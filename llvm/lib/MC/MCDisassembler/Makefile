@@ -1,14 +1,8 @@
-##===- lib/MC/MCDisassembler/Makefile ----------------------*- Makefile -*-===##
-# 
-#                     The LLVM Compiler Infrastructure
-#
-# This file is distributed under the University of Illinois Open Source
-# License. See LICENSE.TXT for details.
-# 
-##===----------------------------------------------------------------------===##
+LLVM_DEPTH = ../../..
 
-LEVEL = ../../..
-LIBRARYNAME = LLVMMCDisassembler
+include $(LLVM_DEPTH)/llvmdefs
 
-include $(LEVEL)/Makefile.common
+SUBDIRS = \
+    build
 
+include $(LLVM_DEPTH)/llvmrules

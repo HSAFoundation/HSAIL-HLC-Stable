@@ -553,11 +553,10 @@ void BrigDwarfGenerator_impl::initializeDwarfProducer()
     Dwarf_Handler errorHandlerFunc = 0;
     void * userData = this;
 
-    // srp
-//    m_pDwarfDebug = dwarf_producer_init_c( initFlags,
-                                           //DwarfProducerCallbackFunc,
-//                                           DwarfErrorHandler, 
-                               //            0 /* errarg */, userData, &pErr );
+    m_pDwarfDebug = dwarf_producer_init_c( initFlags,
+                                           DwarfProducerCallbackFunc,
+                                           DwarfErrorHandler, 
+                                           0 /* errarg */, userData, &pErr );
 
     // only on the init call do we need to check the return value, for all
     // other calls we pass in a "nullError" so that the DwarfErrorHandler
@@ -1216,7 +1215,6 @@ void BrigDwarfGenerator_impl::initializeElf()
     if ( elf_version(EV_CURRENT) == EV_NONE ) 
         error( "Bad elf_version" );
 
-//    m_pElf = elf_begin( m_elfFd, ELF_C_WRITE, 0, 0 );
     m_pElf = elf_begin( m_elfFd, ELF_C_WRITE, 0 );
     if ( ! m_pElf )
         error( "elf_begin() failed" );
@@ -1380,7 +1378,7 @@ void BrigDwarfGenerator_impl::createDwarfElfSections()
                 else
                 {
                     /* libDWARF must set default type of relocations */
-                    assert(relType == __R_HSA_DWARF_32);
+                    assert(relType == R_HSA_DWARF_32);
                 }
                 
             }

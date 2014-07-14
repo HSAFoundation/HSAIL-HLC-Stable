@@ -18,6 +18,7 @@ subdirs := \
   lib/IRReader \
   lib/Linker \
   lib/MC \
+  lib/MC/MCDisassembler \
   lib/MC/MCParser \
   lib/Object \
   lib/Option \
@@ -41,6 +42,7 @@ subdirs := \
   lib/ExecutionEngine/MCJIT \
   lib/ExecutionEngine/Interpreter \
   lib/ExecutionEngine/JIT \
+  lib/ExecutionEngine/RuntimeDyld \
   lib/ExecutionEngine
 
 
@@ -85,12 +87,12 @@ subdirs += \
 #  lib/Target/AMDIL/TargetInfo \
 
 # LLVM Command Line Tools
-subdirs += \
-	../hsail-tools/libHSAIL \
+#subdirs += \
+	tools/llvm-link \
 
-#	tools/llvm-link \
 #	tools/opt
 
+#	../hsail-tools/libHSAIL \
 #	tools/llc \
 	tools/llvm-as \
 	tools/llvm-dis \

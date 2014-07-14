@@ -13,5 +13,6 @@
 #define OCL_DEVICE_TONGA       0x02000000 //<-- Internal Only!
 #define OCL_DEVICE_BERMUDA     0x08000000 //<-- Internal Only!
 #define OCL_DEVICE_FIJI        0x10000000 //<-- Internal Only!
+#define OCL_DEVICE_CARRIZO     0x20000000 //<-- Internal Only!
 
 #endif

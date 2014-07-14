@@ -69,14 +69,25 @@
 #include "llvm/CodeGen/MachineLoopInfo.h"
 #include "llvm/CodeGen/MachinePostDominators.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Target/TargetRegisterInfo.h"
 
 #include <algorithm>
+#include <utility>
 
 #define FirstNonDebugInstr(A) A->begin()
 using namespace llvm;
 
 // TODO: move-begin.
+#ifndef NDEBUG
+static cl::opt<bool>
+DoValidate("amdil-structurizer-validate", cl::init(false), cl::Hidden,
+  cl::desc("Validate code generated"));
+
+static cl::opt<bool>
+DoDetectInfiniteRecurse("amdil-structurizer-detect-inf", cl::init(false),
+    cl::Hidden, cl::desc("Detect infinite recursion"));
+#endif
 
 //===----------------------------------------------------------------------===//
 //
@@ -112,6 +123,14 @@ static void showNewInstr(const MachineInstr *instr) {
 static void showNewBlock(const MachineBasicBlock *BB, const char *Message) {
   dbgs() << "New block (" << Message << ") BB" << BB->getNumber()
          << " size " << BB->size() << '\n';
+}
+
+static void showBlockMapping(const MachineBasicBlock *ExitingBB,
+    const MachineBasicBlock *ExitBB, const MachineBasicBlock *BranchBB,
+    uint32_t BranchVal, const char *Message) {
+  dbgs() <<  Message << " BB" << ExitingBB->getNumber() << " -> " <<
+      " BB" << BranchBB->getNumber() << " -> " <<
+      " BB" << ExitBB->getNumber() << ", branch value: " << BranchVal << '\n';
 }
 
 #define INVALIDREGNUM 0
@@ -748,6 +767,7 @@ private:
 
   int patternMatch(BlockT *CurBlock);
   int patternMatchGroup(BlockT *CurBlock);
+  void validate(BlockT *CurBlock);
 
   int serialPatternMatch(BlockT *CurBlock);
   int ifPatternMatch(BlockT *CurBlock);
@@ -1159,11 +1179,16 @@ int CFGStructurizer<PassT>::patternMatch(BlockT *CurBlock) {
 template<class PassT>
 int CFGStructurizer<PassT>::patternMatchGroup(BlockT *Block) {
   int NumMatch = 0;
+  validate(Block);
   NumMatch += serialPatternMatch(Block);
+  validate(Block);
   NumMatch += ifPatternMatch(Block);
+  validate(Block);
   //NumMatch += switchPatternMatch(Block);
   NumMatch += loopEndPatternMatch(Block);
+  validate(Block);
   NumMatch += loopPatternMatch(Block);
+  validate(Block);
   return NumMatch;
 }
 
@@ -1181,6 +1206,36 @@ int CFGStructurizer<PassT>::serialPatternMatch(BlockT *CurBlock) {
   mergeSerialBlock(CurBlock, ChildBlock);
   ++numSerialPatternMatch;
   return 1;
+}
+
+template<class PassT>
+void CFGStructurizer<PassT>::validate(BlockT *CurBlock) {
+#ifndef NDEBUG
+  if (!DoValidate)
+    return;
+
+  SmallSet<BlockT*, 5> succs;
+  for (typename BlockT::succ_iterator I = CurBlock->succ_begin(),
+      E = CurBlock->succ_end(); I != E; ++I) {
+    succs.insert(*I);
+  }
+  if (succs.size() < CurBlock->succ_size()) {
+    dbgs() << "\nrepeated successors found in BB:\n" << *CurBlock << '\n';
+    llvm_unreachable("invalid BB");
+  }
+  assert(succs.size() == CurBlock->succ_size());
+
+  SmallSet<BlockT*, 5> preds;
+  for (typename BlockT::pred_iterator I = CurBlock->pred_begin(),
+      E = CurBlock->pred_end(); I != E; ++I) {
+    preds.insert(*I);
+  }
+  if (preds.size() < CurBlock->pred_size()) {
+    dbgs() << "\nrepeated predecessors found in BB:\n" << *CurBlock << '\n';
+    llvm_unreachable("invalid BB");
+  }
+  assert(preds.size() == CurBlock->pred_size());
+#endif
 }
 
 template<class PassT>
@@ -1205,6 +1260,7 @@ int CFGStructurizer<PassT>::ifPatternMatch(BlockT *CurBlock) {
   BlockT *FalseBlock = CFGTraits::getFalseBranch(CurBlock, BranchInstr);
   BlockT *LandBlock = NULL;
   int Cloned = 0;
+  assert(TrueBlock != FalseBlock && "Invalid CFG");
 
   // TODO: Simplify
   if (TrueBlock->succ_size() == 1 && FalseBlock->succ_size() == 1
@@ -1428,7 +1484,10 @@ int CFGStructurizer<PassT>::loopBreakPatternMatch(LoopT *LoopRep) {
   BlockTSmallerVector ExitingBlocks;
   LoopRep->getExitingBlocks(ExitingBlocks);
 
-  DEBUG(dbgs() << "Loop has " << ExitingBlocks.size() << " exiting blocks\n");
+  DEBUG(dbgs() << "Loop has " << ExitingBlocks.size() << " exiting blocks:";
+    for (int i = 0, e = ExitingBlocks.size(); i < e; ++i)
+      dbgs() << ' ' << ExitingBlocks[i]->getNumber();
+    dbgs() << '\n');
 
   if (ExitingBlocks.empty()) {
     BlockT *DummyLandingBlock = insertLoopDummyLandingBlock(LoopRep);
@@ -1446,7 +1505,10 @@ int CFGStructurizer<PassT>::loopBreakPatternMatch(LoopT *LoopRep) {
   assert(!ExitBlockSet.empty());
   assert(ExitBlocks.size() == ExitingBlocks.size());
 
-  DEBUG(dbgs() << "Loop has " << ExitBlockSet.size() << " exit blocks\n");
+  DEBUG(dbgs() << "Loop has " << ExitBlockSet.size() << " exit blocks:";
+    for (int i = 0, e = ExitBlocks.size(); i < e; ++i)
+      dbgs() << ' ' << ExitBlocks[i]->getNumber();
+    dbgs() << '\n');
 
   if (ExitBlockSet.size() == 1) {
     BlockT *ExitLandBlock = *ExitBlocks.begin();
@@ -1605,6 +1667,23 @@ int CFGStructurizer<PassT>::handleJumpIntoIfImp(BlockT *HeadBlock,
                                                 BlockT *TrueBlock,
                                                 BlockT *FalseBlock) {
   int Num = 0;
+#ifndef NDEBUG
+  if (DoDetectInfiniteRecurse) {
+    static int last[3] = {-1, -1, -1};
+    if (last[0] == HeadBlock->getNumber() &&
+        last[1] == TrueBlock->getNumber() &&
+        last[2] == FalseBlock->getNumber()) {
+      dbgs() << "\ninfinite recursion detected!\n";
+      dbgs() << "head BB:\n" << *HeadBlock << "\n" <<
+          " true BB:\n" << *TrueBlock << "\n" <<
+          " false BB:\n" << *FalseBlock << "\n";
+      abort();
+    }
+    last[0] = HeadBlock->getNumber();
+    last[1] = TrueBlock->getNumber();
+    last[2] = FalseBlock->getNumber();
+  }
+#endif
 
   // TrueBlock could be the common post dominator
   BlockT *DownBlock = TrueBlock;
@@ -2312,18 +2391,46 @@ CFGStructurizer<PassT>::addLoopEndBranchBlock(LoopT *LoopRep,
   uint32_t NumBlocks = static_cast<uint32_t>(ExitingBlocks.size());
   assert(NumBlocks >= 2);
   assert(ExitingBlocks.size() == ExitBlocks.size());
+  DEBUG(dbgs() << "\naddLoopEndBranchBlock:";
+    for (uint32_t i = 0; i < NumBlocks; ++i) {
+      dbgs() << ' ' << ExitingBlocks[i]->getNumber() << " -> " <<
+          ExitBlocks[i]->getNumber();
+    }
+    dbgs() << '\n');
+
+  // Two adjacent exit blocks can be identical. New branch block should only
+  // be created for unique exit blocks, otherwise branch block containing
+  // if (...) {A} else {A} will be created, which will cause infinite recursion
+  // for ifPatternMatch.
+
+  // A ->(B, i) Exit block A is mapped to new block B with EndBranchReg
+  // set to value i in the corresponding exiting block.
+  DenseMap<const BlockT*, std::pair<BlockT*, uint32_t>> ExitBlockMap(4);
 
   BlockT *PreExitingBlock = ExitingBlocks[0];
   BlockT *PreExitBlock = ExitBlocks[0];
   BlockT *PreBranchBlock = funcRep->CreateMachineBasicBlock();
+  uint32_t PreBranchVal = 0;
+  ExitBlockMap[PreExitBlock] = std::make_pair(PreBranchBlock, PreBranchVal);
 
   funcRep->push_back(PreBranchBlock); // Insert to function
-  DEBUG(showNewBlock(PreBranchBlock, "New loopEndBranch pre exit block"));
+  DEBUG(showNewBlock(PreBranchBlock, "New loopEndBranch pre exit block");
+    showBlockMapping(PreExitingBlock, PreExitBlock, PreBranchBlock,
+        PreBranchVal, "Branch"));
 
   BlockT *NewLandBlock = PreBranchBlock;
 
   PreExitingBlock->ReplaceUsesOfBlockWith(PreExitBlock, NewLandBlock);
 
+  // Find the last unique BB.
+  uint32_t LastUnique = 0;
+  SmallPtrSet<BlockT *, DEFAULT_VEC_SLOTS> ExitBlockSet;
+  for (uint32_t i = 0; i < NumBlocks; ++i) {
+    if (ExitBlockSet.count(ExitBlocks[i]) == 0) {
+      ExitBlockSet.insert(ExitBlocks[i]);
+      LastUnique = i;
+    }
+  }
   // It is redundant to add reg = 0 to ExitingBlocks[0]
 
   // For 1..n th exiting path (the last iteration handles two paths)
@@ -2331,36 +2438,54 @@ CFGStructurizer<PassT>::addLoopEndBranchBlock(LoopT *LoopRep,
   for (uint32_t i = 1; i < NumBlocks; ++i) {
     BlockT *CurExitingBlock = ExitingBlocks[i];
     BlockT *CurExitBlock = ExitBlocks[i];
-    BlockT *CurBranchBlock;
+    BlockT *CurBranchBlock = NULL;
+    uint32_t CurBranchVal = i;
+    bool IsOldBranch = false;
 
-    if (i == NumBlocks - 1) {
-      CurBranchBlock = CurExitBlock;
+    typename DenseMap<const BlockT*, std::pair<BlockT*, uint32_t>>::iterator
+      CurLoc = ExitBlockMap.find(CurExitBlock);
+    if (CurLoc != ExitBlockMap.end()) {
+      CurBranchBlock = CurLoc->second.first;
+      CurBranchVal = CurLoc->second.second;
+      IsOldBranch = true;
     } else {
-      CurBranchBlock = funcRep->CreateMachineBasicBlock();
-      funcRep->push_back(CurBranchBlock); // Insert to function
-      DEBUG(showNewBlock(CurBranchBlock, "New loopEndBranch current branch block"));
+      if (i == LastUnique) {
+        CurBranchBlock = CurExitBlock;
+      } else {
+        CurBranchBlock = funcRep->CreateMachineBasicBlock();
+        funcRep->push_back(CurBranchBlock); // Insert to function
+        DEBUG(showNewBlock(CurBranchBlock,
+            "New loopEndBranch current branch block"));
+      }
+      ExitBlockMap[CurExitBlock] = std::make_pair(CurBranchBlock, CurBranchVal);
     }
+    DEBUG(showBlockMapping(CurExitingBlock, CurExitBlock, CurBranchBlock,
+        CurBranchVal, "Branch"));
 
-    // Add reg = i to ExitingBlocks[i].
-    CFGTraits::insertAssignInstrBefore(CurExitingBlock, passRep, EndBranchReg, i);
+    // Add EndBranchReg = CurBranchVal to ExitingBlocks[i].
+    CFGTraits::insertAssignInstrBefore(CurExitingBlock, passRep, EndBranchReg,
+        CurBranchVal);
 
     // Remove the edge (ExitingBlocks[i], ExitBlocks[i]).
     // Add new edge (ExitingBlocks[i], NewLandBlock).
     CurExitingBlock->ReplaceUsesOfBlockWith(CurExitBlock, NewLandBlock);
 
+    if (IsOldBranch)
+      continue;
+
     // Add to PreBranchBlock the branch instruction:
-    // if (EndBranchReg == preVal)
+    // if (EndBranchReg == PreValReg)
     //    PreExitBlock
     // else
     //    CurBranchBlock
     //
-    // preValReg = i - 1
+    // PreValReg = PreBranchVal
 
     DebugLoc DL;
     RegiT PreValReg = getRegister(&AMDIL::GPR_32RegClass);
     MachineInstr *PreValInst
       = BuildMI(PreBranchBlock, DL, TII->get(AMDIL::LOADCONSTi32), PreValReg)
-      .addImm(i - 1); // preVal
+      .addImm(PreBranchVal);
     DEBUG(showNewInstr(PreValInst));
 
     // CondResReg = (EndBranchReg == PreValReg)
@@ -2378,10 +2503,11 @@ CFGStructurizer<PassT>::addLoopEndBranchBlock(LoopT *LoopRep,
     PreBranchBlock->addSuccessor(PreExitBlock);
     PreBranchBlock->addSuccessor(CurBranchBlock);
 
-    // Update PreExitingBlock, PreExitBlock, PreBranchBlock.
+    // Update PreExitingBlock, PreExitBlock, PreBranchBlock, PreBranchVal
     PreExitingBlock = CurExitingBlock;
     PreExitBlock = CurExitBlock;
     PreBranchBlock = CurBranchBlock;
+    PreBranchVal = CurBranchVal;
   }  // End for 1 .. n blocks
 
   return NewLandBlock;
@@ -3017,8 +3143,10 @@ template<class PassT>
 typename CFGStructurizer<PassT>::LoopLandInfo *
 CFGStructurizer<PassT>::getLoopLandInfo(const LoopT *LoopRep) const {
   typename LoopLandInfoMap::const_iterator It = loopLandInfoMap.find(LoopRep);
-  assert(It != loopLandInfoMap.end());
-  return (It == loopLandInfoMap.end()) ? NULL : It->second;
+
+  // Disabled to workaround bug 9412.
+  //  assert(It != loopLandInfoMap.end());
+  return (It == loopLandInfoMap.end()) ? nullptr : It->second;
 }
 
 template<class PassT>
@@ -3269,10 +3397,6 @@ struct CFGStructTraits<AMDILCFGStructurizer> {
       case AMDIL::BRANCHi64br: return AMDIL::BREAK_LOGICALNZi64r;
       case AMDIL::BRANCHi32bi:
       case AMDIL::BRANCHi32br: return AMDIL::BREAK_LOGICALNZi32r;
-      case AMDIL::BRANCHi16bi:
-      case AMDIL::BRANCHi16br: return AMDIL::BREAK_LOGICALNZi16r;
-      case AMDIL::BRANCHi8bi:
-      case AMDIL::BRANCHi8br:  return AMDIL::BREAK_LOGICALNZi8r;
     default:
       llvm_unreachable("internal error");
     }
@@ -3289,10 +3413,6 @@ struct CFGStructTraits<AMDILCFGStructurizer> {
       case AMDIL::BRANCHi64br: return AMDIL::BREAK_LOGICALZi64r;
       case AMDIL::BRANCHi32bi:
       case AMDIL::BRANCHi32br: return AMDIL::BREAK_LOGICALZi32r;
-      case AMDIL::BRANCHi16bi:
-      case AMDIL::BRANCHi16br: return AMDIL::BREAK_LOGICALZi16r;
-      case AMDIL::BRANCHi8bi:
-      case AMDIL::BRANCHi8br:  return AMDIL::BREAK_LOGICALZi8r;
     default:
       llvm_unreachable("internal error");
     }
@@ -3309,10 +3429,6 @@ struct CFGStructTraits<AMDILCFGStructurizer> {
       case AMDIL::BRANCHi64br: return AMDIL::IF_LOGICALNZi64r;
       case AMDIL::BRANCHi32bi:
       case AMDIL::BRANCHi32br: return AMDIL::IF_LOGICALNZi32r;
-      case AMDIL::BRANCHi16bi:
-      case AMDIL::BRANCHi16br: return AMDIL::IF_LOGICALNZi16r;
-      case AMDIL::BRANCHi8bi:
-      case AMDIL::BRANCHi8br:  return AMDIL::IF_LOGICALNZi8r;
     default:
       llvm_unreachable("internal error");
     }
@@ -3329,10 +3445,6 @@ struct CFGStructTraits<AMDILCFGStructurizer> {
       case AMDIL::BRANCHi64br: return AMDIL::IF_LOGICALZi64r;
       case AMDIL::BRANCHi32bi:
       case AMDIL::BRANCHi32br: return AMDIL::IF_LOGICALZi32r;
-      case AMDIL::BRANCHi16br:
-      case AMDIL::BRANCHi16bi: return AMDIL::IF_LOGICALZi16r;
-      case AMDIL::BRANCHi8bi:
-      case AMDIL::BRANCHi8br:  return AMDIL::IF_LOGICALZi8r;
     default:
       llvm_unreachable("internal error");
     }
@@ -3349,10 +3461,6 @@ struct CFGStructTraits<AMDILCFGStructurizer> {
       case AMDIL::BRANCHi64br: return AMDIL::CONTINUE_LOGICALNZi64r;
       case AMDIL::BRANCHi32bi:
       case AMDIL::BRANCHi32br: return AMDIL::CONTINUE_LOGICALNZi32r;
-      case AMDIL::BRANCHi16bi:
-      case AMDIL::BRANCHi16br: return AMDIL::CONTINUE_LOGICALNZi16r;
-      case AMDIL::BRANCHi8bi:
-      case AMDIL::BRANCHi8br:  return AMDIL::CONTINUE_LOGICALNZi8r;
       default:
         llvm_unreachable("internal error");
     }
@@ -3369,10 +3477,6 @@ struct CFGStructTraits<AMDILCFGStructurizer> {
       case AMDIL::BRANCHi64br: return AMDIL::CONTINUE_LOGICALZi64r;
       case AMDIL::BRANCHi32br:
       case AMDIL::BRANCHi32bi: return AMDIL::CONTINUE_LOGICALZi32r;
-      case AMDIL::BRANCHi16br:
-      case AMDIL::BRANCHi16bi: return AMDIL::CONTINUE_LOGICALZi16r;
-      case AMDIL::BRANCHi8bi:
-      case AMDIL::BRANCHi8br:  return AMDIL::CONTINUE_LOGICALZi8r;
     default:
       llvm_unreachable("internal error");
     }

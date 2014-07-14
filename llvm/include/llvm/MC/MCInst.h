@@ -162,7 +162,13 @@ public:
 
   const MCOperand &getOperand(unsigned i) const { return Operands[i]; }
   MCOperand &getOperand(unsigned i) { return Operands[i]; }
-  unsigned getNumOperands() const { return Operands.size(); }
+  unsigned getNumOperands() const {
+    return
+#if defined(AMD_OPENCL) || 1
+      (unsigned)
+#endif
+      Operands.size();
+  }
 
   void addOperand(const MCOperand &Op) {
     Operands.push_back(Op);

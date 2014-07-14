@@ -50,6 +50,10 @@ static cl::opt<int> HSAILReg64PressureLimit(
   "hsail-reg64-pressure-limit", cl::Hidden, cl::init(18),
   cl::desc("Register pressure limit for 64 bit HSAIL registers"));
 
+static cl::opt<int> HSAILRegSlots(
+  "hsail-reg-slots", cl::Hidden, cl::init(0),
+  cl::desc("A number of 64-bit slots allocated for $s registers"));
+
 HSAILRegisterInfo::HSAILRegisterInfo(HSAILTargetMachine &tm,
                                      const TargetInstrInfo &tii)
   : HSAILGenRegisterInfo(0, 0), TM(tm), TII(tii) {}
@@ -86,19 +90,13 @@ HSAILRegisterInfo::getReservedRegs(const MachineFunction &MF) const
 {
   BitVector Reserved(getNumRegs());
 
-  // Registers are reserved in flat address mode to hold base address of
-  // the spill object and possibly local variables.
-  Reserved.set(getReservedLocalBaseReg(MF));
-
-  // Reserve all return and param registers.
-  Reserved |= getRegsAvailable(&HSAIL::RETREGRegClass);
-  Reserved |= getRegsAvailable(&HSAIL::PARAMREGRegClass);
-
   // We can have up to 128 s-registers, but we should have (s + 2*d + 4*q) <= 128.
   // Let's calulate the number of 32 and 64 bit VRs used in the function
   // and partition register file accordingly.
   static std::map<unsigned, unsigned> FunctionToRegPartionMap;
-  unsigned RegSlots = 32; // Default register file partitioning 64 s-regs + 32 d-regs
+  unsigned NumSlotsTotal = HSAIL::GPR64RegClass.getNumRegs();
+  // Default register file partitioning 64 s-regs + 32 d-regs, RegSlots = 32.
+  unsigned RegSlots = NumSlotsTotal / 2;
 
   // First query for this function, calculate register use
   if (FunctionToRegPartionMap.find(MF.getFunctionNumber()) ==
@@ -116,41 +114,47 @@ HSAILRegisterInfo::getReservedRegs(const MachineFunction &MF) const
       }
     }
 
-    // Calculate register file partitioning. We have 64 allocatable slots which
-    // are either 1 d-register or a pair of s-registers. 8 slots are reserved
-    // for 16 s-registers $s0..$s15, 8 are for 8 d-registers $d0..$d7.
-    // Default partitioning is 64 s-registers + 32 d-registers, which is
-    // RegSlots = 32
+    if (HSAILRegSlots > 0) {
+      RegSlots = HSAILRegSlots;
+    } else {
+      // Calculate register file partitioning. We have 64 allocatable slots which
+      // are either 1 d-register or a pair of s-registers. 8 slots are reserved
+      // for 16 s-registers $s0..$s15, 8 are for 8 d-registers $d0..$d7.
+      // Default partitioning is 64 s-registers + 32 d-registers, which is
+      // RegSlots = 32
 
-    // If we have a small amount of 64 bit VRs, but high 32 bit register
-    // pressure reallocate slots to decrease 64 bit registers
-    if( rc64 < (64-RegSlots) && rc32 > (RegSlots*2) ) {
-      RegSlots = 64 - rc64;
-    }
-    // The opposite situation, we have a small demand on 32 bit registers but
-    // high pressure for 64 bit
-    else if( rc32 < (RegSlots*2) && rc64 > (64 - RegSlots) ) {
-      RegSlots = (rc32+1) / 2;
+      // If we have a small amount of 64 bit VRs, but high 32 bit register
+      // pressure reallocate slots to decrease 64 bit registers
+      if( rc64 < (NumSlotsTotal - RegSlots) && rc32 > (RegSlots*2) ) {
+        RegSlots = NumSlotsTotal - rc64;
+      }
+      // The opposite situation, we have a small demand on 32 bit registers but
+      // high pressure for 64 bit
+      else if( rc32 < (RegSlots*2) && rc64 > (NumSlotsTotal - RegSlots) ) {
+        RegSlots = (rc32+1) / 2;
+      }
     }
 
     // Always preserve room for at least 16 s-registers and 8 d-registers
     if (RegSlots < 8) RegSlots = 8;
-    else if (RegSlots > 56) RegSlots = 56;
+    else if (RegSlots > (NumSlotsTotal - 8)) RegSlots = NumSlotsTotal - 8;
 
     FunctionToRegPartionMap[MF.getFunctionNumber()] = RegSlots;
     DEBUG(dbgs() << "\nFunction: " << MF.getFunction()->getName().data()
                  << " VR count: 32 bit = " << rc32 << ", 64 bit = " << rc64
                  << ", register file partitioning: " << RegSlots*2
-                 << " $s + " << 64-RegSlots << " $d\n\n");
+                 << " $s + " << NumSlotsTotal-RegSlots << " $d\n\n");
   } else {
     RegSlots = FunctionToRegPartionMap[MF.getFunctionNumber()];
   }
 
   unsigned Reg;
-  for( Reg = HSAIL::S0 + RegSlots*2 ; Reg <= HSAIL::S127; ++Reg ) {
+  unsigned LastSReg = HSAIL::S0 + HSAIL::GPR32RegClass.getNumRegs() - 1;
+  for( Reg = HSAIL::S0 + RegSlots*2 ; Reg <= LastSReg; ++Reg ) {
     Reserved.set(Reg);
   }
-  for( Reg = HSAIL::D0 + (64 - RegSlots) ; Reg <= HSAIL::D63; ++Reg ) {
+  unsigned LastDReg = HSAIL::D0 + HSAIL::GPR64RegClass.getNumRegs() - 1;
+  for( Reg = HSAIL::D0 + (NumSlotsTotal - RegSlots) ; Reg <= LastDReg; ++Reg ) {
     Reserved.set(Reg);
   }
 
@@ -534,20 +538,6 @@ HSAILRegisterInfo::getRARegister() const
 {
   assert(!"When do we hit this?");
   return 0;
-}
-
-unsigned int
-HSAILRegisterInfo::getReservedLocalBaseReg(const MachineFunction &MF) const
-{
-  const TargetMachine &TM = MF.getTarget();
-  const HSAILSubtarget &Subtarget = TM.getSubtarget<HSAILSubtarget>();
-  if (Subtarget.usesFlatAddr()) {
-    // Reserve base registers in flat address mode
-    // These registers must match those removed from the allocation list in
-    // HSAILRegisterInfo.td
-    return (Subtarget.is64Bit() ? HSAIL::D0 : HSAIL::S0);
-  }
-  return HSAIL::NoRegister;
 }
 
 /// getRegPressureLimit - Return the register pressure "high water mark" for

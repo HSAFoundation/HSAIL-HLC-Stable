@@ -207,8 +207,6 @@ ModulePass *createAMDSymbolLinkagePass(bool isWhole=false,
                                        std::set<std::string> *reqFuns = NULL);
 ModulePass *createAMDSimplifyCallPass();
 
-ModulePass *createAMDWorkGroupLevelExecutionPass();
-Pass *createAMDLowerThreadInfoBlockPass();
 ModulePass *createAMDRemoveNoaliasPass();
 #endif
 

@@ -58,7 +58,6 @@ using HSAIL_ASM::DirectiveLabel;
 using HSAIL_ASM::InstBasic;
 using HSAIL_ASM::InstSourceType;
 using HSAIL_ASM::InstAtomic;
-using HSAIL_ASM::InstAtomicImage;
 using HSAIL_ASM::InstCmp;
 using HSAIL_ASM::InstCvt;
 using HSAIL_ASM::InstImage;
@@ -1320,7 +1319,7 @@ private:
     string dumpInst(Inst inst)
     {
         HSAIL_ASM::Disassembler disasm(context->getContainer());
-        string res = disasm.get(testSample, machineModel);
+        string res = disasm.get(testSample, machineModel, profile);
         string::size_type pos = res.find_first_of("\t");
         if (pos != string::npos) res = res.substr(0, pos);
         return res;
@@ -1521,6 +1520,10 @@ private:
             if (OperandAddress addr = operand)
             {
                 if (addr.reg() || addr.offset() != 0) return false;
+                if (DirectiveVariable var = addr.symbol()) 
+                {
+                    if (isOpaqueType(addr.symbol().type())) return false;
+                }
             }
             else if (OperandWavesize(operand))
             {

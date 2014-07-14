@@ -41,7 +41,6 @@ public:
     IsGPU(false),
     IsPreLinkOpt(false),
     WholeProgram(false),
-    WGLevelExecution(false),
     GPUArch(0),
     OptLiveness(true),
     OptPrintLiveness(false),
@@ -60,7 +59,7 @@ public:
     LUCount(0),
     LUAllowPartial(true),
     UnrollScratchThreshold(-1),
-    OptMemCombineMaxVecGen(64),
+    OptMemCombineMaxVecGen(16),
     SRThreshold(128),
     SRAEThreshold(1024),
     APThreshold(3),
@@ -72,7 +71,6 @@ public:
   bool      IsGPU;
   bool      IsPreLinkOpt;  // true: PreLinkOpt; false : post-link opt
   bool      WholeProgram;
-  bool      WGLevelExecution;
   uint32_t  GPUArch;
 
   // OpenCL options that are exposed to LLVM

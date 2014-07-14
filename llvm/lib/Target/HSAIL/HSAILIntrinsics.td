@@ -9,6 +9,8 @@ let TargetPrefix = "HSAIL", isTarget = 1 in {
 // HSAIL intrinsics
 def int_HSAIL_workitemid_flat : GCCBuiltin<"__hsail_workitemid_flat">,
                               Intrinsic<[llvm_i32_ty], [], []>;
+def int_HSAIL_workitemid_flatabs : GCCBuiltin<"__hsail_workitemid_flatabs">,
+                              Intrinsic<[llvm_i32_ty], [], []>;
 def int_HSAIL_get_lane_id : GCCBuiltin<"__hsail_get_lane_id">,
                               Intrinsic<[llvm_i32_ty], [], []>;
 def int_HSAIL_get_dynwave_id : GCCBuiltin<"__hsail_get_dynwave_id">,
@@ -19,8 +21,6 @@ def int_HSAIL_get_clock : GCCBuiltin<"__hsail_get_clock">,
                               Intrinsic<[llvm_i64_ty], [], []>;
 def int_HSAIL_get_cu : GCCBuiltin<"__hsail_get_cu">,
                               Intrinsic<[llvm_i32_ty], [], []>;
-def int_HSAIL_syscall : GCCBuiltin<"__hsail_syscall">,
-                              Intrinsic<[llvm_i32_ty], [llvm_i32_ty,llvm_i32_ty,llvm_i32_ty,llvm_i32_ty], []>;
 
 // HSAIL Cross-Lane Intrinsics
 // For OCL 2.0 1/32/64-bit built-ins
@@ -97,7 +97,9 @@ def int_HSAIL_get_group_id : GCCBuiltin<"__hsail_get_group_id">,
                               Intrinsic<[llvm_i32_ty], [llvm_i32_ty], [IntrNoMem]>;
 def int_HSAIL_get_local_id : GCCBuiltin<"__hsail_get_local_id">,
                               Intrinsic<[llvm_i32_ty], [llvm_i32_ty], [IntrNoMem]>;
-def int_HSAIL_get_local_size : GCCBuiltin<"__hsail_get_local_size">,
+def int_HSAIL_workgroup_size : GCCBuiltin<"__hsail_workgroup_size">,
+                              Intrinsic<[llvm_i32_ty], [llvm_i32_ty], [IntrNoMem]>;
+def int_HSAIL_currentworkgroup_size : GCCBuiltin<"__hsail_currentworkgroup_size">,
                               Intrinsic<[llvm_i32_ty], [llvm_i32_ty], [IntrNoMem]>;
 def int_HSAIL_get_global_size : GCCBuiltin<"__hsail_get_global_size">,
                               Intrinsic<[llvm_i32_ty], [llvm_i32_ty], [IntrNoMem]>;
@@ -168,6 +170,7 @@ def int_HSAIL_min_f32 : GCCBuiltin<"__hsail_min_f32">, BinaryFloatIntr;
 def int_HSAIL_min_f64 : GCCBuiltin<"__hsail_min_f64">, BinaryFloatIntr;
 def int_HSAIL_gcn_min_f32 : GCCBuiltin<"__gcn_min_f32">, BinaryFloatIntr;
 def int_HSAIL_gcn_min_f64 : GCCBuiltin<"__gcn_min_f64">, BinaryFloatIntr;
+def int_HSAIL_div_f32 : GCCBuiltin<"__hsail_div_f32">, BinaryFloatIntr;
 
 // Intrinsics for OpenCL relational built-ins (OCL 1.2 6.12.6)
 def int_HSAIL_class_f32 : GCCBuiltin<"__hsail_class_f32">, ClassIntr;
@@ -175,43 +178,13 @@ def int_HSAIL_class_f64 : GCCBuiltin<"__hsail_class_f64">, ClassIntr;
 
 // Intrinsics for OpenCL synchronization built-ins (OCL 1.2 6.12.8)
 def int_HSAIL_barrier         : GCCBuiltin<"__hsail_barrier">, Intrinsic<[], [], []>;
+def int_HSAIL_wavebarrier         : GCCBuiltin<"__hsail_wavebarrier">, Intrinsic<[], [], []>;
 def int_HSAIL_memfence        : GCCBuiltin<"__hsail_memfence">, Intrinsic<[], [], []>;
 def int_HSAIL_memfence_global : GCCBuiltin<"__hsail_memfence_global">, Intrinsic<[], [], []>;
 def int_HSAIL_memfence_group  : GCCBuiltin<"__hsail_memfence_group">, Intrinsic<[], [], []>;
 
-// SYNC OCL 2.0
-
-def int_HSAIL_memfence_g_acq_wg : GCCBuiltin<"__atomic_memfence_g_acq_wg">, Intrinsic<[], [], []>;
-def int_HSAIL_memfence_g_acq_cmp : GCCBuiltin<"__atomic_memfence_g_acq_cmp">, Intrinsic<[], [], []>;
-def int_HSAIL_memfence_g_acq_sys : GCCBuiltin<"__atomic_memfence_g_acq_sys">, Intrinsic<[], [], []>;
-
-def int_HSAIL_memfence_g_rel_wg : GCCBuiltin<"__atomic_memfence_g_rel_wg">, Intrinsic<[], [], []>;
-def int_HSAIL_memfence_g_rel_cmp : GCCBuiltin<"__atomic_memfence_g_rel_cmp">, Intrinsic<[], [], []>;
-def int_HSAIL_memfence_g_rel_sys : GCCBuiltin<"__atomic_memfence_g_rel_sys">, Intrinsic<[], [], []>;
-
-def int_HSAIL_memfence_g_ar_wg : GCCBuiltin<"__atomic_memfence_g_ar_wg">, Intrinsic<[], [], []>;
-def int_HSAIL_memfence_g_ar_cmp : GCCBuiltin<"__atomic_memfence_g_ar_cmp">, Intrinsic<[], [], []>;
-def int_HSAIL_memfence_g_ar_sys : GCCBuiltin<"__atomic_memfence_g_ar_sys">, Intrinsic<[], [], []>;
-
-def int_HSAIL_memfence_g_sc_wg : GCCBuiltin<"__atomic_memfence_g_sc_wg">, Intrinsic<[], [], []>;
-def int_HSAIL_memfence_g_sc_cmp : GCCBuiltin<"__atomic_memfence_g_sc_cmp">, Intrinsic<[], [], []>;
-def int_HSAIL_memfence_g_sc_sys : GCCBuiltin<"__atomic_memfence_g_sc_sys">, Intrinsic<[], [], []>;
-
-def int_HSAIL_memfence_l_acq_wg : GCCBuiltin<"__atomic_memfence_l_acq_wg">, Intrinsic<[], [], []>;
-def int_HSAIL_memfence_l_acq_cmp : GCCBuiltin<"__atomic_memfence_l_acq_cmp">, Intrinsic<[], [], []>;
-def int_HSAIL_memfence_l_acq_sys : GCCBuiltin<"__atomic_memfence_l_acq_sys">, Intrinsic<[], [], []>;
-
-def int_HSAIL_memfence_l_rel_wg : GCCBuiltin<"__atomic_memfence_l_rel_wg">, Intrinsic<[], [], []>;
-def int_HSAIL_memfence_l_rel_cmp : GCCBuiltin<"__atomic_memfence_l_rel_cmp">, Intrinsic<[], [], []>;
-def int_HSAIL_memfence_l_rel_sys : GCCBuiltin<"__atomic_memfence_l_rel_sys">, Intrinsic<[], [], []>;
-
-def int_HSAIL_memfence_l_ar_wg : GCCBuiltin<"__atomic_memfence_l_ar_wg">, Intrinsic<[], [], []>;
-def int_HSAIL_memfence_l_ar_cmp : GCCBuiltin<"__atomic_memfence_l_ar_cmp">, Intrinsic<[], [], []>;
-def int_HSAIL_memfence_l_ar_sys : GCCBuiltin<"__atomic_memfence_l_ar_sys">, Intrinsic<[], [], []>;
-
-def int_HSAIL_memfence_l_sc_wg : GCCBuiltin<"__atomic_memfence_l_sc_wg">, Intrinsic<[], [], []>;
-def int_HSAIL_memfence_l_sc_cmp : GCCBuiltin<"__atomic_memfence_l_sc_cmp">, Intrinsic<[], [], []>;
-def int_HSAIL_memfence_l_sc_sys : GCCBuiltin<"__atomic_memfence_l_sc_sys">, Intrinsic<[], [], []>;
+def int_HSAIL_atomic_memfence : GCCBuiltin<"__atomic_memfence">,
+    Intrinsic<[], [llvm_i32_ty, llvm_i32_ty, llvm_i32_ty], []>;
 
 // Instrinsics for explicit conversions
 // float to int
@@ -625,6 +598,14 @@ def int_HSAIL_stimagei_3d_i32 : GCCBuiltin<"__hsail_stimagei_3d_i32">,
 def int_HSAIL_stimageui_3d_i32 : GCCBuiltin<"__hsail_stimageui_3d_i32">,
         StoreImage3dInt;
 
+// store image 2d depth
+def int_HSAIL_stimagef_2ddepth_i32 : GCCBuiltin<"__hsail_stimagef_2ddepth_i32">,
+        StoreImage2dDepthFloat;
+
+// store image 2d array depth
+def int_HSAIL_stimagef_2dadepth_i32 : GCCBuiltin<"__hsail_stimagef_2dadepth_i32">,
+        StoreImage2dArrayDepthFloat;
+
 // Image query
 def int_HSAIL_query_width_1d  : GCCBuiltin<"__hsail_query_width_1d">, 
         UnaryIntIntr;
@@ -699,4 +680,44 @@ def int_HSAIL_query_channeltype_2ddepth : GCCBuiltin<"__hsail_query_channeltype_
         UnaryIntIntr;
 def int_HSAIL_query_channeltype_2dadepth : GCCBuiltin<"__hsail_query_channeltype_2dadepth">,
         UnaryIntIntr;
+
+def int_HSAIL_addrspacecast_g2f   : GCCBuiltin<"__hsail_addrspacecast_g2f">,
+        Intrinsic<[llvm_anyptr_ty], [llvm_anyptr_ty], [IntrNoMem]>;
+def int_HSAIL_addrspacecast_l2f   : GCCBuiltin<"__hsail_addrspacecast_l2f">,
+        Intrinsic<[llvm_anyptr_ty], [llvm_anyptr_ty], [IntrNoMem]>;
+def int_HSAIL_addrspacecast_p2f   : GCCBuiltin<"__hsail_addrspacecast_p2f">,
+        Intrinsic<[llvm_anyptr_ty], [llvm_anyptr_ty], [IntrNoMem]>;
+def int_HSAIL_addrspacecast_f2g   : GCCBuiltin<"__hsail_addrspacecast_f2g">,
+        Intrinsic<[llvm_anyptr_ty], [llvm_anyptr_ty], [IntrNoMem]>;
+def int_HSAIL_addrspacecast_f2l   : GCCBuiltin<"__hsail_addrspacecast_f2l">,
+        Intrinsic<[llvm_anyptr_ty], [llvm_anyptr_ty], [IntrNoMem]>;
+def int_HSAIL_addrspacecast_f2p   : GCCBuiltin<"__hsail_addrspacecast_f2p">,
+        Intrinsic<[llvm_anyptr_ty], [llvm_anyptr_ty], [IntrNoMem]>;
+
+def int_HSAIL_segmentp_global   : GCCBuiltin<"__hsail_segmentp_global">,
+        Intrinsic<[llvm_i1_ty], [llvm_anyptr_ty], [IntrNoMem]>;
+def int_HSAIL_segmentp_local    : GCCBuiltin<"__hsail_segmentp_local">,
+        Intrinsic<[llvm_i1_ty], [llvm_anyptr_ty], [IntrNoMem]>;
+def int_HSAIL_segmentp_private  : GCCBuiltin<"__hsail_segmentp_private">,
+        Intrinsic<[llvm_i1_ty], [llvm_anyptr_ty], [IntrNoMem]>;
+
+def int_HSAIL_nullptr_flat  : GCCBuiltin<"__hsail_nullptr_flat">,
+        Intrinsic<[llvm_anyptr_ty], [], [IntrNoMem]>;
+def int_HSAIL_nullptr_global   : GCCBuiltin<"__hsail_nullptr_global">,
+        Intrinsic<[llvm_anyptr_ty],[], [IntrNoMem]>;
+def int_HSAIL_nullptr_group    : GCCBuiltin<"__hsail_nullptr_group">,
+        Intrinsic<[llvm_i32_ty], [], [IntrNoMem]>;
+def int_HSAIL_nullptr_private  : GCCBuiltin<"__hsail_nullptr_private">,
+        Intrinsic<[llvm_i32_ty], [], [IntrNoMem]>;
+
+// ld_kernarg instructions have no side effects and can be CSE'd or even deleted if dead.
+def int_HSAIL_ld_kernarg_u32 : GCCBuiltin<"__hsail_ld_kernarg_u32">,
+                              Intrinsic<[llvm_i32_ty], [llvm_ptr_ty], [IntrNoMem]>;
+def int_HSAIL_ld_kernarg_u64 : GCCBuiltin<"__hsail_ld_kernarg_u64">,
+                              Intrinsic<[llvm_i64_ty], [llvm_ptr_ty], [IntrNoMem]>;
+
+// Readonly sampler load instruction for HSAIL 0.98+ spec
+def int_HSAIL_ld_readonly_samp : GCCBuiltin<"__hsail_ld_readonly_samp">,
+                              Intrinsic<[llvm_i64_ty], [llvm_i32_ty], [IntrNoMem]>;
+
 }

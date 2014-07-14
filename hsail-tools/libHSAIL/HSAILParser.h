@@ -140,7 +140,6 @@ private:
     void parseLdcOperands(Inst inst);
     void parseCallOperands(Inst inst);
     void parseRdImageOperands(Inst inst);
-    void parseAtomicImageOperands(Inst inst);
     void parseAtomicNoRetImageOperands(Inst inst);
     void parseQueryOperands(Inst inst);
     void parseNoOperands(Inst inst);

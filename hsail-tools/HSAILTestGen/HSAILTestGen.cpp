@@ -96,7 +96,8 @@ int genTests(string path)
         std::cerr << "Warning: incompatible options;  \"random\" option ignored\n";
     }
 
-    PropDesc::init(machineModel);
+    PropDesc::init(machineModel, profile);
+    TestGen::init();
 
     int res;    
     try 
@@ -120,6 +121,7 @@ int genTests(string path)
         res = 1;
     }
 
+    TestGen::clean();
     PropDesc::clean();
 
     return res;

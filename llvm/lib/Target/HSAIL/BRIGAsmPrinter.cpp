@@ -34,10 +34,13 @@
 #include "llvm/MC/MCObjectStreamer.h"
 #include "llvm/MC/MCAssembler.h"
 #include "llvm/MC/MCObjectWriter.h"
+#include "llvm/Operator.h"
+#include "llvm/Support/GetElementPtrTypeIterator.h"
 #include "llvm/Support/FormattedStream.h"
 #include "llvm/Support/InstIterator.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Target/Mangler.h"
 #include "../lib/CodeGen/AsmPrinter/DwarfDebug.h"
 #include <sstream>
 #include <iostream>
@@ -68,14 +71,6 @@ namespace llvm {
   }
 }
 
-extern bool loweringWithDisasm;
-
-// HSAIL text output from the HSAIL AsmPrinter and BRIG
-// binary output from the BRIG lowering AsmPrinter are
-// mutually exclusive, only one of them can run.
-//
-extern cl::opt<bool> disableBrigLowering;
-
 static cl::opt<std::string> DebugInfoFilename("odebug",
   cl::desc("Debug Info filename"), cl::value_desc("filename"), cl::init(""));
 
@@ -105,6 +100,14 @@ namespace HSAIL_ATOMIC_OPS {
     SEGMENT_INDEX = 1,
     ORDER_INDEX = 2,
     SCOPE_INDEX = 3
+  };
+}
+
+namespace HSAIL_MEMFENCE {
+  enum {
+    SEGMENT_INDEX = 0,
+    ORDER_INDEX = 1,
+    SCOPE_INDEX = 2
   };
 }
 
@@ -287,7 +290,7 @@ static Type* getGVType(Type *ty) {
 
 class LLVM_LIBRARY_VISIBILITY StoreInitializer {
   Brig::BrigType16_t       m_type;
-  const BRIGAsmPrinter&    m_asmPrinter;
+  BRIGAsmPrinter&          m_asmPrinter;
   unsigned                 m_reqNumZeroes;
   HSAIL_ASM::ArbitraryData m_data;
 
@@ -297,19 +300,27 @@ class LLVM_LIBRARY_VISIBILITY StoreInitializer {
   template <Brig::BrigTypeX BrigTypeId>
   void pushValueImpl(typename HSAIL_ASM::BrigType<BrigTypeId>::CType value);
 
+  void initVarWithAddress(const Value *V, const std::string Var,
+                          const APInt& Offset);
+
 public:
-  StoreInitializer(Brig::BrigType16_t type, const BRIGAsmPrinter& asmPrinter)
+  StoreInitializer(Brig::BrigType16_t type, BRIGAsmPrinter& asmPrinter)
       : m_type(type)
       , m_asmPrinter(asmPrinter)
       , m_reqNumZeroes(0) {}
 
-  void append(const Constant* CV);
+  void append(const Constant* CV, const std::string Var);
 
   HSAIL_ASM::SRef toSRef() const { return m_data.toSRef(); }
 
   size_t elementCount() const {
     return m_data.numBytes() / ( HSAIL_ASM::getTypeSize(m_type) / 8);
   }
+
+  size_t dataSizeInBytes() const {
+    return m_data.numBytes();
+  }
+
 };
 
 template <Brig::BrigTypeX BrigTypeId> void StoreInitializer::pushValue(
@@ -345,23 +356,38 @@ template <Brig::BrigTypeX BrigTypeId> void StoreInitializer::pushValueImpl(
   m_data.push_back(value);
 }
 
-uint64_t getNumElementsInHSAILArray(Type* type, const DataLayout& dataLayout);
+uint64_t getNumElementsInHSAILType(Type* type, const DataLayout& dataLayout);
 
-void StoreInitializer::append(const Constant *CV) {
+void StoreInitializer::initVarWithAddress(const Value *V, const std::string Var,
+                                          const APInt& Offset) {
+  assert(V->hasName());
+  std::stringstream initstr;
+  initstr << "initvarwithaddress:" << Var << ":" << dataSizeInBytes() <<
+    ":" << (HSAIL_ASM::getTypeSize(m_type) / 8) << ":" <<
+    BRIGAsmPrinter::getSymbolPrefix(*dyn_cast<GlobalVariable>(V)) <<
+    V->getName().data() << ":" << Offset.toString(10, false);
+  HSAIL_ASM::DirectivePragma pgm = m_asmPrinter.brigantine
+    .createCodeRefDir<HSAIL_ASM::DirectivePragma>();
+  pgm.name() = initstr.str();
+  (m_asmPrinter.getSubtarget().is64Bit()) ?
+    pushValue<Brig::BRIG_TYPE_B64>(0) : pushValue<Brig::BRIG_TYPE_B32>(0);
+}
+
+void StoreInitializer::append(const Constant *CV, const std::string Var) {
   using namespace Brig;
 
   switch(CV->getValueID() ) {
   case Value::ConstantArrayVal: { // recursive type
     const ConstantArray *CA =  cast<ConstantArray>(CV);
-    for (unsigned i = 0, e = CA->getNumOperands(); i != e; ++i) {
-      append(cast<Constant>(CA->getOperand(i)));
+    for (unsigned i = 0, e = CA->getNumOperands(); i < e; ++i) {
+      append(cast<Constant>(CA->getOperand(i)), Var);
     }
     break;
   }
   case Value::ConstantDataArrayVal: {
     const ConstantDataArray *CVE = cast<ConstantDataArray>(CV);
-    for (unsigned i = 0, e = CVE->getNumElements(); i != e; ++i) {
-      append(cast<Constant>(CVE->getElementAsConstant(i)));
+    for (unsigned i = 0, e = CVE->getNumElements(); i < e; ++i) {
+      append(cast<Constant>(CVE->getElementAsConstant(i)), Var);
     }
     break;
   }
@@ -370,8 +396,8 @@ void StoreInitializer::append(const Constant *CV) {
     const StructLayout *layout = m_asmPrinter.getDataLayout()
                                  .getStructLayout(s->getType());
     uint64_t const initStartOffset = m_data.numBytes();
-    for (unsigned i = 0, e = s->getNumOperands(); i != e; ++i) {
-      append(cast<Constant>(s->getOperand(i)));
+    for (unsigned i = 0, e = s->getNumOperands(); i < e; ++i) {
+      append(cast<Constant>(s->getOperand(i)), Var);
       // Match structure layout by padding with zeroes
       uint64_t const nextElemOffset = (i+1) < e ?
                                       layout->getElementOffset(i+1) :
@@ -379,20 +405,24 @@ void StoreInitializer::append(const Constant *CV) {
       uint64_t const structInitSize = m_data.numBytes() - initStartOffset;
       assert(nextElemOffset >= structInitSize);
       m_reqNumZeroes = nextElemOffset - structInitSize;
+      if (m_reqNumZeroes) {
+        m_reqNumZeroes--;
+        pushValue<BRIG_TYPE_U8>(0);
+      }
     }
     break;
   }
   case Value::ConstantVectorVal: { // almost leaf type
     const ConstantVector *CVE = cast<ConstantVector>(CV);
-    for (unsigned i = 0, e = CVE->getType()->getNumElements(); i != e; ++i) {
-      append(cast<Constant>(CVE->getOperand(i)));
+    for (unsigned i = 0, e = CVE->getType()->getNumElements(); i < e; ++i) {
+      append(cast<Constant>(CVE->getOperand(i)), Var);
     }
     break;
   }
   case Value::ConstantDataVectorVal: {
     const ConstantDataVector *CVE = cast<ConstantDataVector>(CV);
-    for (unsigned i = 0, e = CVE->getNumElements(); i != e; ++i) {
-      append(cast<Constant>(CVE->getElementAsConstant(i)));
+    for (unsigned i = 0, e = CVE->getNumElements(); i < e; ++i) {
+      append(cast<Constant>(CVE->getElementAsConstant(i)), Var);
     }
     break;
   }
@@ -428,8 +458,40 @@ void StoreInitializer::append(const Constant *CV) {
     break;
 
   case Value::ConstantAggregateZeroVal:
-    m_reqNumZeroes += getNumElementsInHSAILArray(CV->getType(),m_asmPrinter.getDataLayout());
+    m_reqNumZeroes += getNumElementsInHSAILType(CV->getType(),m_asmPrinter.getDataLayout());
     break;
+
+  case Value::ConstantExprVal: {
+    const ConstantExpr* CE;
+    CE = dyn_cast<ConstantExpr>(CV);
+    assert(CE != NULL);
+    if (CE->isGEPWithNoNotionalOverIndexing()) {
+      const GEPOperator* GO = dyn_cast<GEPOperator>(CE);
+      if (GO) {
+        const Value* Ptr = GO->getPointerOperand()->stripPointerCasts();
+        assert(Ptr != NULL && Ptr->hasName());
+        APInt Offset(m_asmPrinter.getSubtarget().is64Bit() ? 64 : 32, 0);
+        if (!GO->accumulateConstantOffset(m_asmPrinter.getDataLayout(), Offset))
+          llvm_unreachable("Cannot calculate initializer offset");
+        initVarWithAddress(Ptr, Var, Offset);
+      } else {
+        llvm_unreachable("Unhandled ConstantExpr initializer instruction");
+      }
+    } else if (CE->getOpcode() == Instruction::BitCast) {
+      append(cast<Constant>(CE->getOperand(0)), Var);
+    } else {
+      llvm_unreachable("Unhandled ConstantExpr initializer type");
+    }
+    break;
+  }
+
+  case Value::GlobalVariableVal: {
+    const Value* V = CV->stripPointerCasts();
+    assert(V->hasName());
+    initVarWithAddress(V, Var,
+      APInt(m_asmPrinter.getSubtarget().is64Bit() ? 64 : 32, 0));
+    break;
+  }
 
   default: assert(!"Unhandled initializer");
   }
@@ -443,7 +505,7 @@ void BRIGAsmPrinter::BrigEmitGlobalInit(HSAIL_ASM::DirectiveVariable globalVar,
   globalVar.init() = init;
 
   StoreInitializer store(init.type(), *this);
-  store.append(CV);
+  store.append(CV, globalVar.name().str());
 
   if (store.elementCount() > 0) {
     init.elementCount() = store.elementCount();
@@ -552,15 +614,23 @@ static unsigned getAlignTypeQualifier(Type *ty, const DataLayout& DL) {
   return align;
 }
 
-Brig::BrigSegment8_t BRIGAsmPrinter::getHSAILSegment(const GlobalVariable* gv) {
-  switch (gv->getType()->getAddressSpace()) {
+Brig::BrigSegment8_t BRIGAsmPrinter::getHSAILSegment(unsigned AddressSpace)
+                                                     const {
+  switch (AddressSpace) {
   case HSAILAS::GLOBAL_ADDRESS:   return Brig::BRIG_SEGMENT_GLOBAL;
   case HSAILAS::CONSTANT_ADDRESS: return Brig::BRIG_SEGMENT_READONLY;
   case HSAILAS::GROUP_ADDRESS:    return Brig::BRIG_SEGMENT_GROUP;
   case HSAILAS::PRIVATE_ADDRESS:  return Brig::BRIG_SEGMENT_PRIVATE;
+  case HSAILAS::KERNARG_ADDRESS:  return Brig::BRIG_SEGMENT_KERNARG;
+  case HSAILAS::ARG_ADDRESS:      return Brig::BRIG_SEGMENT_ARG;
   // TODO_HSA: default to global until all possible actions are resolved
   default: return Brig::BRIG_SEGMENT_GLOBAL;
   }
+}
+
+Brig::BrigSegment8_t BRIGAsmPrinter::getHSAILSegment(const GlobalVariable* gv)
+                                                     const {
+  return getHSAILSegment(gv->getType()->getAddressSpace());
 }
 
 bool BRIGAsmPrinter::canInitHSAILAddressSpace(const GlobalVariable* gv) const {
@@ -577,7 +647,7 @@ bool BRIGAsmPrinter::canInitHSAILAddressSpace(const GlobalVariable* gv) const {
   return canInit;
 }
 
-uint64_t getNumElementsInHSAILArray(Type* type, const DataLayout& dataLayout) {
+uint64_t getNumElementsInHSAILType(Type* type, const DataLayout& dataLayout) {
   switch(type->getTypeID()) {
   case Type::IntegerTyID:
   case Type::PointerTyID:
@@ -585,11 +655,13 @@ uint64_t getNumElementsInHSAILArray(Type* type, const DataLayout& dataLayout) {
   case Type::DoubleTyID: return 1;
   case Type::VectorTyID: {
     VectorType *vt = cast<VectorType>(type);
-    return vt->getNumElements() * getNumElementsInHSAILArray(vt->getScalarType(),dataLayout);
+    uint64_t allocatedSize = dataLayout.getTypeAllocSize(type);
+    uint64_t elementSize = dataLayout.getTypeAllocSize(vt->getElementType());
+    return (allocatedSize/elementSize);
   }
   case Type::ArrayTyID: {
     const ArrayType *at = cast<ArrayType>(type);
-    return at->getNumElements() * getNumElementsInHSAILArray(at->getElementType(),dataLayout);
+    return at->getNumElements() * getNumElementsInHSAILType(at->getElementType(),dataLayout);
   }
   case Type::StructTyID: {
     StructType *st= cast<StructType>(type);
@@ -628,6 +700,15 @@ void BRIGAsmPrinter::EmitGlobalVariable(const GlobalVariable *GV)
 
   const DataLayout& DL = getDataLayout();
   Type *ty = GV->getType()->getElementType();
+  if (ty->isIntegerTy(1)) {
+   // HSAIL do not support boolean load and stores and all boolean variables
+   // should have been promoted to int8. However, due to llvm optimization
+   // such as shrink to boolean optimization we will still get i1 types.
+   // The loads and stores of this global variables are handled in
+   // selection lowering by extending to int8 types.The type of global
+   // variable will be changed to i8 here.
+    ty = Type::getInt8Ty(GV->getContext());
+  }
   bool const isArray = requireHSAILArray(ty);
 
   // TODO_HSA: pending BRIG_LINKAGE_STATIC implementation in the Finalizer
@@ -638,11 +719,12 @@ void BRIGAsmPrinter::EmitGlobalVariable(const GlobalVariable *GV)
   Brig::BrigLinkage attr = Brig::BRIG_LINKAGE_NONE;
 
   HSAIL_ASM::DirectiveVariable globalVar =
-    brigantine.addVariable(nameString, getHSAILSegment(GV), getBrigType(ty));
+    brigantine.addVariable(nameString, getHSAILSegment(GV),
+    HSAILgetBrigType(ty, Subtarget->is64Bit()));
 
   globalVar.modifier().linkage() = attr;
   globalVar.modifier().isArray() = isArray;
-  globalVar.dim() = isArray ? getNumElementsInHSAILArray(ty,DL) : 0;
+  globalVar.dim() = isArray ? getNumElementsInHSAILType(ty,DL) : 0;
   // Align arrays at least by 4 bytes
   unsigned align_value = std::max((globalVar.dim() > 1) ? 4U : 0U,
     std::max(GV->getAlignment(),
@@ -698,7 +780,8 @@ void BRIGAsmPrinter::EmitFunctionLabel(const Function &rF,
 
   paramCounter = 0;
   if (retType && (retType->getTypeID() != Type::VoidTyID)) {
-    EmitFunctionReturn(retType, false);
+    EmitFunctionReturn(retType, false, StringRef(), F->getRetAttributes()
+                       .hasAttribute(Attributes::SExt));
   }
   if (funcType) {
     // Loop through all of the parameters and emit the types and
@@ -706,10 +789,15 @@ void BRIGAsmPrinter::EmitFunctionLabel(const Function &rF,
     reg1Counter = 0;
     reg32Counter = 0;
     reg64Counter = 0;
+    Function::const_arg_iterator ai = F->arg_begin();
+    Function::const_arg_iterator ae = F->arg_end();
+    unsigned n = 1;
     for (FunctionType::param_iterator pb = funcType->param_begin(),
-         pe = funcType->param_end(); pb != pe; ++pb) {
+         pe = funcType->param_end(); pb != pe; ++pb, ++ai, ++n) {
+      assert(ai != ae);
       Type* type = *pb;
-      EmitFunctionArgument(type, false);
+      EmitFunctionArgument(type, false, ai->getName(), F->getParamAttributes(n)
+                           .hasAttribute(Attributes::SExt));
     }
   }
 }
@@ -782,30 +870,27 @@ void BRIGAsmPrinter::EmitSamplerDefs() {
 
       int ocl_init = handles->getSamplerValue(i);
 
-      samplerProps.modifier().isUnnormalized() =
-        ((ocl_init & 0x1) != 0x1); // CLK_NORMALIZED_COORDS_TRUE | // CLK_NORMALIZED_COORDS_FALSE;
+      samplerProps.coord() = (ocl_init & 0x1)
+            ? Brig::BRIG_COORD_NORMALIZED
+            : Brig::BRIG_COORD_UNNORMALIZED;
 
       switch (ocl_init & 0x30) {
+      default:
       case 0x10:
-        samplerProps.modifier().filter() = Brig::BRIG_FILTER_NEAREST; // CLK_FILTER_NEAREST
+        samplerProps.filter() = Brig::BRIG_FILTER_NEAREST; // CLK_FILTER_NEAREST
         break;
       case 0x20:
-        samplerProps.modifier().filter() = Brig::BRIG_FILTER_LINEAR; // CLK_FILTER_LINEAR
+        samplerProps.filter() = Brig::BRIG_FILTER_LINEAR; // CLK_FILTER_LINEAR
         break;
       }
 
-      Brig::BrigSamplerBoundaryMode mode;
       switch (ocl_init & 0xE) {
-      case 0x0 : mode = Brig::BRIG_BOUNDARY_UNDEFINED; break;  // CLK_ADDRESS_NONE
-      case 0x2 : mode = Brig::BRIG_BOUNDARY_WRAP;      break;  // CLK_ADDRESS_REPEAT
-      case 0x4 : mode = Brig::BRIG_BOUNDARY_CLAMP;     break;  // CLK_ADDRESS_CLAMP_TO_EDGE
-      case 0x6 : mode = Brig::BRIG_BOUNDARY_BORDER;    break;  // CLK_ADDRESS_CLAMP
-      case 0x8 : mode = Brig::BRIG_BOUNDARY_MIRROR;    break;  // CLK_ADDRESS_MIRRORED_REPEAT
+      case 0x0 : samplerProps.addressing() = Brig::BRIG_ADDRESSING_UNDEFINED;          break;  // CLK_ADDRESS_NONE
+      case 0x2 : samplerProps.addressing() = Brig::BRIG_ADDRESSING_REPEAT;             break;  // CLK_ADDRESS_REPEAT
+      case 0x4 : samplerProps.addressing() = Brig::BRIG_ADDRESSING_CLAMP_TO_EDGE;      break;  // CLK_ADDRESS_CLAMP_TO_EDGE
+      case 0x6 : samplerProps.addressing() = Brig::BRIG_ADDRESSING_CLAMP_TO_BORDER;    break;  // CLK_ADDRESS_CLAMP
+      case 0x8 : samplerProps.addressing() = Brig::BRIG_ADDRESSING_MIRRORED_REPEAT;    break;  // CLK_ADDRESS_MIRRORED_REPEAT
       }
-
-      samplerProps.boundaryU() = mode;
-      samplerProps.boundaryV() = mode;
-      samplerProps.boundaryW() = mode;
 
       samplers[i]->setEmitted();
     }
@@ -871,6 +956,37 @@ void BRIGAsmPrinter::EmitBasicBlockStart(const MachineBasicBlock *MBB) {
   }
 
   AsmPrinter::EmitBasicBlockStart(MBB);
+}
+
+/// Emit ld_arg or st_arg
+void BRIGAsmPrinter::EmitLdStArg(const MachineInstr *MI, bool isLoad) {
+  MachineInstr::const_mop_iterator oi = MI->operands_begin();
+  const MachineMemOperand *MMO = *MI->memoperands_begin();
+  const MachinePointerInfo &MPI = MMO->getPointerInfo();
+
+  HSAIL_ASM::InstMem inst = brigantine.addInst<HSAIL_ASM::InstMem>(
+    isLoad ? Brig::BRIG_OPCODE_LD : Brig::BRIG_OPCODE_ST);
+
+  assert(oi->isReg());
+  BrigEmitOperand(MI, 0, inst); ++oi;
+  assert(oi->isSymbol());
+  std::string sym("%");
+  sym += oi++->getSymbolName();
+  HSAIL_ASM::SRef reg_name;
+  if (oi->isReg())
+    reg_name = HSAIL_ASM::SRef(getRegisterName(oi->getReg()));
+  oi++; oi++; // skip reg and offset (offset is taken from MMO).
+  brigantine.setOperandEx(inst, 1, brigantine
+    .createRef(sym, reg_name, MMO->getOffset()));
+
+  assert(oi->isImm());
+  Brig::BrigTypeX type = static_cast<Brig::BrigTypeX>(oi->getImm());
+  inst.segment()    = getHSAILSegment(MPI.getAddrSpace());
+  inst.type()       = type;
+  inst.align()      = getBrigAlignment(MMO->getAlignment());
+  inst.width()      = isLoad ? Brig::BRIG_WIDTH_1 : Brig::BRIG_WIDTH_NONE;
+  inst.equivClass() = 0;
+  inst.modifier().isConst() = 0;
 }
 
 namespace {
@@ -965,6 +1081,20 @@ void BRIGAsmPrinter::EmitInstruction(const MachineInstr *II) {
     return;
   }
 
+  if (II->getOpcode() == llvm::HSAIL::hsail_atomic_memfence) {
+    HSAIL_ASM::InstMemFence instMemFence;
+    instMemFence =
+        brigantine.addInst< HSAIL_ASM::InstMemFence >(Brig::BRIG_OPCODE_MEMFENCE,
+                Brig::BRIG_TYPE_NONE);
+    instMemFence.segments() =
+        II->getOperand(HSAIL_MEMFENCE::SEGMENT_INDEX).getImm();
+    instMemFence.memoryOrder() =
+        II->getOperand(HSAIL_MEMFENCE::ORDER_INDEX).getImm();
+    instMemFence.memoryScope() =
+        II->getOperand(HSAIL_MEMFENCE::SCOPE_INDEX).getImm();
+    return;
+  }
+
   switch(II->getOpcode()) {
   default:
     BrigEmitInstruction(II);
@@ -980,8 +1110,6 @@ void BRIGAsmPrinter::EmitInstruction(const MachineInstr *II) {
 
   case HSAIL::arg_scope_end:
     brigantine.endArgScope();
-    call_paramlist.clear();
-    ret_list.clear();
     return;
 
   case HSAIL::target_call:
@@ -991,13 +1119,40 @@ void BRIGAsmPrinter::EmitInstruction(const MachineInstr *II) {
       emitMacroFunc(II, O);
 #endif
     } else {
-      const GlobalValue *gv = II->getOperand(0).getGlobal();;
+      MachineInstr::const_mop_iterator oi = II->operands_begin();
+      MachineInstr::const_mop_iterator oe = II->operands_end();
+      const GlobalValue *gv = (oi++)->getGlobal();;
       bool isKernel = isKernelFunc(cast<Function>(gv));
 
       // Place a call
       HSAIL_ASM::InstBr call = brigantine.addInst<HSAIL_ASM::InstBr>(
                                  Brig::BRIG_OPCODE_CALL,Brig::BRIG_TYPE_NONE);
       call.width() = Brig::BRIG_WIDTH_ALL;
+
+      std::vector<HSAIL_ASM::DirectiveVariable> ret_list;
+      for (; oi != oe && oi->isSymbol() ; ++oi) {
+        std::string ret("%");
+        ret += oi->getSymbolName();
+        ret_list.push_back(
+          brigantine.findInScopes<HSAIL_ASM::DirectiveVariable>(ret));
+      }
+
+      // Return value and argument symbols are delimited with a 0 value.
+      assert((oi->isImm() && (oi->getImm() == 0)) ||
+             !"Unexpected target call instruction operand list!");
+
+      std::vector<HSAIL_ASM::DirectiveVariable> call_paramlist;
+      for (++oi; oi != oe; ++oi) {
+        if (oi->isSymbol()) {
+          std::string op("%");
+          op += oi->getSymbolName();
+          call_paramlist.push_back(
+            brigantine.findInScopes<HSAIL_ASM::DirectiveVariable>(op));
+        } else {
+          llvm_unreachable("Unexpected target call instruction operand list!");
+        }
+      }
+
       brigantine.appendOperand(call, brigantine.createArgList(ret_list.begin(),
                                                               ret_list.end()));
       brigantine.appendOperand(call, brigantine.createFuncRef(std::string("&") +
@@ -1007,6 +1162,18 @@ void BRIGAsmPrinter::EmitInstruction(const MachineInstr *II) {
     }
 
     return;
+  case HSAIL::ld_arg_64:
+    EmitLdStArg(II, true);
+    return;
+
+  case HSAIL::st_arg_64:
+    EmitLdStArg(II, false);
+    return;
+
+  case HSAIL::arg_decl:
+    BrigEmitVecArgDeclaration(II);
+    break;
+
   case HSAIL::ftz_f32: {
   // add_ftz_f32  $dst, $src, 0F00000000
     HSAIL_ASM::InstMod ftz = brigantine.addInst<HSAIL_ASM::InstMod>(
@@ -1263,7 +1430,7 @@ void BRIGAsmPrinter::EmitEndOfAsmFile(Module &M) {
   }
 
   if (mBrigStream) {
-    if (!loweringWithDisasm) {
+    if (mTM->HSAILFileType == TargetMachine::CGFT_ObjectFile) {
       // Common case
       // TBD err stream
       RawOstreamWriteAdapter brigAdapter(*mBrigStream, std::cerr);
@@ -1307,19 +1474,35 @@ static const Type* GetBasicType(const Type* pType) {
   return pType;
 }
 
-HSAIL_ASM::DirectiveVariable BRIGAsmPrinter::EmitLocalArray(
+HSAIL_ASM::DirectiveVariable BRIGAsmPrinter::EmitLocalVariable(
   const GlobalVariable *GV, Brig::BrigSegment8_t segment) {
 
   const Type *pElType = GetBasicType(GV->getType()->getElementType());
-  uint64_t size = HSAILgetTypeSize(GV->getType(), true) /
-                  HSAILgetTypeSize(pElType, true);
-  HSAIL_ASM::DirectiveVariable var = brigantine.addArrayVariable(("%" +
-    GV->getName()).str(), size, segment,
-    getBrigType(GV->getType()->getElementType()));
-  // Align arrays at least by 4 bytes
-  var.align() = getBrigAlignment(std::max((var.dim() > 1) ? 4U : 0U,
-    std::max(GV->getAlignment(),
-      getAlignTypeQualifier(GV->getType()->getElementType(), getDataLayout()))));
+  uint64_t num_elem = 1;
+  OpaqueType OT = GetOpaqueType(pElType);
+  Type  *type = GV->getType()->getElementType();
+  const DataLayout& DL = getDataLayout();
+  if (type->isIntegerTy(1)) {
+   // convert boolean variables generated by llvm optimizations
+   // to i32 type.
+    type = Type::getInt32Ty(GV->getContext());
+  }
+  if (OT == NotOpaque)
+    num_elem = getNumElementsInHSAILType(type, DL);
+  HSAIL_ASM::DirectiveVariable var;
+  if (num_elem > 1) {
+     var = brigantine.addArrayVariable(("%" + GV->getName()).str(),num_elem,
+           segment, HSAILgetBrigType(type, Subtarget->is64Bit()));
+    // Align arrays at least by 4 bytes
+    var.align() = getBrigAlignment(std::max((var.dim() > 1) ? 4U : 0U,
+                      std::max(GV->getAlignment(),
+                      getAlignTypeQualifier(type, getDataLayout()))));
+  } else {
+    var = brigantine.addVariable(("%" + GV->getName()).str(),
+           segment, HSAILgetBrigType(type, Subtarget->is64Bit()));
+    var.align() = getBrigAlignment(getAlignTypeQualifier(type,getDataLayout()));
+  }
+
   return var;
 }
 
@@ -1390,8 +1573,9 @@ void BRIGAsmPrinter::EmitFunctionBodyStart() {
        E = F->getParent()->global_end(); I != E; ++I) {
     pvgvo_iterator II = groupVariablesOffsets.find(I);
     if (II != groupVariablesOffsets.end()) {
-      HSAIL_ASM::DirectiveVariable var = EmitLocalArray(II->first,
-        Brig::BRIG_SEGMENT_GROUP);  // TBD Why array?
+         HSAIL_ASM::DirectiveVariable var =
+             EmitLocalVariable(II->first, Brig::BRIG_SEGMENT_GROUP);
+
       II->second = var.brigOffset();
     }
   }
@@ -1476,29 +1660,46 @@ void BRIGAsmPrinter::EmitFunctionBodyEnd() {
   brigantine.endBody();
 }
 
-void BRIGAsmPrinter::EmitFunctionReturn(Type* type, bool isKernel) {
-  HSAIL_ASM::SRef ret = "%ret_r0";
+void BRIGAsmPrinter::EmitFunctionReturn(Type* type, bool isKernel,
+                                        const StringRef RetName, bool isSExt) {
+  std::string SymName("%");
+  SymName += RetName.empty() ? "ret" : RetName;
+  HSAIL_ASM::SRef ret = SymName;
   reg1Counter = 0;
   reg32Counter = 0;
   reg64Counter = 0;
+
+  // Handle bit return as DWORD
+  Type* memType = type->getScalarType();
+  if (memType->isIntegerTy(1))
+    memType = Type::getInt32Ty(type->getContext());
 
   // construct return symbol
   HSAIL_ASM::DirectiveVariable retParam;
   if (const VectorType *VT = dyn_cast<VectorType>(type)) {
     retParam = brigantine.addArrayVariable(ret, VT->getNumElements(),
-      Brig::BRIG_SEGMENT_ARG, getBrigType(type));
+      Brig::BRIG_SEGMENT_ARG, HSAILgetBrigType(memType, Subtarget->is64Bit(),
+                                               isSExt));
   } else {
     retParam = brigantine.addVariable(ret, Brig::BRIG_SEGMENT_ARG,
-                                      getBrigType(type));
+                      HSAILgetBrigType(memType, Subtarget->is64Bit(), isSExt));
   }
-  retParam.align() = getBrigAlignment(getAlignTypeQualifier(type,
-                                                            getDataLayout()));
+  retParam.align() = getBrigAlignment(std::max(
+    getAlignTypeQualifier(memType, getDataLayout()),
+    getAlignTypeQualifier(type, getDataLayout())));
   brigantine.addOutputParameter(retParam);
 }
 
-uint64_t BRIGAsmPrinter::EmitFunctionArgument(Type* type, bool isKernel) {
+uint64_t BRIGAsmPrinter::EmitFunctionArgument(Type* type, bool isKernel,
+                                              const StringRef argName,
+                                              bool isSExt) {
   std::ostringstream stream;
-  stream << "%arg_p" << paramCounter++;
+  if (argName.empty()) {
+    stream << "%arg_p" << paramCounter;
+  } else {
+    stream << "%" << HSAILParamManager::mangleArg(Mang, argName);
+  }
+  paramCounter++;
 
   std::string const name = stream.str();
   const Brig::BrigSegment8_t symSegment = isKernel ? Brig::BRIG_SEGMENT_KERNARG
@@ -1516,13 +1717,26 @@ uint64_t BRIGAsmPrinter::EmitFunctionArgument(Type* type, bool isKernel) {
     sym.align() = Brig::BRIG_ALIGNMENT_8;
   } else {
     const VectorType *VT = dyn_cast<VectorType>(type);
-    if (VT && !isKernel) {
+    // Handle bit argument as DWORD
+    Type* memType = type->getScalarType();
+    if (memType->isIntegerTy(1))
+      memType = Type::getInt32Ty(type->getContext());
+    if (VT) {
       sym = brigantine.addArrayVariable(name, VT->getNumElements(), symSegment,
-        getBrigType(type));
+        HSAILgetBrigType(memType, Subtarget->is64Bit(), isSExt));
+      // TODO_HSA: workaround for RT bug.
+      // RT does not read argument alignment from BRIG, so if we align vectors
+      // on a full vector size that will cause mismatch between kernarg offsets
+      // in RT and finalizer.
+      // The line below has to be removed as soon as RT is fixed.
+      if (isKernel) type = VT->getElementType();
     } else {
-      sym = brigantine.addVariable(name, symSegment, getBrigType(type));
+      sym = brigantine.addVariable(name, symSegment,
+                      HSAILgetBrigType(memType, Subtarget->is64Bit(), isSExt));
     }
-    sym.align() = getBrigAlignment(getAlignTypeQualifier(type, getDataLayout()));
+    sym.align() = getBrigAlignment(
+      std::max(getAlignTypeQualifier(type, getDataLayout()),
+               getAlignTypeQualifier(memType, getDataLayout())));
   }
 
   uint64_t rv = sym.brigOffset();
@@ -1537,6 +1751,8 @@ void BRIGAsmPrinter::EmitFunctionEntryLabel() {
   Type *retType = F->getReturnType();
   FunctionType *funcType = F->getFunctionType();
   bool isKernel = isKernelFunc(F);
+  const HSAILParamManager &PM = MF->getInfo<HSAILMachineFunctionInfo>()->
+        getParamManager();
   std::stringstream ss;
   ss << "&" << F->getName();
   if (isKernel) {
@@ -1553,10 +1769,9 @@ void BRIGAsmPrinter::EmitFunctionEntryLabel() {
 
   // Functions with kernel linkage cannot have output args
   if (!isKernel) {
-    // TODO_HSA: Need "good" names for the formal arguments and returned value
-    // TODO_HSA: Need to emit alignment information.
     if (retType && (retType->getTypeID() != Type::VoidTyID)) {
-      EmitFunctionReturn(retType, isKernel);
+      EmitFunctionReturn(retType, isKernel, PM.getParamName(*(PM.ret_begin())),
+        F->getRetAttributes().hasAttribute(Attributes::SExt));
     }
   }
   if (funcType) {
@@ -1571,8 +1786,8 @@ void BRIGAsmPrinter::EmitFunctionEntryLabel() {
     functionScalarArgumentOffsets.clear();
     functionVectorArgumentOffsets.clear();
 
-    Function::const_arg_iterator Ip = F->arg_begin();
-    Function::const_arg_iterator Ep = F->arg_end();
+    HSAILParamManager::param_iterator Ip = PM.arg_begin();
+    HSAILParamManager::param_iterator Ep = PM.arg_end();
 
     FunctionType::param_iterator pb = funcType->param_begin(),
                                  pe = funcType->param_end();
@@ -1585,31 +1800,16 @@ void BRIGAsmPrinter::EmitFunctionEntryLabel() {
       ++pb;
     }
 
-    for (; pb != pe; ++pb) {
+    for (unsigned n = 1; pb != pe; ++pb, ++Ip, ++n) {
       Type* type = *pb;
       assert(Ip != Ep);
-      Type *argType = Ip->getType();
-      // Argument type and part of the function type must point to the same object
-      assert( type == argType && "unexpected argument type" );
       // Obtain argument name
-      std::string argName = Ip->getName().str();
+      const char* argName = PM.getParamName(*Ip);
       // Here we will store an offset of DirectiveVariable
       uint64_t argDirectiveOffset = 0;
-      const VectorType *VT = dyn_cast<VectorType>(type);
-      if (VT && isKernel) {
-        type = VT->getElementType();
-        VectorArgumentOffsets Offsets;
-        for (unsigned x = 0, y = VT->getNumElements(); x < y; ++x) {
-          uint64_t offs = EmitFunctionArgument(type, isKernel);
-          uint64_t size = HSAIL_ASM::brigtype_get_length(getBrigType(type));
-          Offsets.push_back(VectorArgumentOffsets::value_type(offs, size));
-        }
-        functionVectorArgumentOffsets[argName] = Offsets;
-      } else {
-        argDirectiveOffset = EmitFunctionArgument(type, isKernel);
-        functionScalarArgumentOffsets[argName] = argDirectiveOffset;
-      }
-      Ip++;
+      argDirectiveOffset = EmitFunctionArgument(type, isKernel, argName,
+        F->getParamAttributes(n).hasAttribute(Attributes::SExt));
+      functionScalarArgumentOffsets[argName] = argDirectiveOffset;
     }
   }
 
@@ -1660,50 +1860,6 @@ int BRIGAsmPrinter::getHSAILParameterSize(Type* type, HSAIL_ARG_TYPE arg_type) {
     break;
   }
   return type_size;
-}
-
-Brig::BrigType16_t BRIGAsmPrinter::getBrigType(Type* type) {
-  switch (type->getTypeID()) {
-  case Type::VoidTyID:
-    return Brig::BRIG_TYPE_NONE; // TODO_HSA: FIXME: void
-  case Type::FloatTyID:
-    return Brig::BRIG_TYPE_F32;
-  case Type::DoubleTyID:
-    return Brig::BRIG_TYPE_F64;
-  case Type::IntegerTyID:
-    if (type->isIntegerTy(8)) {
-      return Brig::BRIG_TYPE_U8;
-    } else if (type->isIntegerTy(16)) {
-      return Brig::BRIG_TYPE_U16;
-    } else if (type->isIntegerTy(32)) {
-      return Brig::BRIG_TYPE_U32;
-    } else if (type->isIntegerTy(64)) {
-      return Brig::BRIG_TYPE_U64;
-    } else if (type->isIntegerTy(1)) {
-      return Brig::BRIG_TYPE_B1;
-    } else {
-      type->dump();
-      assert(!"Found a case we don't handle!");
-    }
-    break;
-  case Type::PointerTyID:
-    if (Subtarget->is64Bit())
-      return Brig::BRIG_TYPE_U64;
-    else
-      return Brig::BRIG_TYPE_U32;
-  case Type::StructTyID:
-    // Treat struct as array of bytes.
-    return Brig::BRIG_TYPE_U8;
-  case Type::VectorTyID:
-    return getBrigType(type->getScalarType());
-  case Type::ArrayTyID:
-    return getBrigType(dyn_cast<ArrayType>(type)->getElementType());
-  default:
-    type->dump();
-    assert(!"Found a case we don't handle!");
-    break;
-  }
-  return Brig::BRIG_TYPE_U8;  // FIXME needs a value here for linux release build
 }
 
 std::string BRIGAsmPrinter::getHSAILReg(Type* type) {
@@ -1878,7 +2034,7 @@ void BRIGAsmPrinter::BrigEmitOperand(const MachineInstr *MI, unsigned opNum,
 
   opNum += Offset;
   Brig::BrigType16_t const expType = getOperandType(inst, opNum,
-                                       brigantine.getMachineModel());
+                                       brigantine.getMachineModel(), brigantine.getProfile());
 
   switch (MO.getType()) {
   default:
@@ -1954,7 +2110,11 @@ void BRIGAsmPrinter::BrigEmitOperandLdStAddress(const MachineInstr *MI,
     else
       assert("Immediate base address: neither spill nor private stack" && 0);
   }
-
+  // Kernel or function argument
+  else if (base.isSymbol()) {
+    base_name = "%";
+    base_name.append(base.getSymbolName());
+  }
   // Get [$reg]
   HSAIL_ASM::SRef reg_name;
   if (reg.isReg() && reg.getReg() != 0) {
@@ -1986,8 +2146,8 @@ void BRIGAsmPrinter::BrigEmitQualifiers(const MachineInstr *MI, unsigned opNum,
     inst.width() = width;
 
     // Emit const
-   if(HSAILAS::GLOBAL_ADDRESS ==
-      (*(MI->memoperands_begin()))->getPointerInfo().getAddrSpace()) {
+    unsigned AS = (*(MI->memoperands_begin()))->getPointerInfo().getAddrSpace();
+    if(HSAILAS::GLOBAL_ADDRESS == AS || HSAILAS::KERNARG_ADDRESS == AS) {
       const MachineOperand &const_op = getLoadConstQual(MI);
       assert( const_op.isImm());
       bool isConst = const_op.getImm();
@@ -2027,87 +2187,26 @@ void BRIGAsmPrinter::BrigEmitOperandAddress(const MachineInstr *MI,
   }
 }
 
-void BRIGAsmPrinter::BrigEmitOperandArgRef(const MachineInstr *MI,
-     unsigned opNum, const char * prefix, HSAIL_ASM::Inst inst, int Offset ) {
-  const MachineOperand &Reg = MI->getOperand(opNum);
+void BRIGAsmPrinter::BrigEmitVecArgDeclaration(const MachineInstr *MI) {
+  MachineOperand symb      = MI->getOperand(0);
+  MachineOperand brig_type = MI->getOperand(1);
+  MachineOperand size      = MI->getOperand(2);
 
-  opNum += Offset;
-
-  assert( Reg.getType() == MachineOperand::MO_Register );
-
-  std::stringstream ss;
-  ss << prefix << getRegisterName(Reg.getReg());
-  if (MI->getNumOperands() > opNum) {
-    const MachineOperand &MO2 = MI->getOperand(opNum+1);
-    // There is an extra argument for offset supplied
-    if ((MO2.isReg() && !MO2.isImplicit() && !MO2.isDef()) || MO2.isImm()) {
-      HSAIL_ASM::SRef reg_name;
-      int64_t offset = 0;
-      if (MO2.isReg()) {
-        reg_name = HSAIL_ASM::SRef(getRegisterName(MO2.getReg()));
-      } else if (MO2.isImm()) {
-        offset = MO2.getImm();
-      }
-      brigantine.setOperandEx(inst, opNum,
-        brigantine.createRef(ss.str(), reg_name, offset));
-      return;
-    }
-  }
-  brigantine.setOperandEx(inst, opNum, brigantine.createRef(ss.str()));
-}
-
-static Brig::BrigTypeX OpcodeToBrigType(unsigned opcode) {
-  switch(opcode) {
-  case HSAIL::arg_ret_u8:
-  case HSAIL::arg_u8:
-    return Brig::BRIG_TYPE_U8;
-  case HSAIL::arg_ret_u16:
-  case HSAIL::arg_u16:
-    return Brig::BRIG_TYPE_U16;
-  case HSAIL::arg_ret_u32:
-  case HSAIL::arg_u32:
-    return Brig::BRIG_TYPE_U32;
-  case HSAIL::arg_ret_u64:
-  case HSAIL::arg_u64:
-    return Brig::BRIG_TYPE_U64;
-  case HSAIL::arg_ret_f32:
-  case HSAIL::arg_f32:
-    return Brig::BRIG_TYPE_F32;
-  case HSAIL::arg_ret_f64:
-  case HSAIL::arg_f64:
-    return Brig::BRIG_TYPE_F64;
-  }
-  // We have no invalid BRIG type to indicate error
-  assert(!"Unexpected opcode in OpcodeToBrigType");
-  return Brig::BRIG_TYPE_B32;
-}
-
-void BRIGAsmPrinter::BrigEmitVecArgDeclaration(const MachineInstr *MI,
-     unsigned opPreg, const char * prefix, unsigned opSize) {
-  std::string sPref = prefix;
-  MachineOperand preg = MI->getOperand(opPreg);
-  MachineOperand size = MI->getOperand(opSize);
-
-  assert( preg.getType() == MachineOperand::MO_Immediate );
-  assert( size.getType() == MachineOperand::MO_Immediate );
+  assert( symb.getType()      == MachineOperand::MO_ExternalSymbol );
+  assert( brig_type.getType() == MachineOperand::MO_Immediate );
+  assert( size.getType()      == MachineOperand::MO_Immediate );
 
   std::ostringstream stream;
-  stream << prefix << getRegisterName(preg.getImm());
+  stream << "%" << symb.getSymbolName();
 
   unsigned num_elem = size.getImm();
 
-  Brig::BrigTypeX brigType = OpcodeToBrigType(MI->getOpcode());
+  Brig::BrigTypeX brigType = (Brig::BrigTypeX)brig_type.getImm();
   HSAIL_ASM::DirectiveVariable vec_arg = (num_elem > 1 ) ?
     brigantine.addArrayVariable(stream.str(), num_elem, Brig::BRIG_SEGMENT_ARG, brigType) :
     brigantine.addVariable(stream.str(), Brig::BRIG_SEGMENT_ARG, brigType);
 
   vec_arg.align() = getBrigAlignment(HSAIL_ASM::getByteSize(brigType) * num_elem);
-
-  if(0 == sPref.compare("%param_")) {
-    call_paramlist.push_back(vec_arg);
-  } else if ( sPref.find("ret") != sPref.npos ) {
-    ret_list.push_back(vec_arg);
-  }
 
   return;
 }
@@ -2180,7 +2279,13 @@ void BRIGAsmPrinter::BrigEmitImageInst(const MachineInstr *MI,
                                        HSAIL_ASM::InstImage inst, int Offset) {
   unsigned opCnt = 0, operand = 0;
 
-  brigantine.setOperandEx(inst, operand++, BrigEmitVecOperand(MI, opCnt, 4));
+  if (inst.geometry() == Brig::BRIG_GEOMETRY_2DDEPTH ||
+      inst.geometry() == Brig::BRIG_GEOMETRY_2DADEPTH) {
+     brigantine.setOperandEx(inst, operand++,
+                           getBrigReg(MI->getOperand(opCnt++)));
+  } else {
+    brigantine.setOperandEx(inst, operand++, BrigEmitVecOperand(MI, opCnt, 4));
+  }
 
   if (!EnableExperimentalFeatures) {
     switch(inst.opcode()) {
@@ -2215,9 +2320,11 @@ void BRIGAsmPrinter::BrigEmitImageInst(const MachineInstr *MI,
     break;
   case Brig::BRIG_GEOMETRY_1DA:
   case Brig::BRIG_GEOMETRY_2D:
+  case Brig::BRIG_GEOMETRY_2DDEPTH:
     brigantine.setOperandEx(inst, operand, BrigEmitVecOperand(MI, opCnt, 2));
     break;
   case Brig::BRIG_GEOMETRY_2DA:
+  case Brig::BRIG_GEOMETRY_2DADEPTH:
   case Brig::BRIG_GEOMETRY_3D:
     brigantine.setOperandEx(inst, operand, BrigEmitVecOperand(MI, opCnt, 3));
     break;
@@ -2250,30 +2357,23 @@ char BRIGAsmPrinter::getSymbolPrefix(const GlobalValue& gv) {
 }
 
 Brig::BrigAlignment8_t BRIGAsmPrinter::getBrigAlignment(unsigned align_value) {
+  if (align_value & (align_value-1)) {
+    // Round to the next power of 2
+    unsigned int i = 1;
+    while (i < align_value) i <<= 1;
+    align_value = i;
+  }
   Brig::BrigAlignment8_t ret = HSAIL_ASM::num2align(align_value);
   assert(ret != Brig::BRIG_ALIGNMENT_NONE && "invalid alignment value");
   return ret;
 }
 
-static MCInstPrinter *createHSAILMCInstPrinter(const Target &T,
-                                               unsigned SyntaxVariant,
-                                               const MCAsmInfo &MAI,
-                                               const MCInstrInfo &MII,
-                                               const MCRegisterInfo &MRI,
-                                               const MCSubtargetInfo &STI) {
-  return new HSAILInstPrinter(MAI);
-}
-
 // Force static initialization.
 extern "C" void LLVMInitializeBRIGAsmPrinter() {
-  if (disableBrigLowering)
-    return;
-
   RegisterAsmPrinter<BRIGAsmPrinter> X(TheHSAIL_32Target);
   RegisterAsmPrinter<BRIGAsmPrinter> Y(TheHSAIL_64Target);
+}
 
-  TargetRegistry::RegisterMCInstPrinter(TheHSAIL_32Target,
-                                        createHSAILMCInstPrinter);
-  TargetRegistry::RegisterMCInstPrinter(TheHSAIL_64Target,
-                                        createHSAILMCInstPrinter);
+extern "C" void LLVMInitializeHSAILAsmPrinter() {
+  LLVMInitializeBRIGAsmPrinter();
 }

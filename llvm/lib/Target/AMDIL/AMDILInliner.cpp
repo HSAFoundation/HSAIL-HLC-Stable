@@ -270,9 +270,7 @@ bool AMDILInlinePass::runOnFunction(Function &MF) {
       }
 
       // Support function call in amdil.
-      if (CS.getCaller() &&
-          !CS.getCaller()->getFnAttributes().hasAttribute(Attributes::NoInline) &&
-          CS.getCalledFunction() && CS.isNoInline()) {
+      if (CS.getCalledFunction() && CS.isNoInline()) {
         DEBUG_WITH_TYPE("noinline",
           llvm::dbgs() << "[AMDILInlinePass::runOnFunction] "
             << CS.getCalledFunction()->getName()

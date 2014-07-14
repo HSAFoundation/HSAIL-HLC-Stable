@@ -67,6 +67,60 @@ let isSelect = 1 in {
   defm CMOV_LOGICAL : SelectMC<IL_OP_CMOV_LOGICAL>;
 }
 
+def CONST_ADDRESS: SDNode<"AMDILISD::CONST_ADDRESS",
+  SDTypeProfile<1, -1, [SDTCisInt<0>, SDTCisPtrTy<1>]>,
+  [SDNPVariadic]
+>;
+
+def ADDRGA_CONST_OFFSET : ComplexPattern<i32, 1, "SelectGlobalValueConstantOffset", [], []>;
+def ADDRGA_VAR_OFFSET : ComplexPattern<i32, 2, "SelectGlobalValueVariableOffset", [], []>;
+
+def ADDRGA_CONST_OFFSET64 : ComplexPattern<i64, 1, "SelectGlobalValueConstantOffset", [], []>;
+def ADDRGA_VAR_OFFSET64 : ComplexPattern<i64, 2, "SelectGlobalValueVariableOffset", [], []>;
+
+let mayLoad = 1, /*load = 1,*/ isAsCheapAsAMove = 1, neverHasSideEffects = 1, cbmem = 1 in {
+  // FIXME: CB32LOAD and CB64LOAD are redundant with this.  FIXME:
+  // There's no reason we need to copy into a register before using
+  // it.
+  // FIXME: May need to consider 64-bit pointers for variable case
+  // FIXME: Assumes everything 128-bit aligned, but this is OK so long
+  // as we are only using this for constant offsets into kernel
+  // arguments.
+  def CONST_COPY : ILFormat<IL_OP_MOV,
+                            (outs GPR_32:$dst),
+                            (ins MEM32:$ptr, i32imm:$buf_id),
+                            IL_OP_MOV.Text#" $dst, cb$buf_id[$ptr].x",
+                            [(set GPR_32:$dst, (CONST_ADDRESS ADDRGA_CONST_OFFSET:$ptr, (i32 timm:$buf_id)))]>;
+
+  // def CONST_COPYv2imm : ILFormat<IL_OP_MOV,
+  //                           (outs GPRV2I32:$dst),
+  //                           (ins MEM32:$ptr, i32imm:$buf_id),
+  //                           IL_OP_MOV.Text#" $dst, cb$buf_id[$ptr].xy",
+  //                           [(set GPRV2I32:$dst, (CONST_ADDRESS ADDRGA_CONST_OFFSET:$ptr, (i32 timm:$buf_id)))]>;
+
+  def CONST_COPYv4imm : ILFormat<IL_OP_MOV,
+                            (outs GPRV4I32:$dst),
+                            (ins MEM32:$ptr, i32imm:$buf_id),
+                            IL_OP_MOV.Text#" $dst, cb$buf_id[$ptr]",
+                            [(set GPRV4I32:$dst, (CONST_ADDRESS ADDRGA_CONST_OFFSET:$ptr, (i32 timm:$buf_id)))]>;
+  def CONST_COPYv4 : ILFormat<IL_OP_MOV,
+                            (outs GPRV4I32:$dst),
+                            (ins MEM32:$ptr, i32imm:$buf_id),
+                            IL_OP_MOV.Text#" $dst, cb$buf_id[$ptr]",
+                            [(set GPRV4I32:$dst, (CONST_ADDRESS ADDRGA_VAR_OFFSET:$ptr, (i32 timm:$buf_id)))]>;
+
+  def CONST_COPYv4imm64 : ILFormat<IL_OP_MOV,
+                            (outs GPRV4I32:$dst),
+                            (ins MEM64:$ptr, i32imm:$buf_id),
+                            IL_OP_MOV.Text#" $dst, cb$buf_id[$ptr]",
+                            [(set GPRV4I32:$dst, (CONST_ADDRESS ADDRGA_CONST_OFFSET64:$ptr, (i32 timm:$buf_id)))]>;
+  def CONST_COPYv464 : ILFormat<IL_OP_MOV,
+                            (outs GPRV4I32:$dst),
+                            (ins MEM64:$ptr, i32imm:$buf_id),
+                            IL_OP_MOV.Text#" $dst, cb$buf_id[$ptr]",
+                            [(set GPRV4I32:$dst, (CONST_ADDRESS ADDRGA_VAR_OFFSET64:$ptr, (i32 timm:$buf_id)))]>;
+
+}
 
 // Integer offsets for addressing
 let Uses = [SP] in {
@@ -326,10 +380,6 @@ defm NOT : NotMCReg<IL_OP_I_NOT, not, vnot>;
 
 def vineg : PatFrag<(ops node:$in), (sub immAllZerosV, node:$in)>;
 
-defm NEG : UnaryPatMCi8Scalar<IL_OP_I_NEGATE, ineg>;
-defm NEG : UnaryPatMCi8Vector<IL_OP_I_NEGATE, vineg>;
-defm NEG : UnaryPatMCi16Scalar<IL_OP_I_NEGATE, ineg>;
-defm NEG : UnaryPatMCi16Vector<IL_OP_I_NEGATE, vineg>;
 defm NEG : UnaryPatMCi32Scalar<IL_OP_I_NEGATE, ineg>;
 defm NEG : UnaryPatMCi32Vector<IL_OP_I_NEGATE, vineg>;
 defm NEG : UnaryPatMCi64Scalar<IL_OP_I64_NEGATE, ineg>;
@@ -358,16 +408,9 @@ defm FREXPf64 : UnaryIntMCFull<IL_OP_D_FREXP, int_AMDIL_frexp_f64,
                                f64imm, fpimm>;
 defm LDEXP : BinaryIntMCDDI<IL_OP_D_LDEXP, int_AMDIL_ldexp>;
 
-def MACRO__sdiv_i16 : BinaryMacro<GPRI16, GPRI16, GPRI16, sdiv>;
 def MACRO__sdiv_i32 : BinaryMacro<GPR_32, GPR_32, GPR_32, sdiv>;
-def MACRO__udiv_i8  : BinaryMacro< GPRI8, GPRI8, GPRI8, udiv>;
-def MACRO__udiv_i16 : BinaryMacro<GPRI16, GPRI16, GPRI16, udiv>;
 def MACRO__udiv_i32 : BinaryMacro<GPR_32, GPR_32, GPR_32, udiv>;
-def MACRO__smod_i8  : BinaryMacro< GPRI8, GPRI8, GPRI8, srem>;
-def MACRO__smod_i16 : BinaryMacro<GPRI16, GPRI16, GPRI16, srem>;
 def MACRO__smod_i32 : BinaryMacro<GPR_32, GPR_32, GPR_32, srem>;
-def MACRO__umod_i8  : BinaryMacro< GPRI8, GPRI8, GPRI8, urem>;
-def MACRO__umod_i16 : BinaryMacro<GPRI16, GPRI16, GPRI16, urem>;
 def MACRO__umod_i32 : BinaryMacro<GPR_32, GPR_32, GPR_32, urem>;
 
 let Predicates = [HasHWDDiv] in {
@@ -1049,21 +1092,21 @@ let Predicates = [HasCISupport] in {
     defm ROUND_ZERO : UnaryIntMCf64<IL_OP_DTRUNC, int_AMDIL_round_zero>;
 
     def UMAD6432 : ILFormat<IL_OP_MAD_U64_U32, (outs GPR_64:$dst),
-        (ins GPR_32:$src0, GPR_32:$src1, GPR_32:$src2),
+        (ins GPR_32:$src0, GPR_32:$src1, GPR_64:$src2),
         !strconcat(IL_OP_MAD_U64_U32.Text, " $dst, $src0, $src1, $src2"),
         [(set GPR_64:$dst,
-            (int_AMDIL_mad_u64_u32 GPR_32:$src0, GPR_32:$src1, GPR_32:$src2))]>;
+            (int_AMDIL_mad_u64_u32 GPR_32:$src0, GPR_32:$src1, GPR_64:$src2))]>;
     def SMAD6432 : ILFormat<IL_OP_MAD_I64_I32, (outs GPR_64:$dst),
-        (ins GPR_32:$src0, GPR_32:$src1, GPR_32:$src2),
+        (ins GPR_32:$src0, GPR_32:$src1, GPR_64:$src2),
         !strconcat(IL_OP_MAD_I64_I32.Text, " $dst, $src0, $src1, $src2"),
         [(set GPR_64:$dst,
-            (int_AMDIL_mad_i64_i32 GPR_32:$src0, GPR_32:$src1, GPR_32:$src2))]>;
+            (int_AMDIL_mad_i64_i32 GPR_32:$src0, GPR_32:$src1, GPR_64:$src2))]>;
 
     def MQSAD_i32i8: ILFormat<IL_OP_MQSAD_U32_U8, (outs GPRV4I32:$dst),
-        (ins GPRXYV2I32:$src0, GPR_X_32:$src1, GPRV4I8:$src2),
+        (ins GPRXYV2I32:$src0, GPR_X_32:$src1, GPRV4I32:$src2),
         !strconcat(IL_OP_MQSAD_U32_U8.Text, " $dst, $src0, $src1, $src2"),
         [(set GPRV4I32:$dst,
-            (int_AMDIL_media_mqsad_u32_u8 GPRXYV2I32:$src0, GPR_X_32:$src1, GPRV4I8:$src2))]>;
+            (int_AMDIL_media_mqsad_u32_u8 GPRXYV2I32:$src0, GPR_X_32:$src1, GPRV4I32:$src2))]>;
   }
 
   let Predicates = [Has64BitPtr], flat = 1, addr64 = 1 in {
@@ -1276,6 +1319,7 @@ let Predicates = [HasCrossThreadOps] in {
                                        int_AMDIL_readfirstlane,
                                        v4i32, GPRV4I32,
                                        v4i32, GPRV4I32, v4i32imm, imm>;
+    // FIXME: Need to handle v2i32 and v4i32 versions.
     defm RECEIVELANE : QuaternaryInst<IL_OP_RECEIVELANE,
                                       int_AMDIL_receivelane, i32,
                                       GPR_32, i32imm, imm>;

@@ -50,19 +50,13 @@
 
 #include "AMDILUtilityFunctions.h"
 #include "AMDILMachineFunctionInfo.h"
-#include "AMDILISelLowering.h"
 #include "AMDILCompilerErrors.h"
 #include "llvm/Constants.h"
-#include "llvm/DerivedTypes.h"
-#include "llvm/Instructions.h"
-#include "llvm/Instruction.h"
 #include "llvm/Type.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/ValueMap.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/CodeGen/MachineInstr.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/FormattedStream.h"
 
 #include <cstdio>
 #include <queue>
@@ -76,51 +70,12 @@ unsigned getVectorReg(unsigned Reg, const TargetRegisterInfo *TRI) {
   return Reg;
 }
 
-void printSDNode(const SDNode *Node) {
-  printf("Opcode: %d isTargetOpcode: %d isMachineOpcode: %d\n",
-      Node->getOpcode(), Node->isTargetOpcode(), Node->isMachineOpcode());
-  printf("Empty: %d OneUse: %d Size: %d NodeID: %d\n",
-      Node->use_empty(), Node->hasOneUse(), (int)Node->use_size(), Node->getNodeId());
-
-  for (unsigned I = 0, N = Node->getNumOperands(); I < N; ++I) {
-    printf("OperandNum: %d ValueCount: %d ValueType: %d\n",
-        I, Node->getNumValues(), Node->getValueType(0).getSimpleVT().SimpleTy);
-    printSDValue(Node->getOperand(I), 0);
-  }
-}
-
-void printSDValue(const SDValue &Op, int Level) {
-  dbgs() << "\nOp: " << &Op << '\n'
-         << " OpCode: " << Op.getOpcode() << '\n'
-         << " NumOperands: " << Op.getNumOperands() << '\n'
-         << " IsTarget: " << Op.isTargetOpcode() << '\n'
-         << " IsMachine: " << Op.isMachineOpcode() << '\n';
-
-  if (Op.isMachineOpcode()) {
-    dbgs() << "MachineOpcode: " << Op.getMachineOpcode() << '\n';
-  }
-
-  EVT VT = Op.getValueType();
-  dbgs() << "ValueType: " << VT.getSimpleVT().SimpleTy << '\n'
-         << "UseEmpty: " << Op.use_empty() << '\n'
-         << "OneUse: " << Op.hasOneUse() << '\n';
-
-  if (Level != 0) {
-    dbgs() << "Children for " << Level << ":\n";
-    for (unsigned I = 0, N = Op.getNumOperands(); I < N; ++I) {
-      dbgs() << "Child " << Level << "->" << I << ':';
-      printSDValue(Op.getOperand(I), Level - 1);
-    }
-  }
-}
-
 bool check_type(const Value *Ptr, unsigned AddrSpace) {
-  if (!Ptr) {
+  if (!Ptr)
     return false;
-  }
 
   Type *PtrType = Ptr->getType();
-  return dyn_cast<PointerType>(PtrType)->getAddressSpace() == AddrSpace;
+  return cast<PointerType>(PtrType)->getAddressSpace() == AddrSpace;
 }
 
 size_t getNumElements(Type *const T) {
@@ -295,7 +250,8 @@ bool isPtrLoadInst(const llvm::MachineInstr *MI) {
 }
 
 bool isSWSExtLoadInst(const llvm::MachineInstr *MI) {
-  return isPtrLoadInst(MI) && (MI->getDesc().TSFlags & (1ULL << AMDID::SWSEXTLD));
+  return false;
+//  return isPtrLoadInst(MI) && (MI->getDesc().TSFlags & (1ULL << AMDID::SWSEXTLD));
 }
 
 bool isExtLoadInst(const llvm::MachineInstr *MI) {
@@ -758,31 +714,16 @@ const char *getTypeName(Type *Ptr,
   return "unknown";
 }
 
-#if LLVM_VERSION < 3316
-bool isImageType(const Type *Ty, const TypeSymbolTable *SymTab) {
-  if (!isa<StructType>(Ty) && !isa<OpaqueType>(Ty)) {
-    return false;
-  }
-  const Type *i1d_type  = SymTab.lookup("struct._image1d_t");
-  const Type *i1da_type = SymTab.lookup("struct._image1d_array_t");
-  const Type *i1db_type = SymTab.lookup("struct._image1d_buffer_t");
-  const Type *i2d_type = SymTab.lookup( "struct._image2d_t" );
-  const Type *i2da_type = SymTab.lookup("struct._image2d_array_t");
-  const Type *i3d_type = SymTab.lookup( "struct._image3d_t" );
-  bool is_image = (Ty == i2d_type || Ty == i3d_type || Ty == i1d_type ||
-                   Ty == i1da_type || Ty == i1db_type || Ty == i2da_type);
-}
-#else
 bool isImageType(const Type *Ty) {
-  if (!isa<StructType>(Ty)) {
+  const StructType *ST = dyn_cast<StructType>(Ty);
+  if (!ST)
     return false;
-  }
-  const StructType *ST = cast<StructType>(Ty);
-  return ST->getName().startswith("struct._image1d_t") ||
-         ST->getName().startswith("struct._image1d_array_t") ||
-         ST->getName().startswith("struct._image1d_buffer_t") ||
-         ST->getName().startswith("struct._image2d_t") ||
-         ST->getName().startswith("struct._image2d_array_t") ||
-         ST->getName().startswith("struct._image3d_t");
-#endif
+
+  StringRef Name = ST->getName();
+  return Name.startswith("struct._image1d_t") ||
+         Name.startswith("struct._image1d_array_t") ||
+         Name.startswith("struct._image1d_buffer_t") ||
+         Name.startswith("struct._image2d_t") ||
+         Name.startswith("struct._image2d_array_t") ||
+         Name.startswith("struct._image3d_t");
 }

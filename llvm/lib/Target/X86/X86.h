@@ -47,6 +47,12 @@ FunctionPass *createCleanupLocalDynamicTLSPass();
 ///
 FunctionPass *createX86FloatingPointStackifierPass();
 
+/// createAMDX86AddrSpaceCastPass() - This function handle generic
+/// address builtins.
+#if 1 || defined(AMD_OPENCL)
+FunctionPass *createAMDX86AddrSpaceCastPass();
+#endif
+
 /// createX86IssueVZeroUpperPass - This pass inserts AVX vzeroupper instructions
 /// before each call to avoid transition penalty between functions encoded with
 /// AVX and SSE.

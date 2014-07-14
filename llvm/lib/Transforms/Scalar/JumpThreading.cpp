@@ -232,9 +232,7 @@ static unsigned getJumpThreadDuplicationCost(const BasicBlock *BB) {
 #if 1 || defined(AMD_OPENCL_BARRIER_CLONE)
     AMDLLVMContextHook *amdhook = static_cast<AMDLLVMContextHook*>(
     BB->getParent()->getContext().getAMDLLVMContextHook());
-    bool barrierCloneOk =
-      (amdhook && (amdhook->amdoptions.IsGPU ||
-                   amdhook->amdoptions.WGLevelExecution)) ? false : true;
+    bool barrierCloneOk = !amdhook || !amdhook->amdoptions.IsGPU;
 #endif
 
   // Sum up the cost of each instruction until we get to the terminator.  Don't

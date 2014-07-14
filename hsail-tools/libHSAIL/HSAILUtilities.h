@@ -66,6 +66,11 @@ struct SRef;
 
 void     setBrigProp(Inst inst, unsigned propId, unsigned val, bool ignoreErrors = false);
 unsigned getBrigProp(Inst inst, unsigned propId, bool ignoreErrors = false, unsigned defaultVal = 0);
+const char* validateProp(unsigned propId, unsigned val, unsigned* vals, unsigned length, unsigned model, unsigned profile);
+const char* validateProp(unsigned propId, unsigned val, unsigned model, unsigned profile, bool imageExt);
+const char* validateProp(Inst inst, unsigned propId, unsigned model, unsigned profile, bool imageExt);
+
+bool hasImageExtProps(Inst inst);     // checks opcode, type and operands
 
 //============================================================================
 // Operations with directives
@@ -90,8 +95,8 @@ unsigned   getSegment(Inst inst);
 unsigned   getPacking(Inst inst);
 unsigned   getEqClass(Inst inst);
 
-unsigned   getDefWidth(Inst inst, unsigned machineModel);
-unsigned   getDefRounding(Inst inst, unsigned machineModel);
+unsigned   getDefWidth(Inst inst, unsigned machineModel, unsigned profile);
+unsigned   getDefRounding(Inst inst, unsigned machineModel, unsigned profile);
 
 // This function returns type of the specified operand based on values of instruction fields 
 // and machineModel (BRIG_MACHINE_SMALL or BRIG_MACHINE_LARGE). 
@@ -103,7 +108,7 @@ unsigned   getDefRounding(Inst inst, unsigned machineModel);
 // - the specified operand is supported, but has no type (e.g. list of call arguments);
 // The returned value is BRIG_TYPE_INVALID in the following cases:
 // - type cannot be determined because of malformed instruction.
-unsigned   getOperandType(Inst inst, unsigned operandIdx, unsigned machineModel);
+unsigned   getOperandType(Inst inst, unsigned operandIdx, unsigned machineModel, unsigned profile);
 
 // This function may be used to validate instruction before requesting type of operands.
 // It returns 0 for properly formed instructions and a string containing an error
@@ -113,11 +118,11 @@ unsigned   getOperandType(Inst inst, unsigned operandIdx, unsigned machineModel)
 // For example, "masklane_b64 $d1, 1" has missing src type, as a result, 'getOperandType' will 
 // return NONE for 2d operand which will result in 'unexpected operand' message
 //
-const char* preValidateInst(Inst inst, unsigned machineModel);
+const char* preValidateInst(Inst inst, unsigned machineModel, unsigned profile);
 
 Inst appendInst(BrigContainer &container, unsigned instFormat);
 
-bool isImageInst(unsigned opcode);
+bool isImageInst(unsigned opcode);  // checks opcode only
 inline bool isGcnInst(unsigned opcode) { return (opcode & (1<<15))!=0; }
 
 //============================================================================
@@ -187,7 +192,6 @@ bool                isValidAlignment(unsigned align, unsigned type);
 // Misc operations
 
 const char* width2str(unsigned val);
-const char* memoryFenceSeg2str(unsigned arg);
 
 size_t     align(size_t s, size_t pow2);
 

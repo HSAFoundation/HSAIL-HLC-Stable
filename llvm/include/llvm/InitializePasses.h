@@ -274,6 +274,8 @@ void initializeMachineFunctionPrinterPassPass(PassRegistry&);
 #if 1 || defined(AMD_OPENCL)
 void initializeAMDDbgmovePass(PassRegistry&);
 void initializeAMDX86AdapterPass(PassRegistry&);
+void initializeAMDGenerateDevEnqMetadataPass(PassRegistry&);
+void initializeAMDLowerEnqueueKernelPass(PassRegistry&);
 void initializeAMDExternalPassPass(PassRegistry&);
 void initializeLivenessAnalysisPass(PassRegistry&);
 void initializeAMDLivenessPrinterPass(PassRegistry&);
@@ -289,8 +291,6 @@ void initializeAMDSimplifyLibCallsPass(PassRegistry&);
 void initializeAMDUseNativeCallsPass(PassRegistry&);
 void initializeOpenCLSymbolsAnalysisGroup(PassRegistry&);
 void initializeAMDOpenCLSymbolsPass(PassRegistry&);
-void initializeAMDWorkGroupLevelExecutionPass(PassRegistry&);
-void initializeAMDLowerThreadInfoBlockPass(PassRegistry&);
 void initializeAMDIL7XXIOExpansionPass(PassRegistry&);
 void initializeAMDILEGIOExpansionPass(PassRegistry&);
 void initializeAMDILSIIOExpansionPass(PassRegistry&);
@@ -319,7 +319,12 @@ void initializeAMDLocalArrayUsagePass(PassRegistry&);
 void initializeAMDEDGToIA64TranslatorPass(PassRegistry&);
 void initializeAMDLowerAtomicsPass(PassRegistry&);
 void initializeAMDLowerPipeBuiltinsPass(PassRegistry&);
+void initializeAMDLowerToPreciseBuiltinsPass(PassRegistry&);
 void initializeAMDILCreateKernelStubPass(PassRegistry&);
+
+void initializeAMDPrintfRuntimeBinding(PassRegistry&);
+void initializeHSAILPrintfRuntimeBindingKernArgPass(PassRegistry&);
+void initializeHSAILPrintfRuntimeBindingMetadataPass(PassRegistry&);
 
 void initializeHSAILUniformOperationsPass(PassRegistry&);
 void initializeHSAILControlDependencyAnalysisPass(PassRegistry&);
@@ -332,6 +337,8 @@ void initializeHSAILSyntaxCleanupPassPass(PassRegistry&);
 void initializeHSAILGlobalOffsetInsertionPassPass(PassRegistry&);
 void initializeHSAILFixSpecialIntrinsicsPass(PassRegistry&);
 void initializeHSAILLowerSPIRSamplersPass(PassRegistry&);
+void initializeHSAILNullPtrInsertionPass(PassRegistry&);
+void initializeHSAILInsertKernelIndexMetadataPass(PassRegistry&);
 #endif
 }
 

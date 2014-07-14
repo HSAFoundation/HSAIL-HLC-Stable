@@ -123,7 +123,6 @@ HSAILMachineFunctionInfo::HSAILMachineFunctionInfo()
   mGroupMemSize = -1;
   mArgSize = -1;
   mStackSize = -1;
-  hasStructByVal = false;
 }
 
 HSAILMachineFunctionInfo::HSAILMachineFunctionInfo(MachineFunction& MF)
@@ -155,7 +154,6 @@ HSAILMachineFunctionInfo::HSAILMachineFunctionInfo(MachineFunction& MF)
   mGroupMemSize = -1;
   mArgSize = -1;
   mStackSize = -1;
-  hasStructByVal = false;
 }
 
 HSAILMachineFunctionInfo::~HSAILMachineFunctionInfo()
@@ -164,18 +162,6 @@ HSAILMachineFunctionInfo::~HSAILMachineFunctionInfo()
       pfe = printf_end(); pfb != pfe; ++pfb) {
     delete pfb->second;
   }
-}
-
-
-bool 
-HSAILMachineFunctionInfo::getHasStructByVal() {
-  return hasStructByVal;
-
-}
-    
-void 
-HSAILMachineFunctionInfo::setHasStructByVal(bool b){
-  hasStructByVal = b;
 }
 
 unsigned int
@@ -727,14 +713,6 @@ HSAILMachineFunctionInfo::addMetadata(std::string md, bool kernelOnly)
   } else {
     mMetadataFunc.insert(md);
   }
-}
-
-size_t
-HSAILMachineFunctionInfo::get_num_write_images() 
-{
-  return write_image3d_size() + write_image2d_size() 
-    + write_image2d_array_size() + write_image1d_array_size()
-    + write_image1d_size() + write_image1d_buffer_size();
 }
 
 bool

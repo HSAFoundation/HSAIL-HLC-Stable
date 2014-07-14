@@ -2,6 +2,19 @@ LOCAL_PATH:= $(call my-dir)
 
 transforms_scalar_SRC_FILES := \
   ADCE.cpp \
+  AMDEDGToIA64Translator.cpp \
+  AMDGenerateDevEnqMetadata.cpp \
+  AMDLowerAtomics.cpp \
+  AMDLowerEnqueueKernel.cpp \
+  AMDLowerPipeBuiltins.cpp \
+  AMDLowerToPreciseBuiltins.cpp \
+  AMDMemCombine.cpp \
+  AMDPeephole.cpp \
+  AMDPrintfRuntimeBinding.cpp \
+  AMDScalarReplArrayElem.cpp \
+  AMDSimplifyLibCalls.cpp \
+  AMDVectorCoarsening.cpp \
+  AMDX86Adapter.cpp \
   BasicBlockPlacement.cpp \
   CodeGenPrepare.cpp \
   ConstantProp.cpp \
@@ -30,15 +43,10 @@ transforms_scalar_SRC_FILES := \
   ScalarReplAggregates.cpp \
   SimplifyCFGPass.cpp \
   Sink.cpp \
-  TailRecursionElimination.cpp \
   SimplifyLibCalls.cpp \
-  AMDMemCombine.cpp \
-  AMDScalarReplArrayElem.cpp \
-  AMDSimplifyLibCalls.cpp \
-  AMDVectorCoarsening.cpp \
   ObjCARC.cpp \
   SROA.cpp \
-  AMDPeephole.cpp
+  TailRecursionElimination.cpp \
 
 # For the host
 # =====================================================
@@ -51,9 +59,9 @@ LOCAL_MODULE:= AMDlibLLVMScalarOpts
 
 LOCAL_MODULE_TAGS := optional
 
-include $(LLVM_HOST_BUILD_MK)
-include $(LLVM_GEN_INTRINSICS_MK)
-include $(BUILD_HOST_STATIC_LIBRARY)
+#include $(LLVM_HOST_BUILD_MK)
+#include $(LLVM_GEN_INTRINSICS_MK)
+#include $(BUILD_HOST_STATIC_LIBRARY)
 
 # For the device
 # =====================================================
@@ -68,6 +76,12 @@ LOCAL_MODULE:= AMDlibLLVMScalarOpts
 ifeq ($(TARGET_ARCH),x86)
 LOCAL_CFLAGS += -O1
 endif
+
+LOCAL_CFLAGS += \
+	-D OPENCL_MAJOR=2 \
+	-D OPENCL_MINOR=0 \
+	-std=c++11 \
+	-nostdinc++
 
 LOCAL_MODULE_TAGS := optional
 

@@ -38,6 +38,32 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS WITH THE
 // SOFTWARE.
+inline bool instSupportsFtz(Brig::BrigOpcode16_t arg) {
+  using namespace Brig;
+  switch( arg ) {
+    case BRIG_OPCODE_ABS                : return true;
+    case BRIG_OPCODE_ADD                : return true;
+    case BRIG_OPCODE_CEIL               : return true;
+    case BRIG_OPCODE_CMP                : return true;
+    case BRIG_OPCODE_COPYSIGN           : return true;
+    case BRIG_OPCODE_CVT                : return true;
+    case BRIG_OPCODE_DIV                : return true;
+    case BRIG_OPCODE_FLOOR              : return true;
+    case BRIG_OPCODE_FMA                : return true;
+    case BRIG_OPCODE_FRACT              : return true;
+    case BRIG_OPCODE_MAX                : return true;
+    case BRIG_OPCODE_MIN                : return true;
+    case BRIG_OPCODE_MUL                : return true;
+    case BRIG_OPCODE_MULHI              : return true;
+    case BRIG_OPCODE_NEG                : return true;
+    case BRIG_OPCODE_RINT               : return true;
+    case BRIG_OPCODE_SQRT               : return true;
+    case BRIG_OPCODE_SUB                : return true;
+    case BRIG_OPCODE_TRUNC              : return true;
+    default : return false;
+    }
+}
+
 template <typename RetType, typename Visitor> RetType visitOpcode_gen(HSAIL_ASM::Inst inst, Visitor& vis) {
   using namespace Brig;
   switch( inst.opcode() ) {
@@ -52,8 +78,6 @@ template <typename RetType, typename Visitor> RetType visitOpcode_gen(HSAIL_ASM:
     case BRIG_OPCODE_AND                : return vis.template visitOpcode<BRIG_OPCODE_AND>                   (HSAIL_ASM::InstBasic(inst));
     case BRIG_OPCODE_ARRIVEFBAR         : return vis.template visitOpcode<BRIG_OPCODE_ARRIVEFBAR>            (HSAIL_ASM::InstBr(inst));
     case BRIG_OPCODE_ATOMIC             : return vis.template visitOpcode<BRIG_OPCODE_ATOMIC>                (HSAIL_ASM::InstAtomic(inst));
-    case BRIG_OPCODE_ATOMICIMAGE        : return vis.template visitOpcode<BRIG_OPCODE_ATOMICIMAGE>           (HSAIL_ASM::InstAtomicImage(inst));
-    case BRIG_OPCODE_ATOMICIMAGENORET   : return vis.template visitOpcode<BRIG_OPCODE_ATOMICIMAGENORET>      (HSAIL_ASM::InstAtomicImage(inst));
     case BRIG_OPCODE_ATOMICNORET        : return vis.template visitOpcode<BRIG_OPCODE_ATOMICNORET>           (HSAIL_ASM::InstAtomic(inst));
     case BRIG_OPCODE_BARRIER            : return vis.template visitOpcode<BRIG_OPCODE_BARRIER>               (HSAIL_ASM::InstBr(inst));
     case BRIG_OPCODE_BITALIGN           : return vis.template visitOpcode<BRIG_OPCODE_BITALIGN>              (HSAIL_ASM::InstBasic(inst));
@@ -166,15 +190,8 @@ template <typename RetType, typename Visitor> RetType visitOpcode_gen(HSAIL_ASM:
     case BRIG_OPCODE_PACKETCOMPLETIONSIG : return vis.template visitOpcode<BRIG_OPCODE_PACKETCOMPLETIONSIG>   (HSAIL_ASM::InstBasic(inst));
     case BRIG_OPCODE_PACKETID           : return vis.template visitOpcode<BRIG_OPCODE_PACKETID>              (HSAIL_ASM::InstBasic(inst));
     case BRIG_OPCODE_POPCOUNT           : return vis.template visitOpcode<BRIG_OPCODE_POPCOUNT>              (HSAIL_ASM::InstSourceType(inst));
-    case BRIG_OPCODE_QUERYIMAGEARRAY    : return vis.template visitOpcode<BRIG_OPCODE_QUERYIMAGEARRAY>       (HSAIL_ASM::InstSourceType(inst));
-    case BRIG_OPCODE_QUERYIMAGEDEPTH    : return vis.template visitOpcode<BRIG_OPCODE_QUERYIMAGEDEPTH>       (HSAIL_ASM::InstSourceType(inst));
-    case BRIG_OPCODE_QUERYIMAGEFORMAT   : return vis.template visitOpcode<BRIG_OPCODE_QUERYIMAGEFORMAT>      (HSAIL_ASM::InstSourceType(inst));
-    case BRIG_OPCODE_QUERYIMAGEHEIGHT   : return vis.template visitOpcode<BRIG_OPCODE_QUERYIMAGEHEIGHT>      (HSAIL_ASM::InstSourceType(inst));
-    case BRIG_OPCODE_QUERYIMAGEORDER    : return vis.template visitOpcode<BRIG_OPCODE_QUERYIMAGEORDER>       (HSAIL_ASM::InstSourceType(inst));
-    case BRIG_OPCODE_QUERYIMAGEWIDTH    : return vis.template visitOpcode<BRIG_OPCODE_QUERYIMAGEWIDTH>       (HSAIL_ASM::InstSourceType(inst));
-    case BRIG_OPCODE_QUERYSAMPLERBOUNDARY : return vis.template visitOpcode<BRIG_OPCODE_QUERYSAMPLERBOUNDARY>  (HSAIL_ASM::InstSourceType(inst));
-    case BRIG_OPCODE_QUERYSAMPLERCOORD  : return vis.template visitOpcode<BRIG_OPCODE_QUERYSAMPLERCOORD>     (HSAIL_ASM::InstSourceType(inst));
-    case BRIG_OPCODE_QUERYSAMPLERFILTER : return vis.template visitOpcode<BRIG_OPCODE_QUERYSAMPLERFILTER>    (HSAIL_ASM::InstSourceType(inst));
+    case BRIG_OPCODE_QUERYIMAGE         : return vis.template visitOpcode<BRIG_OPCODE_QUERYIMAGE>            (HSAIL_ASM::InstQueryImage(inst));
+    case BRIG_OPCODE_QUERYSAMPLER       : return vis.template visitOpcode<BRIG_OPCODE_QUERYSAMPLER>          (HSAIL_ASM::InstQuerySampler(inst));
     case BRIG_OPCODE_QUEUEID            : return vis.template visitOpcode<BRIG_OPCODE_QUEUEID>               (HSAIL_ASM::InstBasic(inst));
     case BRIG_OPCODE_QUEUEPTR           : return vis.template visitOpcode<BRIG_OPCODE_QUEUEPTR>              (HSAIL_ASM::InstSeg(inst));
     case BRIG_OPCODE_RDIMAGE            : return vis.template visitOpcode<BRIG_OPCODE_RDIMAGE>               (HSAIL_ASM::InstImage(inst));
@@ -215,32 +232,6 @@ template <typename RetType, typename Visitor> RetType visitOpcode_gen(HSAIL_ASM:
     case BRIG_OPCODE_WORKITEMID         : return vis.template visitOpcode<BRIG_OPCODE_WORKITEMID>            (HSAIL_ASM::InstBasic(inst));
     case BRIG_OPCODE_XOR                : return vis.template visitOpcode<BRIG_OPCODE_XOR>                   (HSAIL_ASM::InstBasic(inst));
     default : return RetType();
-    }
-}
-
-inline bool instSupportsFtz(Brig::BrigOpcode16_t arg) {
-  using namespace Brig;
-  switch( arg ) {
-    case BRIG_OPCODE_ABS                : return true;
-    case BRIG_OPCODE_ADD                : return true;
-    case BRIG_OPCODE_CEIL               : return true;
-    case BRIG_OPCODE_CMP                : return true;
-    case BRIG_OPCODE_COPYSIGN           : return true;
-    case BRIG_OPCODE_CVT                : return true;
-    case BRIG_OPCODE_DIV                : return true;
-    case BRIG_OPCODE_FLOOR              : return true;
-    case BRIG_OPCODE_FMA                : return true;
-    case BRIG_OPCODE_FRACT              : return true;
-    case BRIG_OPCODE_MAX                : return true;
-    case BRIG_OPCODE_MIN                : return true;
-    case BRIG_OPCODE_MUL                : return true;
-    case BRIG_OPCODE_MULHI              : return true;
-    case BRIG_OPCODE_NEG                : return true;
-    case BRIG_OPCODE_RINT               : return true;
-    case BRIG_OPCODE_SQRT               : return true;
-    case BRIG_OPCODE_SUB                : return true;
-    case BRIG_OPCODE_TRUNC              : return true;
-    default : return false;
     }
 }
 

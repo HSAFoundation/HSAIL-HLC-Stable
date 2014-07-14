@@ -181,16 +181,6 @@ bool AMDILLiteralManager::trackLiterals(MachineBasicBlock::iterator *BBB) {
             ? mMFI->addi64Literal(ImmVal)
             : mMFI->addi32Literal(static_cast<int>(ImmVal));
           break;
-        case AMDIL::GPRI8RegClassID:
-        case AMDIL::GPRV2I8RegClassID:
-        case AMDIL::GPRV4I8RegClassID:
-          Idx = mMFI->addi32Literal(static_cast<int>(ImmVal), AMDIL::LOADCONSTi8);
-          break;
-        case AMDIL::GPRI16RegClassID:
-        case AMDIL::GPRV2I16RegClassID:
-        case AMDIL::GPRV4I16RegClassID:
-          Idx = mMFI->addi32Literal(static_cast<int>(ImmVal), AMDIL::LOADCONSTi16);
-          break;
         case AMDIL::GPR_32RegClassID:
         case AMDIL::GPRV2I32RegClassID:
         case AMDIL::GPRV4I32RegClassID:

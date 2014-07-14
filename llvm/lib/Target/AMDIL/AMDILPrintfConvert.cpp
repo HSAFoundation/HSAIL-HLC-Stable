@@ -202,7 +202,7 @@ AMDILPrintfConvert::expandPrintf(BasicBlock::iterator *bbb)
         bytes = str.size();
         for (uint32_t x = 1, y = num_ops; x < y; ++x) {
             Type *oType = CI->getOperand(x)->getType();
-            uint64_t Size = DL->getTypeSizeInBits(oType);
+            uint64_t Size = DL->getTypeAllocSizeInBits(oType);
             assert(Size && "empty size");
             mMFI->addPrintfOperand(str, x - 1, (uint32_t)Size);
         }
@@ -223,15 +223,15 @@ AMDILPrintfConvert::expandPrintf(BasicBlock::iterator *bbb)
             sprintf(buffer, "___dumpBytes_v1bs");
           }
           else {
-            uint64_t Size = DL->getTypeSizeInBits(oType);
+            uint64_t Size = DL->getTypeAllocSizeInBits(oType);
             assert((Size == 32 || Size == 64) && "unsupported size");
             Type* DstType = (Size == 32) ? Int32Ty : Int64Ty;
             op = new PtrToIntInst(op, DstType, "printfPtrCast", CI);
           }
-        } else if (oType->getTypeID() == Type::VectorTyID) {
-            Type *iType = NULL;
-            uint32_t eleCount = getNumElements(oType);
-            uint32_t eleSize = oType->getScalarSizeInBits();
+        } else if (VectorType *VT = dyn_cast<VectorType>(oType)) {
+            Type *iType = nullptr;
+            uint32_t eleCount = VT->getVectorNumElements();
+            uint32_t eleSize = VT->getScalarSizeInBits();
             uint32_t totalSize = eleCount * eleSize;
             if (eleCount == 3) {
                 IntegerType *int32ty = Type::getInt32Ty(oType->getContext());
@@ -288,7 +288,7 @@ AMDILPrintfConvert::expandPrintf(BasicBlock::iterator *bbb)
             op = new BitCastInst(op, iType, "printfBitCast", CI);
         }
         if (buffer[0] == '\0') {
-          Size = DL->getTypeSizeInBits(oType);
+          Size = DL->getTypeAllocSizeInBits(oType);
           assert(Size && "empty size");
           sprintf(buffer, "___dumpBytes_v1b%u", (uint32_t)Size);
         }

@@ -23,10 +23,6 @@ def private_load : PatFrag<(ops node:$ptr),
                    (load node:$ptr),
                    [{return isPrivateLoad(dyn_cast<LoadSDNode>(N));}]>;
 
-def load_from_struct : PatFrag<(ops node:$ptr),
-                   (load node:$ptr),
-                   [{return isLoadFromStructByVal(dyn_cast<LoadSDNode>(N));}]>;
-
 def spill_load : PatFrag<(ops node:$ptr),
                    (load node:$ptr),
                    [{return isSpillLoad(dyn_cast<LoadSDNode>(N));}]>;
@@ -34,6 +30,14 @@ def spill_load : PatFrag<(ops node:$ptr),
 def group_load : PatFrag<(ops node:$ptr),
                  (load node:$ptr),
                  [{return isGroupLoad(dyn_cast<LoadSDNode>(N));}]>;
+
+def kernarg_load : PatFrag<(ops node:$ptr),
+                 (load node:$ptr),
+                 [{return isKernargLoad(dyn_cast<LoadSDNode>(N));}]>;
+
+def arg_load     : PatFrag<(ops node:$ptr),
+                 (load node:$ptr),
+                 [{return isArgLoad(dyn_cast<LoadSDNode>(N));}]>;
 
 def flat_store : PatFrag<(ops node:$val, node:$ptr),
                    (store node:$val, node:$ptr),
@@ -55,9 +59,9 @@ def group_store : PatFrag<(ops node:$val, node:$ptr),
                   (store node:$val, node:$ptr),
                   [{return isGroupStore(dyn_cast<StoreSDNode>(N));}]>;
 
-def store_to_struct : PatFrag<(ops node:$val, node:$ptr),
-                   (store node:$val, node:$ptr),
-                   [{return isStoreToStructByVal(dyn_cast<StoreSDNode>(N));}]>;
+def arg_store : PatFrag<(ops node:$val, node:$ptr),
+                  (store node:$val, node:$ptr),
+                  [{return isArgStore(dyn_cast<StoreSDNode>(N));}]>;
 
 // Extending loads
 multiclass ExtLoadPat<PatFrag extloadpat> {
@@ -80,6 +84,14 @@ multiclass ExtLoadPat<PatFrag extloadpat> {
   def _private  : PatFrag<(ops node:$ptr), 
                           (extloadpat node:$ptr),
                           [{return isPrivateLoad(dyn_cast<LoadSDNode>(N));}]>;
+
+  def _kernarg  : PatFrag<(ops node:$ptr),
+                          (extloadpat node:$ptr),
+                          [{return isKernargLoad(dyn_cast<LoadSDNode>(N));}]>;
+
+  def _arg      : PatFrag<(ops node:$ptr),
+                          (extloadpat node:$ptr),
+                          [{return isArgLoad(dyn_cast<LoadSDNode>(N));}]>;
 
   def _spill  : PatFrag<(ops node:$ptr), 
                           (extloadpat node:$ptr),
@@ -117,6 +129,10 @@ multiclass TruncStorePat<PatFrag truncstorepat> {
   def _spill   : PatFrag<(ops node:$val, node:$ptr),
                          (truncstorepat node:$val, node:$ptr),
                          [{return isSpillStore(dyn_cast<StoreSDNode>(N));}]>;
+
+  def _arg     : PatFrag<(ops node:$val, node:$ptr),
+                         (truncstorepat node:$val, node:$ptr),
+                         [{return isArgStore(dyn_cast<StoreSDNode>(N));}]>;
 }
 
 defm truncstorei8  : TruncStorePat<truncstorei8>;

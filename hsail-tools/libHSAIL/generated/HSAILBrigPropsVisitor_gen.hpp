@@ -70,20 +70,6 @@ void visitBrigProps(Inst inst)
         }
         break;
 
-        case BRIG_INST_ATOMIC_IMAGE:
-        {
-            InstAtomicImage it = inst;
-        
-            visitProp(inst, PROP_OPCODE, it.opcode());
-            visitProp(inst, PROP_TYPE, it.type());
-            visitProp(inst, PROP_IMAGETYPE, it.imageType());
-            visitProp(inst, PROP_COORDTYPE, it.coordType());
-            visitProp(inst, PROP_GEOMETRY, it.geometry());
-            visitProp(inst, PROP_ATOMICOPERATION, it.atomicOperation());
-            visitProp(inst, PROP_EQUIVCLASS, it.equivClass());
-        }
-        break;
-
         case BRIG_INST_BASIC:
         {
             InstBasic it = inst;
@@ -188,6 +174,28 @@ void visitBrigProps(Inst inst)
             visitProp(inst, PROP_ROUND, it.modifier().round());
             visitProp(inst, PROP_FTZ, it.modifier().ftz());
             visitProp(inst, PROP_PACK, it.pack());
+        }
+        break;
+
+        case BRIG_INST_QUERY_IMAGE:
+        {
+            InstQueryImage it = inst;
+        
+            visitProp(inst, PROP_OPCODE, it.opcode());
+            visitProp(inst, PROP_TYPE, it.type());
+            visitProp(inst, PROP_IMAGETYPE, it.imageType());
+            visitProp(inst, PROP_GEOMETRY, it.geometry());
+            visitProp(inst, PROP_IMAGEQUERY, it.imageQuery());
+        }
+        break;
+
+        case BRIG_INST_QUERY_SAMPLER:
+        {
+            InstQuerySampler it = inst;
+        
+            visitProp(inst, PROP_OPCODE, it.opcode());
+            visitProp(inst, PROP_TYPE, it.type());
+            visitProp(inst, PROP_SAMPLERQUERY, it.samplerQuery());
         }
         break;
 

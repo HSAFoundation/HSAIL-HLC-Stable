@@ -17,5 +17,9 @@ SUBDIRS = \
 
 ifeq ($(BUILD_HSA_TARGET),yes)
      SUBDIRS+= llvm-dwarfdump inflate
+else
+  ifeq ($(call gte,$(OPENCL_VERSION),200),$(true))
+     SUBDIRS+= llvm-dwarfdump inflate
+  endif
 endif
 include $(LLVM_DEPTH)/llvmrules

@@ -58,5 +58,7 @@ OpaqueType llvm::GetOpaqueType(const Type *T)
     .Case("struct._counter32_t", C32)
     .Case("struct._counter64_t", C64)
     .Case("struct._sema_t", Sema)
+    .Case("opencl.reserve_id_t",ReserveId)
+    .Case("opencl.clk_event_t", CLKEventT)
     .Default(UnknownOpaque);
 }

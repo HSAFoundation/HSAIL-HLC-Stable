@@ -13,9 +13,7 @@ TARGET = HSAIL
 
 # Make sure that tblgen is run, first thing.
 BUILT_SOURCES = HSAILGenAsmMatcher.inc \
-                HSAILGenAsmWriter.inc \
                 HSAILGenBrigWriter.inc \
-                HSAILGenCallingConv.inc \
                 HSAILGenDAGISel.inc \
                 HSAILGenEDInfo.inc \
                 HSAILGenFastISel.inc \
@@ -28,6 +26,6 @@ BUILT_SOURCES = HSAILGenAsmMatcher.inc \
                 HSAILGenSubtarget.inc \
                 HSAILGenVecMap.inc
 
-DIRS = InstPrinter TargetInfo AsmParser Disassembler
+DIRS = TargetInfo
 
 include $(LEVEL)/Makefile.common

@@ -60,9 +60,9 @@ LOCAL_MODULE_TAGS := optional
 LOCAL_SRC_FILES := $(libhsail_SRC_FILES)
 intermediates := $(call local-intermediates-dir)
 
-include $(LLVM_HOST_BUILD_MK)
-include $(LLVM_GEN_INTRINSICS_MK)
-include $(BUILD_HOST_STATIC_LIBRARY)
+#include $(LLVM_HOST_BUILD_MK)
+#include $(LLVM_GEN_INTRINSICS_MK)
+#include $(BUILD_HOST_STATIC_LIBRARY)
 DK := $(DK_ROOT)
 COMPILER := $(LLVM_ROOT_PATH)/..
 HOSTSTATIC := $(TOP)/out/host/linux-x86/obj/STATIC_LIBRARIES
@@ -73,5 +73,27 @@ $(addprefix $(intermediates)/,HSAILTemplateUtilities_gen.hpp):$(COMPILER)/hsail-
 	$(DK)/perl/5.16.1/bin/perl -I "$(PERLLIB)" $(COMPILER)/hsail-tools/libHSAIL/generate.pl --dk=$(DK) $(COMPILER)/hsail-tools/libHSAIL $(HOSTSTATIC)/LIBHSAIL_intermediates
 	#$(DK)/perl/5.16.1/bin/perl-static -I "$(PERLLIB)" $(COMPILER)/hsail-tools/libHSAIL/HDLProcessor.pl -target=validator <$(COMPILER)/hsail-tools/libHSAIL/HSAILBrigInstr.hdl >$(HOSTSTATIC)/libloader_intermediates/HSAILInstValidation_gen.hpp.tmp
 
+# For the device
+# =====================================================
+include $(CLEAR_VARS)
+
+LOCAL_MODULE_CLASS := STATIC_LIBRARIES
+LOCAL_MODULE:= LIBHSAIL
+LOCAL_MODULE_TAGS := optional
+LOCAL_SRC_FILES := $(libhsail_SRC_FILES)
+intermediates := $(call local-intermediates-dir)
+
+include $(LLVM_DEVICE_BUILD_MK)
+include $(LLVM_GEN_INTRINSICS_MK)
+include $(BUILD_STATIC_LIBRARY)
+DK := $(DK_ROOT)
+COMPILER := $(LLVM_ROOT_PATH)/..
+STATIC := $(TOP)/out/debug/target/product/prototype/obj/STATIC_LIBRARIES
+PERLLIB := $(DK_ROOT)/perl/5.16.1/lib
+
+$(addprefix $(intermediates)/, HSAILBrigantine.o):$(addprefix $(intermediates)/,HSAILTemplateUtilities_gen.hpp)
+$(addprefix $(intermediates)/,HSAILTemplateUtilities_gen.hpp):$(COMPILER)/hsail-tools/libHSAIL/generate.pl $(COMPILER)/hsail-tools/libHSAIL/HDLProcessor.pl
+	$(DK)/perl/5.16.1/bin/perl -I "$(PERLLIB)" $(COMPILER)/hsail-tools/libHSAIL/generate.pl --dk=$(DK) $(COMPILER)/hsail-tools/libHSAIL $(STATIC)/LIBHSAIL_intermediates
+	#$(DK)/perl/5.16.1/bin/perl-static -I "$(PERLLIB)" $(COMPILER)/hsail-tools/libHSAIL/HDLProcessor.pl -target=validator <$(COMPILER)/hsail-tools/libHSAIL/HSAILBrigInstr.hdl >$(STATIC)/libloader_intermediates/HSAILInstValidation_gen.hpp.tmp
 
 

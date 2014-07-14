@@ -62,10 +62,62 @@ static void CheckSPIRVersion(const Module *M,
   }
 }
 
-#if 0
-static void addAdaptersForClang(PassManager &Passes,
-                                StringRef TargetTripleStr,
-                                Module *M) {
+static void runAdapters(llvm::Module *M,
+                        llvm::StringRef TargetTripleStr,
+                        llvm::StringRef TargetLayoutStr,
+                        bool RunSPIRLoader,
+                        bool DemangleBuiltins,
+                        bool RunEDGAdapter,
+                        bool SetSPIRCallingConv,
+                        bool RunX86Adapter,
+                        bool RunPrintfRuntimeBinding,
+                        bool RunPrintfCpuLowering,
+                        bool RunLowerEnqueueKernel,
+                        bool RunGenDevEnqMetadata) {
+
+  M->setTargetTriple(TargetTripleStr);
+  M->setDataLayout(TargetLayoutStr);
+
+  PassManager Passes;
+  Passes.add(new DataLayout(M));
+
+  if (RunPrintfRuntimeBinding == true || RunPrintfCpuLowering == true)
+    Passes.add(llvm::createAMDPrintfRuntimeBinding(RunPrintfCpuLowering));
+
+  Passes.add(createAMDLowerAtomicsPass());
+  Passes.add(createAMDLowerPipeBuiltinsPass());
+
+  if (RunEDGAdapter) {
+    assert(!RunSPIRLoader);
+    Passes.add(createAMDEDGToIA64TranslatorPass(SetSPIRCallingConv));
+  }
+
+  if (RunSPIRLoader) {
+    assert(!RunEDGAdapter);
+    Passes.add(createSPIRLoader(DemangleBuiltins));
+  }
+
+  if (RunX86Adapter) {
+    //One of them should run before the AMDX86Adapter Pass.
+    assert(RunSPIRLoader || RunEDGAdapter);
+    Passes.add(llvm::createAMDX86AdapterPass());
+  }
+
+  if (RunLowerEnqueueKernel) {
+    Passes.add(llvm::createAMDLowerEnqueueKernelPass());
+  }
+
+  if (RunGenDevEnqMetadata) {
+    Passes.add(llvm::createAMDGenerateDevEnqMetadataPass());
+  }
+
+  Passes.run(*M);
+}
+
+namespace llvm {
+
+void fixUpModule(Module *M, StringRef TargetTripleStr,
+                 StringRef TargetLayoutStr) {
 
   // We need to fix-up the kernel module so that it matches the
   // builtin library.
@@ -81,7 +133,12 @@ static void addAdaptersForClang(PassManager &Passes,
   bool RunEDGAdapter = false;       // EDG      -> x86/HSAIL
   bool SetSPIRCallingConv = false;  // EDG      -> HSAIL
   bool RunX86Adapter = false;       // SPIR/EDG -> x86
+  bool RunLowerEnqueueKernel = false;
+  bool RunPrintfRuntimeBinding = false;
+  bool RunPrintfCpuLowering = false;
+  bool RunGenDevEnqMetadata = false;
 
+  assert(!TargetTripleStr.empty());
   Triple TargetTriple(TargetTripleStr);
   Triple ModuleTriple(M->getTargetTriple());
 
@@ -93,9 +150,7 @@ static void addAdaptersForClang(PassManager &Passes,
 #ifdef BUILD_HSA_TARGET // special case for HSA build
     DemangleBuiltins |= isHSAILTriple(TargetTriple);
 #endif
-#ifndef BUILD_X86_WITH_CLANG // this will go away
-    DemangleBuiltins |= isX86Triple(TargetTriple);
-#endif
+    // Never demangle for x86 target on 200 build.
 #else // OpenCL 1.2 build (this will go away)
     DemangleBuiltins = true;
 #endif
@@ -106,67 +161,50 @@ static void addAdaptersForClang(PassManager &Passes,
     // FIXME: Remove the #ifdef when x86 and HSAIL libraries are
     // always built by Clang.
 #ifndef BUILD_HSA_TARGET
-    // Run the adapter for HSAIL only if this is an Orca build!
+    // Run the adapter for HSAIL only if this is an ORCA build!
     //
     // On an HSA build, the HSAIL library is always built with EDG.
     // This assumption must match the settings in
     // "opencl/library/hsa/hsail/build/Makefile.hsail"
     RunEDGAdapter |= isHSAILTriple(TargetTriple);
 #endif
-
-#ifdef BUILD_X86_WITH_CLANG
-    // FIXME: Remove the #ifdef when x86 is always built by Clang.
-    RunEDGAdapter |= isX86Triple(TargetTriple);
-#endif
-
     // HSAIL requires SPIR calling conventions since the library is in
     // SPIR format. This doesn't matter if the EDGAdapter is not run.
     SetSPIRCallingConv = isHSAILTriple(TargetTriple);
+
+    // Run the EDG Adapter if OPENCL_MAJOR >= 2 and for x86 target.
+    RunEDGAdapter |= isX86Triple(TargetTriple);
 #endif // OPENCL_MAJOR >= 2
   }
 
-// It should run for both EDG generated LLVM IR and SPIR for x86 path.
-// FIXME: Remove the #ifdef when x86 is always built by Clang.
-#ifdef BUILD_X86_WITH_CLANG
+// FIXME: RunX86Adapter bool should be removed when x86 builtins
+// is always built by Clang on OpenCL 1.2 builds.
+#if OPENCL_MAJOR >= 2
   RunX86Adapter = isX86Triple(TargetTriple);
+  RunLowerEnqueueKernel = isSPIRTriple(ModuleTriple);
+  // Printf is bound to a buffer
+  // for OpenCL2.0 when compiled with the 
+  // HSAIL target triple.
+  // Check for OpenCL2.0 version
+  // is inside the printf lowering
+  // pass.
+  // For X86, printf formats are 
+  // lowered for opencl vector
+  // formats.
+  if (isHSAILTriple(TargetTriple)) {
+    RunPrintfRuntimeBinding = true;
+  } else if (isX86Triple(TargetTriple)) {
+    RunPrintfCpuLowering = true;
+  }
+  RunGenDevEnqMetadata = isHSAILTriple(TargetTriple);
 #endif
 
-  if (RunEDGAdapter) {
-    assert(!RunSPIRLoader);
-    Passes.add(createAMDEDGToIA64TranslatorPass(SetSPIRCallingConv));
-  }
-
-  if (RunSPIRLoader) {
-    assert(!RunEDGAdapter);
-    Passes.add(createSPIRLoader(TargetTripleStr, DemangleBuiltins));
-  }
-
-  if (RunX86Adapter) {
-    //One of them should run before the AMDX86Adapter Pass.
-    assert(RunSPIRLoader || RunEDGAdapter);
-    Passes.add(llvm::createAMDX86AdapterPass());
-  }
-}
-#endif
-
-namespace llvm {
-
-void fixUpModule(Module *M, StringRef TargetTripleStr)
-{
-  PassManager Passes;
-  // Create the datalayout only because PassManager complains. It is
-  // not used in this set of passes. The source of this datalayout
-  // does not matter. The SPIRLoader will always change the triple to
-  // match the target.
-  Passes.add(new DataLayout(M));
-  Passes.add(createAMDLowerAtomicsPass());
-  Passes.add(createAMDLowerPipeBuiltinsPass());
-
-  assert(!TargetTripleStr.empty());
-
-  //addAdaptersForClang(Passes, TargetTripleStr, M);
-
-  Passes.run(*M);
+  runAdapters(M, TargetTripleStr, TargetLayoutStr,
+              RunSPIRLoader, DemangleBuiltins,
+              RunEDGAdapter, SetSPIRCallingConv,
+              RunX86Adapter, RunPrintfRuntimeBinding,
+              RunPrintfCpuLowering, RunLowerEnqueueKernel,
+              RunGenDevEnqMetadata);
 }
 
 } // end namespace llvm

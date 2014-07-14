@@ -65,7 +65,8 @@ public:
   /// thus cannot be deleted.
   ///
   static bool isReservedFunctionName(const StringRef FunctionName) {
-    if (FunctionName.startswith("___") || FunctionName.startswith("llvm.")) {
+    if (FunctionName.startswith("___") || FunctionName.startswith("llvm.") ||
+        FunctionName.startswith("__amdrt_")) {
       return true;
     }
     return false;

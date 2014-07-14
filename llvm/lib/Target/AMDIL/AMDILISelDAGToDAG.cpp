@@ -84,6 +84,11 @@ public:
 
   SDNode *Select(SDNode *N);
   // Complex pattern selectors
+
+  bool SelectGlobalValueConstantOffset(SDValue Addr, SDValue &IntPtr);
+  bool SelectGlobalValueVariableOffset(SDValue Addr, SDValue &BaseReg,
+                                       SDValue &Offset);
+
   bool SelectADDR(SDValue N, SDValue &R1);
   bool SelectADDR64(SDValue N, SDValue &R1);
 
@@ -121,6 +126,27 @@ FunctionPass *llvm::createAMDILISelDag(AMDILTargetMachine &TM,
 
 SDValue AMDILDAGToDAGISel::getSmallIPtrImm(unsigned int Imm) {
   return CurDAG->getTargetConstant(Imm, MVT::i32);
+}
+
+bool AMDILDAGToDAGISel::SelectGlobalValueConstantOffset(SDValue Addr,
+                                                        SDValue &IntPtr) {
+  if (ConstantSDNode *Cst = dyn_cast<ConstantSDNode>(Addr)) {
+    IntPtr = CurDAG->getIntPtrConstant(Cst->getZExtValue(), true);
+    return true;
+  }
+
+  return false;
+}
+
+bool AMDILDAGToDAGISel::SelectGlobalValueVariableOffset(SDValue Addr,
+                                                        SDValue &BaseReg,
+                                                        SDValue &Offset) {
+  if (!isa<ConstantSDNode>(Addr)) {
+    BaseReg = Addr;
+    Offset = CurDAG->getIntPtrConstant(0, true);
+    return true;
+  }
+  return false;
 }
 
 bool AMDILDAGToDAGISel::SelectADDR(SDValue Addr, SDValue& R1) {
@@ -189,6 +215,20 @@ SDNode *AMDILDAGToDAGISel::Select(SDNode *N) {
     AMDILMachineFunctionInfo *MFI = MF->getInfo<AMDILMachineFunctionInfo>();
     MFI->setOutputInst();
   }
+
+  if (Opc == ISD::BUILD_PAIR) {
+    EVT VT = N->getValueType(0);
+    assert(VT == MVT::i64 && "Not implemented");
+
+    // FIXME: Use INSERT_SUBREG, and this should be a pattern.
+    SDValue LCreate = CurDAG->getNode(AMDILISD::LCREATE,
+                                      N->getDebugLoc(),
+                                      MVT::i64,
+                                      N->getOperand(0),
+                                      N->getOperand(1));
+    return SelectCode(LCreate.getNode());
+  }
+
   return SelectCode(N);
 }
 
@@ -299,12 +339,13 @@ bool AMDILDAGToDAGISel::isPrivateLoad(const LoadSDNode *N) const {
       return false;
     }
   }
-  if (!check_type(N->getSrcValue(), AMDILAS::LOCAL_ADDRESS)
-      && !check_type(N->getSrcValue(), AMDILAS::GLOBAL_ADDRESS)
-      && !check_type(N->getSrcValue(), AMDILAS::REGION_ADDRESS)
-      && !check_type(N->getSrcValue(), AMDILAS::CONSTANT_ADDRESS)
-      && !isFlatASOverrideEnabled())
-  {
+  if (!check_type(N->getSrcValue(), AMDILAS::LOCAL_ADDRESS) &&
+      !check_type(N->getSrcValue(), AMDILAS::GLOBAL_ADDRESS) &&
+      !check_type(N->getSrcValue(), AMDILAS::REGION_ADDRESS) &&
+      !check_type(N->getSrcValue(), AMDILAS::CONSTANT_ADDRESS) &&
+      !check_type(N->getSrcValue(), AMDILAS::CONSTANT_BUFFER_0) &&
+      !check_type(N->getSrcValue(), AMDILAS::CONSTANT_BUFFER_1) && // TODO: Rest of CBs
+      !isFlatASOverrideEnabled()) {
     return true;
   }
   return false;

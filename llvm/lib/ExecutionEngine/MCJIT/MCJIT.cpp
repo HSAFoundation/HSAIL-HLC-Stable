@@ -105,7 +105,9 @@ void MCJIT::emitObject(Module *m) {
     report_fatal_error(Dyld.getErrorString());
 
   // Resolve any relocations.
+#if !defined(AMD_OPENCL) && 0
   Dyld.resolveRelocations();
+#endif
 
   // FIXME: Make this optional, maybe even move it to a JIT event listener
   LoadedObject->registerWithDebugger();

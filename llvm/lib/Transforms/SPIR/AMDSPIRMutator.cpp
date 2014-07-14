@@ -4,6 +4,7 @@
 //
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "spirloader"
+#include <stdio.h>
 #include "AMDSPIRMutator.h"
 #include "AMDSPIRLoader.h"
 #include "llvm/Constants.h"
@@ -24,7 +25,6 @@
 #include <iterator>
 #include <functional>
 #include "cxxabi.h"
-#include <stdio.h>
 using namespace llvm;
 using namespace spir;
 namespace spir {

@@ -21,6 +21,7 @@
 #include "llvm/LLVMContext.h"
 #include "llvm/AMDLLVMContextHook.h"
 #include "llvm/Transforms/Utils/AMDLibCalls.h"
+#include "llvm/Transforms/AMDSPIRUtils.h"
 #include <vector>
 #include <string>
 #include <sstream>
@@ -50,6 +51,28 @@ FOPTTBL(f) },
 #define MATH_LOG2_10   3.3219280948873623478703194294893901758648313930245806  // Value of log2(10)
 #define MATH_RLOG2_10  0.3010299956639811952137388947244930267681898814621085  // Value of 1 / log2(10)
 #define MATH_RLOG2_E   0.6931471805599453094172321214581765680755001343602552  // Value of 1 / M_LOG2E_F = 1 / log2(e)
+
+template <typename IRB> 
+CallInst *CreateCallEx(IRB &B, Value *Callee, 
+    Value *Arg, const Twine &Name="")
+{
+    CallInst *r = B.CreateCall(Callee,Arg,Name);
+    if (Function* f = dyn_cast<Function>(Callee)) {
+        r->setCallingConv(f->getCallingConv());
+    }
+    return r;
+}
+
+template <typename IRB> 
+CallInst *CreateCallEx2(IRB &B, Value *Callee, 
+    Value *Arg1, Value *Arg2, const Twine &Name="") 
+{
+    CallInst *r = B.CreateCall2(Callee,Arg1,Arg2,Name);
+    if (Function* f = dyn_cast<Function>(Callee)) {
+        r->setCallingConv(f->getCallingConv());
+    }
+    return r;
+}
 
 namespace {
 
@@ -242,8 +265,11 @@ Str2IntMap AMDLibCalls::FName2IDMap;
 
 Constant *AMDLibCalls::getFunction(Module *M,
                                    FunctionType *FuncTy,
-                                   StringRef FuncName)
+                                   StringRef bareFuncName,
+                                   const AMDIntrinsicInfo& fInfo)
 {
+  std::string FuncName = fInfo.mangleName(bareFuncName);
+
   AMDLLVMContextHook *amdhook =
     static_cast<AMDLLVMContextHook*>(M->getContext().getAMDLLVMContextHook());
   bool prelinkopt = amdhook ? amdhook->amdoptions.IsPreLinkOpt : false;
@@ -251,7 +277,12 @@ Constant *AMDLibCalls::getFunction(Module *M,
 
   // If the function exists (could be of local linkage), return it. 
   ValueSymbolTable &MSymTab = M->getValueSymbolTable();
-  Function *F = cast_or_null<Function>(MSymTab.lookup(FuncName));
+  
+  Function *F = dyn_cast_or_null<Function>(MSymTab.lookup(FuncName));
+  
+  DEBUG_WITH_TYPE("usenative", if (F==NULL) 
+    dbgs() << "<useNative> function " << FuncName << " is not found\n");
+
   if (F && !F->isDeclaration() && 
       !FuncTy->isVarArg() && !F->isVarArg() &&
       (FuncTy->getNumParams() == F->arg_size())) {
@@ -262,7 +293,7 @@ Constant *AMDLibCalls::getFunction(Module *M,
   // If we are doing PreLinkOpt, the function is external. So it is safe to
   // use getOrInsertFunction() at this stage. The same is true for
   // non-whole program mode.
-  if (prelinkopt || !wholeprogram || FuncName.startswith("__hsail_")) {
+  if (prelinkopt || !wholeprogram || fInfo.FKind==AMDIntrinsicInfo::HSAIL) {
 
       // We are supposed to pass only single instruction intrinsics with
       // "__hsail_" prefix for this to work correctly. These intrinsics are
@@ -270,30 +301,42 @@ Constant *AMDLibCalls::getFunction(Module *M,
       // even without library linking. Other functions supposed to be passed
       // by other names (i.e. "__sqrt_f32" vs "__hsail_nsqrt_f32").
 
+      Constant *res = NULL;
+
       // Do not set extra attributes for functions with pointer arguments.
       FunctionType::param_iterator PI = FuncTy->param_begin();
       FunctionType::param_iterator PE = FuncTy->param_end();
       for (; PI != PE; ++PI) {
         const Type* argTy = static_cast<const Type*>(*PI);
         if (argTy->isPointerTy()) {
-          return M->getOrInsertFunction(FuncName, FuncTy);
+          res = M->getOrInsertFunction(FuncName, FuncTy);
+          break;
         }
       }
 
-      Attributes::AttrVal AVs[2]={Attributes::ReadOnly, Attributes::NoUnwind };
-      AttributeWithIndex AWI = AttributeWithIndex::get(M->getContext(), 
-                                   AttrListPtr::FunctionIndex,
-                                   ArrayRef<Attributes::AttrVal>(AVs, 2));
-
-      return M->getOrInsertFunction(FuncName, 
-                                    FuncTy,
-                                    AttrListPtr::get(M->getContext(),AWI));
+      if (!res) {
+        Attributes::AttrVal AVs[2]={Attributes::ReadOnly, Attributes::NoUnwind };
+        AttributeWithIndex AWI = AttributeWithIndex::get(M->getContext(), 
+                                     AttrListPtr::FunctionIndex,
+                                     ArrayRef<Attributes::AttrVal>(AVs, 2));
+        
+        res = M->getOrInsertFunction(FuncName, 
+                                      FuncTy,
+                                      AttrListPtr::get(M->getContext(),AWI));
+      }
+      if (fInfo.ManglingKind == AMDIntrinsicInfo::ITANIUM) {
+        Function *f = cast<Function>(res);
+        f->setCallingConv(CallingConv::SPIR_FUNC);
+      }
+      
+      return res;
   }
   return NULL;
 }
 
 Constant *AMDLibCalls::getFunction(Module *M, 
                                    StringRef FuncName,
+                                   const AMDIntrinsicInfo& fInfo,
                                    Type *RetTy, ...)
 {
   va_list Args;
@@ -305,177 +348,28 @@ Constant *AMDLibCalls::getFunction(Module *M,
   }
   va_end(Args);
 
-  return getFunction(M, FunctionType::get(RetTy, ArgTys, false), FuncName);
+  return getFunction(M, FunctionType::get(RetTy, ArgTys, false), FuncName, fInfo);
 }
 
-
-/*
-   Our math library function has the following name mangling
-     FMangledName = __<FName>_<s><VSize><EType>[_<s><VSize><EType>]
-
-        FName = API Function Name such as
-                sin, cos, native_sin, half_sin, etc, which are given
-                in the OpenCL spec.
-        VSize = | <n>  (can be empty)
-                blank: means scalar
-                <n>=2,3,4,8,16 : vector size
-        EType = f32 | f64 : element type
-        s     = |g|l|p   (can be empty)
-                used to indicate that func has a pointer argument.      
-
-        Note that the first "<s><VSize><EType>" is the most important as it
-        encodes the type of input arguments,  here we call it "key arg type"
-        or simply "key type".  And optional part is for functions with pointer
-        argument, such as remquo.
-
-  parseFunctionName() parses the FMangledName, and return true with the following
-  detail if if it finds one :
-    GFName :  the generic function name with native_/half_ removed from API Function
-              name if there is one. So, for half_sin/native_sin, GFName is sin.
-    FKind :  normal/native/half
-    VectorSize : 1 (scalar), 2,3,4,8,16,  for key arg type.
-    EType : f32 (single-precision float) or f64 (double-precision float), for key
-            arg type.
-*/
-bool AMDLibCalls::parseFunctionName(StringRef FMangledName, FuncInfo &FInfo)
+StringRef AMDLibCalls::parseFunctionName(const StringRef& FMangledName, 
+                                         FuncInfo *FInfo)
 {
-  // Get rid of non-candidates quickly
-  if (!FMangledName.startswith("__")) {
-    return false;
-  }
-
-  size_t sz = FMangledName.size();
-  if (sz > MAX_FNAME_SIZE) {
-    return false;
-  }
-
-  // pos to start and end of generic function name, respectively.
-  size_t pos_start, pos_end;
-  size_t end;  // pos to the end of key arg type
-  if (FMangledName.startswith("__native_")) {
-    FInfo.FKind = FK_NATIVE;
-    pos_start = 9;
-  } else if (FMangledName.startswith("__half_")) {
-    FInfo.FKind = FK_HALF;
-    pos_start = 7;
-  } else if (FMangledName.startswith("__hsail_")) {
-    FInfo.FKind = FK_HSAIL;
-    pos_start = 8;
-  } else {
-    pos_start = 2;
-    FInfo.FKind = FK_NORMAL;
-  }
-
-  end = FMangledName.rfind('_');
-  if (pos_start >= end) {
-    return false;
-  }
-  pos_end = FMangledName.rfind('_', end);
-  if (pos_start >= pos_end) {
-    // No optional type encoding
-    pos_end = end;
-    end = FMangledName.size();
-  }
-  /* 
-  else {
-    // has 2nd argument encoding, check the type encoding
-  }
-  */
-
-  if ((end - pos_end) < 3) {
-    return false;
-  }
-
-  if (FMangledName[end-3] != 'f') {
-    return false;
-  }
-  if ((FMangledName[end - 2] == '3') && (FMangledName[end - 1] == '2')) {
-    FInfo.EType = ET_F32;
-  } else if ((FMangledName[end - 2] == '6') && (FMangledName[end - 1] == '4')) {
-    FInfo.EType = ET_F64;
-  } else {
-    return false;
-  }
-
-  size_t endm4 = end - 4;
-  if (endm4 == pos_end ||
-      (endm4 == (pos_end + 1) && isPtrEncode(FMangledName[endm4]))) {
-    // scalar form __<name>_f32 or __<name>_f64
-    FInfo.VectorSize = 1;
-  } else if (endm4 == (pos_end + 1) ||
-             (endm4 == (pos_end + 2) && isPtrEncode(FMangledName[endm4-1]))) {
-    char c = FMangledName[endm4];
-    switch (c) {
-    case '2':
-        FInfo.VectorSize = 2;
-        break;
-    case '3':
-        FInfo.VectorSize = 3;
-        break;
-    case '4':
-        FInfo.VectorSize = 4;
-        break;
-    case '8':
-        FInfo.VectorSize = 8;
-        break;
-    default:
-        return false;
+  StringRef funcName = AMDIntrinsicInfo::parseName(FMangledName, FInfo);
+  if (!funcName.empty()) {
+    Str2IntMap::iterator it = FName2IDMap.find(funcName);
+    if (it == FName2IDMap.end()) {
+      return StringRef();
     }
-  } else if (endm4 == (pos_end + 2) ||
-             (endm4 == (pos_end + 3) && isPtrEncode(FMangledName[endm4-2]))) {
-    char c1 = FMangledName[endm4];
-    char c0 = FMangledName[endm4-1];
-    if ( (c0 == '1') && (c1 == '6')) {
-      FInfo.VectorSize = 16;
-    } else {
-      return false;
+    BLTIN_FUNC_ID FID = (BLTIN_FUNC_ID)it->second; 
+    if (FInfo) {
+      FInfo->FID = FID;
     }
-  } else {
-    return false;
+    if ((FInfo->FKind != AMDIntrinsicInfo::HSAIL) &&
+        (BltinFuncDesc[FID].flags & BLTINDESC_HsailOnly)) {
+      return StringRef();
+    }
   }
-
-  // Get generic function name
-  int ix=0;
-  for (size_t i=pos_start; i < pos_end; ++i, ++ix) {
-    FInfo.GFName[ix] = FMangledName[i];
-  }
-  FInfo.GFName[ix] = 0;
-
-  Str2IntMap::iterator it = FName2IDMap.find(FInfo.GFName);
-  if (it == FName2IDMap.end()) {
-    return false;
-  }
-
-  FInfo.FID = (BLTIN_FUNC_ID)it->second;
-
-  if ((FInfo.FKind != FK_HSAIL) &&
-      (BltinFuncDesc[FInfo.FID].flags & BLTINDESC_HsailOnly)) {
-    return false;
-  }
-
-  return true;
-}
-
-// Create a library function name, given a generic function name,
-// element type, kind, and vector size.
-void AMDLibCalls::getFunctionName(
-  std::string& FuncName, // out 
-  const char* GFName, BLTIN_FUNC_KIND FKind, ELEMENT_TYPE EType, int VSize)
-{
-  std::stringstream sstr;
-  if (FKind == FK_HALF)
-    sstr << "__half_";
-  else if (FKind == FK_NATIVE)
-    sstr << "__native_";
-  else if (FKind == FK_HSAIL)
-    sstr << "__hsail_";
-  else
-    sstr << "__";
-  sstr << GFName << "_";
-  if (VSize > 1)
-    sstr << VSize;
-  sstr << (EType == ET_F32 ? "f32" : "f64");
-  FuncName = sstr.str();
+  return funcName;
 }
 
 AMDLibCalls::AMDLibCalls()
@@ -742,28 +636,27 @@ void AMDLibCalls::setFuncNames(const char* V)
   }
 }
 
-bool AMDLibCalls::sincosUseNative(CallInst *aCI, FuncInfo &FInfo,
-                                  const char *Suffix)
+bool AMDLibCalls::sincosUseNative(CallInst *aCI, const FuncInfo &FInfo)
 {
-  std::string tname;
   bool native_sin = (UseNativeFuncs.lookup("sin") == 1);
   bool native_cos = (UseNativeFuncs.lookup("cos") == 1);
+
   if (native_sin || native_cos) {
     Module *M = aCI->getParent()->getParent()->getParent();
     Value *opr0 = aCI->getArgOperand(0);
 
-    tname = native_sin ? "__native_sin_" : "__sin_";
-    tname += Suffix;
+    AMDIntrinsicInfo nf = FInfo;
+
+    nf.FKind = native_sin ? AMDIntrinsicInfo::NATIVE : AMDIntrinsicInfo::NORMAL;
     Constant *sinExpr = getFunction(M,
-                                    tname,
+                                    "sin", nf,
                                     aCI->getType(),
                                     opr0->getType(),
                                     NULL);
 
-    tname = native_cos ? "__native_cos_" : "__cos_";
-    tname += Suffix;
+    nf.FKind = native_cos ? AMDIntrinsicInfo::NATIVE : AMDIntrinsicInfo::NORMAL;
     Constant *cosExpr = getFunction(M,
-                                    tname,
+                                    "cos", nf,
                                     aCI->getType(),
                                     opr0->getType(),
                                     NULL);
@@ -789,29 +682,29 @@ bool AMDLibCalls::useNative(CallInst *aCI, const DataLayout *DL)
   StringRef MangledFName = Callee->getName();
 
   FuncInfo FInfo;
-
-  if (!parseFunctionName(MangledFName, FInfo)) {
+  StringRef const bareName = parseFunctionName(MangledFName, &FInfo);
+  if (bareName.empty() || 
+      FInfo.FKind==AMDIntrinsicInfo::AMDIL || 
+      FInfo.FKind==AMDIntrinsicInfo::GCN) {
     return false;
   }
 
   // If this func isn't a normal one or is f64.
-  if (FInfo.FKind != FK_NORMAL || FInfo.EType == ET_F64)
+  if (FInfo.FKind != AMDIntrinsicInfo::NORMAL || FInfo.ArgType == Type::DoubleTyID)
     return false;
 
   if (FInfo.FID == BFID_sincos) {
-    // __sincos_<s>[10][11]...
-    return sincosUseNative(aCI, FInfo, MangledFName.data()+10);
+    return sincosUseNative(aCI, FInfo);
   }
 
   // no native or not requested, skip
   if ((BltinFuncDesc[FInfo.FID].flags & BLTINDESC_HasNative) == 0 ||
-      (!AllNative && UseNativeFuncs.lookup(FInfo.GFName) != 1)) {
+      (!AllNative && UseNativeFuncs.lookup(bareName) != 1)) {
     return false;
   }
 
-  std::string nativeFunc;
-  nativeFunc = "__native_";
-  nativeFunc += (MangledFName.data() + 2);   
+  FInfo.FKind = AMDIntrinsicInfo::NATIVE;
+  const std::string& nativeFunc = FInfo.mangleName(bareName); 
   Module *M = CI->getParent()->getParent()->getParent();
   Constant *func = M->getOrInsertFunction(nativeFunc, Callee->getFunctionType());
   CI->setCalledFunction(func);
@@ -835,7 +728,14 @@ AMDLibCalls::fold(CallInst *CI, const DataLayout *DL, AliasAnalysis *AA)
   // Ignore indirect calls.
   if (Callee == 0) return false;
 
-  StringRef MangledFName = Callee->getName();
+  FuncInfo FInfo;
+  StringRef const bareName = parseFunctionName(Callee->getName(), &FInfo);
+  if (bareName.empty() || 
+      FInfo.FKind==AMDIntrinsicInfo::AMDIL || 
+      FInfo.FKind==AMDIntrinsicInfo::GCN) {
+    return false;
+  }
+
   // const FunctionType *FT = Callee->getFunctionType();
   BasicBlock *BB = CI->getParent();
   LLVMContext &Context = CI->getParent()->getContext();
@@ -844,11 +744,6 @@ AMDLibCalls::fold(CallInst *CI, const DataLayout *DL, AliasAnalysis *AA)
   // Set the builder to the instruction after the call.
   B.SetInsertPoint(BB, CI);
 
-  FuncInfo FInfo;
-
-  if (!parseFunctionName(MangledFName, FInfo)) {
-    return false;
-  }
 
   BLTIN_FUNC_ID FID = FInfo.FID;
 
@@ -865,7 +760,7 @@ AMDLibCalls::fold(CallInst *CI, const DataLayout *DL, AliasAnalysis *AA)
   // Under unsafe-math, evaluate calls if possible.
   // According to Brian Sumner, we can do this for all f32 function calls
   // using host's double function calls.
-  if ((UnsafeMathOpt /* || FInfo.EType == ET_F32 */) &&
+  if ((UnsafeMathOpt /* || FInfo.ArgType == Type::FloatTyID */) &&
       evaluateCall(CI, FInfo))
     return true;
 
@@ -873,13 +768,15 @@ AMDLibCalls::fold(CallInst *CI, const DataLayout *DL, AliasAnalysis *AA)
   switch (FID) {
   case BFID_recip:
     // skip vector function
-    assert ((FInfo.FKind == FK_NATIVE || FInfo.FKind == FK_HALF) &&
+    assert ((FInfo.FKind == AMDIntrinsicInfo::NATIVE || 
+             FInfo.FKind == AMDIntrinsicInfo::HALF) &&
             "recip must be an either native or half function");
     return (FInfo.VectorSize != 1) ? false : fold_recip(CI, B, FInfo);
 
   case BFID_divide:
     // skip vector function
-    assert ((FInfo.FKind == FK_NATIVE || FInfo.FKind == FK_HALF) &&
+    assert ((FInfo.FKind == AMDIntrinsicInfo::NATIVE || 
+             FInfo.FKind == AMDIntrinsicInfo::HALF) &&
             "divide must be an either native or half function");
     return (FInfo.VectorSize != 1) ? false : fold_divide(CI, B, FInfo);
 
@@ -898,25 +795,31 @@ AMDLibCalls::fold(CallInst *CI, const DataLayout *DL, AliasAnalysis *AA)
     return (FInfo.VectorSize != 1) ? false : fold_fma_mad(CI, B, FInfo);
 
   case BFID_exp:
-    return UnsafeMathOpt && (replaceWithNative(CI, FInfo) || fold_exp(CI, B, FInfo));
+    return UnsafeMathOpt && (replaceWithNative(CI, bareName, FInfo) || 
+           fold_exp(CI, B, FInfo));
   case BFID_exp2:
-    return UnsafeMathOpt && (replaceWithNative(CI, FInfo) || fold_exp2(CI, B, FInfo));
+    return UnsafeMathOpt && (replaceWithNative(CI, bareName, FInfo) || 
+           fold_exp2(CI, B, FInfo));
   case BFID_exp10:
-    return UnsafeMathOpt && (replaceWithNative(CI, FInfo) || fold_exp10(CI, B, FInfo));
+    return UnsafeMathOpt && (replaceWithNative(CI, bareName, FInfo) || 
+           fold_exp10(CI, B, FInfo));
   case BFID_log:
-    return UnsafeMathOpt && (replaceWithNative(CI, FInfo) || fold_log(CI, B, FInfo));
+    return UnsafeMathOpt && (replaceWithNative(CI, bareName, FInfo) || 
+           fold_log(CI, B, FInfo));
   case BFID_log2:
-    return UnsafeMathOpt && (replaceWithNative(CI, FInfo) || fold_log2(CI, B, FInfo));
+    return UnsafeMathOpt && (replaceWithNative(CI, bareName, FInfo) || 
+           fold_log2(CI, B, FInfo));
   case BFID_log10:
-    return UnsafeMathOpt && (replaceWithNative(CI, FInfo) || fold_log10(CI, B, FInfo));
+    return UnsafeMathOpt && (replaceWithNative(CI, bareName, FInfo) || 
+           fold_log10(CI, B, FInfo));
   case BFID_sqrt:
     return UnsafeMathOpt && fold_sqrt(CI, B, FInfo);
 
   case BFID_cos:
   case BFID_sin:
-    if (((FInfo.EType == ET_F32) || (FInfo.EType == ET_F64))
-      && (FInfo.FKind != FK_NATIVE)
-      && (FInfo.FKind != FK_HSAIL)) {
+    if (((FInfo.ArgType == Type::FloatTyID) || 
+         (FInfo.ArgType == Type::DoubleTyID))
+      && (FInfo.FKind == AMDIntrinsicInfo::NORMAL)) {
       return fold_sincos(CI, B, AA);
     }
     break;
@@ -962,14 +865,14 @@ bool AMDLibCalls::TDOFold(CallInst *CI, const DataLayout *DL, FuncInfo &FInfo)
       }
       LLVMContext &context = CI->getParent()->getParent()->getContext();
       Constant *nval;
-      if (FInfo.EType == ET_F32) {
+      if (FInfo.ArgType == Type::FloatTyID) {
         SmallVector<float, 0> FVal;
         for (unsigned i=0; i < DVal.size(); ++i) {
           FVal.push_back((float)DVal[i]);
         }
         ArrayRef<float> tmp(FVal);
         nval = ConstantDataVector::get(context, tmp);
-      } else { // ET_F64
+      } else { // Type::DoubleTyID
         ArrayRef<double> tmp(DVal);
         nval = ConstantDataVector::get(context, tmp);
       }
@@ -997,18 +900,19 @@ bool AMDLibCalls::TDOFold(CallInst *CI, const DataLayout *DL, FuncInfo &FInfo)
   return false;
 }
 
-bool AMDLibCalls::replaceWithNative(CallInst *CI, FuncInfo &FInfo)
+bool AMDLibCalls::replaceWithNative(CallInst *CI, 
+                                    const StringRef& bareName, const FuncInfo &FInfo)
 {
-  Module *M = CI->getParent()->getParent()->getParent();
-  std::string nativeFN;
-  if (FInfo.EType != ET_F32  || FInfo.FKind != FK_NORMAL ||
+  Module *M = CI->getParent()->getParent()->getParent(); 
+  if (FInfo.ArgType != Type::FloatTyID  || FInfo.FKind != AMDIntrinsicInfo::NORMAL ||
       (BltinFuncDesc[FInfo.FID].flags & BLTINDESC_HasNative) == 0)
     return false;
       
-  getFunctionName(nativeFN, FInfo.GFName, FK_NATIVE,
-                  FInfo.EType, FInfo.VectorSize);
+  AMDIntrinsicInfo nf = FInfo;
+  nf.FKind = AMDIntrinsicInfo::NATIVE;
+
   FunctionType *FTy = CI->getCalledFunction()->getFunctionType();
-  if (Constant *FPExpr = getFunction(M, FTy, nativeFN)) {
+  if (Constant *FPExpr = getFunction(M, FTy, bareName, nf)) {
 
     DEBUG(dbgs() << "AMDIC: " << *CI << " ---> ");
 
@@ -1049,7 +953,7 @@ bool AMDLibCalls::fold_divide(CallInst *CI, IRBuilder<> &B, FuncInfo &FInfo)
   ConstantFP *CF1 = dyn_cast<ConstantFP>(opr1);
 
   if ((CF0 && CF1) ||  // both are constants
-      (CF1 && (FInfo.EType == ET_F32)))  // CF1 is constant && f32 divide
+      (CF1 && (FInfo.ArgType == Type::FloatTyID)))  // CF1 is constant && f32 divide
   {
     Value *nval1 = B.CreateFDiv(ConstantFP::get(opr1->getType(), 1.0),
                                 opr1, "__div2recip");
@@ -1058,6 +962,17 @@ bool AMDLibCalls::fold_divide(CallInst *CI, IRBuilder<> &B, FuncInfo &FInfo)
     return true;
   }
   return false;
+}
+
+namespace llvm {
+static double log2(double V)
+{
+#if _XOPEN_SOURCE >= 600 || _ISOC99_SOURCE || _POSIX_C_SOURCE >= 200112L
+  return ::log2(V);
+#else
+  return log(V) / 0.693147180559945309417;
+#endif
+}
 }
 
 bool AMDLibCalls::fold_pow(CallInst *CI, IRBuilder<> &B, FuncInfo &FInfo)
@@ -1138,23 +1053,16 @@ bool AMDLibCalls::fold_pow(CallInst *CI, IRBuilder<> &B, FuncInfo &FInfo)
   Module *M = CI->getParent()->getParent()->getParent();
   if (CF && (CF->isExactlyValue(0.5) || CF->isExactlyValue(-0.5))) {
     // pow[r](x, [-]0.5) = sqrt(x)
-    std::string tname;
     bool issqrt = CF->isExactlyValue(0.5);
-    if (issqrt)
-      getFunctionName(tname, "sqrt",
-                      FInfo.FKind, FInfo.EType, FInfo.VectorSize);
-    else
-      getFunctionName(tname, "rsqrt",
-                      FInfo.FKind, FInfo.EType, FInfo.VectorSize);
-
+    const char * const name = issqrt ? "sqrt" : "rsqrt";
     if (Constant *FPExpr = getFunction(M,
-                                       tname, 
+                                       name, FInfo,
                                        CI->getType(),
                                        opr0->getType(),
                                        NULL)) {
       DEBUG(errs() << "AMDIC: " << *CI << " ---> "
-                   << tname.c_str() << "(" << *opr0 << ")\n");
-      Value *nval = B.CreateCall(FPExpr, opr0, issqrt ? "__pow2sqrt"
+                   << FInfo.mangleName(name).c_str() << "(" << *opr0 << ")\n");
+      Value *nval = CreateCallEx(B,FPExpr, opr0, issqrt ? "__pow2sqrt"
                                                       : "__pow2rsqrt");
       replaceCall(nval);
       return true;
@@ -1168,7 +1076,7 @@ bool AMDLibCalls::fold_pow(CallInst *CI, IRBuilder<> &B, FuncInfo &FInfo)
 
   // Remember that ci_opr1 is set if opr1 is integral
   if (CF) {
-    double dval = (FInfo.EType == ET_F32)
+    double dval = (FInfo.ArgType == Type::FloatTyID)
                     ? (double)CF->getValueAPF().convertToFloat()
                     : CF->getValueAPF().convertToDouble();
     int ival = (int)dval;
@@ -1215,12 +1123,12 @@ bool AMDLibCalls::fold_pow(CallInst *CI, IRBuilder<> &B, FuncInfo &FInfo)
     return true;
   }
 
-  // pow/powr ---> exp(y * log(x))
-  std::string expfname;
-  getFunctionName(expfname, "exp",
-                  FInfo.FKind, FInfo.EType, FInfo.VectorSize);
+  // powr ---> exp2(y * log2(x))
+  // pown/pow ---> powr(fabs(x), y) | (x & ((int)y << 31))
+  std::string expfname = FInfo.mangleName("exp2");
+  
   Constant *ExpExpr = getFunction(M,
-                                  expfname, 
+                                  "exp2", FInfo,
                                   CI->getType(),
                                   opr0->getType(),
                                   NULL);
@@ -1228,55 +1136,44 @@ bool AMDLibCalls::fold_pow(CallInst *CI, IRBuilder<> &B, FuncInfo &FInfo)
     return false;
 
   bool needlog = false;
-  Constant *cnval;
+  bool needabs = false;
+  bool needcopysign = false;
+  Constant *cnval = NULL;
   if (FInfo.VectorSize == 1) {
     CF = dyn_cast<ConstantFP>(opr0);
 
-    // Don't do pown if opr0 isn't const, or const is negative.
-    if (FID == BFID_pown && (!CF || CF->isNegative()))
-      return false;
-
     if (CF) {
-      double V = (FInfo.EType == ET_F32)
+      double V = (FInfo.ArgType == Type::FloatTyID)
                    ? (double)CF->getValueAPF().convertToFloat()
                    : CF->getValueAPF().convertToDouble();
-      
-      V = log(V);
+
+      V = log2(abs(V));
       cnval = ConstantFP::get(eltType, V);
+      needcopysign = (FID != BFID_powr) && CF->isNegative();
     } else {
       needlog = true;
+      needcopysign = needabs = FID != BFID_powr && (!CF || CF->isNegative());
     }
   } else {
     ConstantDataVector *CDV = dyn_cast<ConstantDataVector>(opr0);
 
-    // If opr0 isn't constant, or any of opr0's constant is negative,
-    // don't do pown
-    if (FID == BFID_pown) {
-      if (!CDV)
-        return false;
-
-      for (int i=0; i < FInfo.VectorSize; ++i) {
-        if (CDV->getElementAsAPFloat(i).isNegative())
-          return false;
-      }
-    }
-
     if (!CDV) {
       needlog = true;
+      needcopysign = needabs = FID != BFID_powr;
     } else {
       assert ((int)CDV->getNumElements() == FInfo.VectorSize &&
               "Wrong vector size detected");
 
-
       SmallVector<double, 0> DVal;
       for (int i=0; i < FInfo.VectorSize; ++i) {
-        double V = (FInfo.EType == ET_F32)
+        double V = (FInfo.ArgType == Type::FloatTyID)
                      ? (double)CDV->getElementAsFloat(i)
                      : CDV->getElementAsDouble(i);
-        V = log(V);
+        if (V < 0.0) needcopysign = true;
+        V = log2(abs(V));
         DVal.push_back(V);
       }
-      if (FInfo.EType == ET_F32) {
+      if (FInfo.ArgType == Type::FloatTyID) {
         SmallVector<float, 0> FVal;
         for (unsigned i=0; i < DVal.size(); ++i) {
           FVal.push_back((float)DVal[i]);
@@ -1290,21 +1187,58 @@ bool AMDLibCalls::fold_pow(CallInst *CI, IRBuilder<> &B, FuncInfo &FInfo)
     }
   }
 
+  if (needcopysign && (FID == BFID_pow)) {
+    // We cannot handle corner cases for a general pow() function, give up
+    // unless y is a constant integral value. Then proceed as if it were pown.
+    if (FInfo.VectorSize == 1) {
+      if (const ConstantFP *CF = dyn_cast<ConstantFP>(opr1)) {
+        double y = (FInfo.ArgType == Type::FloatTyID)
+                   ? (double)CF->getValueAPF().convertToFloat()
+                   : CF->getValueAPF().convertToDouble();
+        if (y != (double)(int64_t)y)
+          return false;
+      } else
+        return false;
+    } else {
+      if (const ConstantDataVector *CDV = dyn_cast<ConstantDataVector>(opr1)) {
+        for (int i=0; i < FInfo.VectorSize; ++i) {
+          double y = (FInfo.ArgType == Type::FloatTyID)
+                     ? (double)CDV->getElementAsFloat(i)
+                     : CDV->getElementAsDouble(i);
+          if (y != (double)(int64_t)y)
+            return false;
+        }
+      } else
+        return false;
+    }
+  }
+
   Value *nval;
+  if (needabs) {
+    std::string absfname = FInfo.mangleName("fabs");
+
+    Constant *AbsExpr = getFunction(M,
+                                    "fabs", FInfo,
+                                    CI->getType(),
+                                    opr0->getType(),
+                                    NULL);
+    if (!AbsExpr)
+      return false;
+    nval = CreateCallEx(B, AbsExpr, opr0, absfname);
+  } else {
+    nval = cnval ? cnval : opr0;
+  }
   if (needlog) {
-    std::string logfname;
-    getFunctionName(logfname, "log",
-                    FInfo.FKind, FInfo.EType, FInfo.VectorSize);
+    std::string logfname = FInfo.mangleName("log2");
+
     Constant *LogExpr = getFunction(M,
-                                    logfname, 
+                                    "log2", FInfo,
                                     CI->getType(),
                                     opr0->getType(),
                                     NULL);
     if (!LogExpr)
       return false;
-    nval = B.CreateCall(LogExpr, opr0, logfname);
-  } else {
-    nval = cnval;
+    nval = CreateCallEx(B,LogExpr, nval, logfname);
   }
 
   if (FID == BFID_pown) {
@@ -1312,10 +1246,30 @@ bool AMDLibCalls::fold_pow(CallInst *CI, IRBuilder<> &B, FuncInfo &FInfo)
     opr1 = B.CreateSIToFP(opr1, nval->getType(), "pownI2F");
   }
   nval = B.CreateFMul(opr1, nval, "__ylogx");
-  nval = B.CreateCall(ExpExpr, nval, expfname);
+  nval = CreateCallEx(B,ExpExpr, nval, expfname);
+
+  if (needcopysign) {
+    Value *opr_n;
+    Type* rTy = opr0->getType();
+    Type* nTyS = eltType->isDoubleTy() ? B.getInt64Ty() : B.getInt32Ty();
+    Type *nTy = nTyS;
+    if (const VectorType *vTy = dyn_cast<VectorType>(rTy))
+      nTy = VectorType::get(nTyS, vTy->getNumElements());
+    unsigned size = nTy->getScalarSizeInBits();
+    opr_n = CI->getArgOperand(1);
+    if (opr_n->getType()->isIntegerTy())
+      opr_n = B.CreateZExtOrBitCast(opr_n, nTy, "__ytou");
+    else
+      opr_n = B.CreateFPToSI(opr1, nTy, "__ytou");
+
+    Value *sign = B.CreateShl(opr_n, size-1, "__yeven");
+    sign = B.CreateAnd(B.CreateBitCast(opr0, nTy), sign, "__pow_sign");
+    nval = B.CreateOr(B.CreateBitCast(nval, nTy), sign);
+    nval = B.CreateBitCast(nval, opr0->getType());
+  }
   
   DEBUG(errs() << "AMDIC: " << *CI << " ---> "
-               << "exp(" << *opr1 << " * log(" << *opr0 << "))\n");
+               << "exp2(" << *opr1 << " * log2(" << *opr0 << "))\n");
   replaceCall(nval);
         
   return true;
@@ -1344,13 +1298,13 @@ bool AMDLibCalls::fold_rootn(CallInst *CI, IRBuilder<> &B, FuncInfo &FInfo)
     Module *M = CI->getParent()->getParent()->getParent();
     if (Constant *FPExpr = getFunction(
          M,
-         (FInfo.EType == ET_F32) ? "__sqrt_f32" : "__sqrt_f64", 
+         "sqrt", FInfo,
          CI->getType(),
          opr0->getType(),
          NULL)) {
       DEBUG(errs() << "AMDIC: " << *CI
                    << " ---> sqrt(" << *opr0 << ")\n");
-      Value *nval = B.CreateCall(FPExpr, opr0, "__rootn2sqrt");
+      Value *nval = CreateCallEx(B,FPExpr, opr0, "__rootn2sqrt");
       replaceCall(nval);
       return true;
     }
@@ -1358,13 +1312,13 @@ bool AMDLibCalls::fold_rootn(CallInst *CI, IRBuilder<> &B, FuncInfo &FInfo)
     Module *M = CI->getParent()->getParent()->getParent();
     if (Constant *FPExpr = getFunction(
          M,
-         (FInfo.EType == ET_F32) ? "__cbrt_f32" : "__cbrt_f64", 
+         "cbrt", FInfo,
          CI->getType(),
          opr0->getType(),
          NULL)) {
       DEBUG(errs() << "AMDIC: " << *CI
                    << " ---> cbrt(" << *opr0 << ")\n");
-      Value *nval = B.CreateCall(FPExpr, opr0, "__rootn2cbrt");
+      Value *nval = CreateCallEx(B,FPExpr, opr0, "__rootn2cbrt");
       replaceCall(nval);
       return true;
     }
@@ -1419,47 +1373,37 @@ bool AMDLibCalls::fold_fma_mad(CallInst *CI, IRBuilder<> &B, FuncInfo &FInfo)
 }
 
 // Get a scalar native or HSAIL builtin signle argument FP function
-Constant* AMDLibCalls::getNativeOrHsailFunction(Module* M, StringRef Name, ELEMENT_TYPE EType)
+Constant* AMDLibCalls::getNativeOrHsailFunction(Module* M, StringRef Name, 
+                                                Type::TypeID type)
 {
-    std::string func;
     std::string base(Name);
-    BLTIN_FUNC_KIND kind = FK_NATIVE;
+    AMDIntrinsicInfo::EKind kind = AMDIntrinsicInfo::NATIVE;
     Triple::ArchType Arch = Triple(M->getTargetTriple()).getArch();
     if (Arch == Triple::hsail || Arch == Triple::hsail_64) {
       // These hsail native builtins have leading 'n'.
       // We may need to create a string map if there is a general use of this utility.
       base.insert(0, "n");
-      kind = FK_HSAIL;
+      kind = AMDIntrinsicInfo::HSAIL;
     }
-    getFunctionName(func, base.c_str(), kind, EType, 1);
-    Type* FTy;
-    switch (EType) {
-    case ET_F32:
-      FTy = Type::getFloatTy(M->getContext());
-      break;
-    case ET_F64:
-      FTy = Type::getDoubleTy(M->getContext());
-      break;
-    default:
-      return NULL;
-    }
-    return getFunction(M, func, FTy, FTy, NULL);
+    AMDIntrinsicInfo fInfo(type, kind);
+    Type* FTy = Type::getPrimitiveType(M->getContext(), type);
+    return getFunction(M, base, fInfo, FTy, FTy, NULL);
 }
 
 // fold exp -> native_exp2 (x * LOG2E)
 bool AMDLibCalls::fold_exp(CallInst *CI, IRBuilder<> &B, FuncInfo &FInfo)
 {
-  if ((FInfo.EType == ET_F32) && (FInfo.VectorSize == 1) &&
-      (FInfo.FKind != FK_NATIVE)) {
+  if ((FInfo.ArgType == Type::FloatTyID) && (FInfo.VectorSize == 1) &&
+      (FInfo.FKind != AMDIntrinsicInfo::NATIVE)) {
     if (Constant *FPExpr = getNativeOrHsailFunction(
-        CI->getParent()->getParent()->getParent(), "exp2", FInfo.EType)) {
+        CI->getParent()->getParent()->getParent(), "exp2", FInfo.ArgType)) {
       Value *opr0 = CI->getArgOperand(0);
       DEBUG(errs() << "AMDIC: " << *CI << " ---> "
                    << "exp2(" << *opr0 << " * M_LOG2E)\n");
       Value *nval1 = B.CreateFMul(opr0,
                                   ConstantFP::get(opr0->getType(), MATH_LOG2E),
                                   "__exp_arg");
-      Value *nval  = B.CreateCall(FPExpr, nval1, "__exp");
+      Value *nval  = CreateCallEx(B,FPExpr, nval1, "__exp");
       replaceCall(nval);
       return true;
     }
@@ -1470,14 +1414,15 @@ bool AMDLibCalls::fold_exp(CallInst *CI, IRBuilder<> &B, FuncInfo &FInfo)
 // fold exp2 -> native_exp2
 bool AMDLibCalls::fold_exp2(CallInst *CI, IRBuilder<> &B, FuncInfo &FInfo)
 {
-  if ((FInfo.EType == ET_F32) && (FInfo.VectorSize == 1) &&
-      (FInfo.FKind != FK_NATIVE) && (FInfo.FKind != FK_HSAIL)) {
+  if ((FInfo.ArgType == Type::FloatTyID) && (FInfo.VectorSize == 1) &&
+      (FInfo.FKind != AMDIntrinsicInfo::NATIVE) && 
+      (FInfo.FKind != AMDIntrinsicInfo::HSAIL)) {
     if (Constant *FPExpr = getNativeOrHsailFunction(
-        CI->getParent()->getParent()->getParent(), "exp2", FInfo.EType)) {
+        CI->getParent()->getParent()->getParent(), "exp2", FInfo.ArgType)) {
       Value *opr0 = CI->getArgOperand(0);
       DEBUG(errs() << "AMDIC: " << *CI << " ---> "
                    << "exp2(" << *opr0 << ")\n");
-      Value *nval  = B.CreateCall(FPExpr, opr0, "__exp2");
+      Value *nval  = CreateCallEx(B,FPExpr, opr0, "__exp2");
       replaceCall(nval);
       return true;
     }
@@ -1488,17 +1433,17 @@ bool AMDLibCalls::fold_exp2(CallInst *CI, IRBuilder<> &B, FuncInfo &FInfo)
 // fold exp10 -> native_exp2 (x * M_LOG2_10)
 bool AMDLibCalls::fold_exp10(CallInst *CI, IRBuilder<> &B, FuncInfo &FInfo)
 {
-  if ((FInfo.EType == ET_F32) && (FInfo.VectorSize == 1) &&
-      (FInfo.FKind != FK_NATIVE)) {
+  if ((FInfo.ArgType == Type::FloatTyID) && (FInfo.VectorSize == 1) &&
+      (FInfo.FKind != AMDIntrinsicInfo::NATIVE)) {
     if (Constant *FPExpr = getNativeOrHsailFunction(
-        CI->getParent()->getParent()->getParent(), "exp2", FInfo.EType)) {
+        CI->getParent()->getParent()->getParent(), "exp2", FInfo.ArgType)) {
       Value *opr0 = CI->getArgOperand(0);
       DEBUG(errs() << "AMDIC: " << *CI << " ---> "
                    << "exp2(" << *opr0 << " * M_LOG2_10\n");
       Value *nval1 = B.CreateFMul(opr0,
                                   ConstantFP::get(opr0->getType(), MATH_LOG2_10),
                                   "__exp10_arg");
-      Value *nval  = B.CreateCall(FPExpr, nval1, "__exp10");
+      Value *nval  = CreateCallEx(B,FPExpr, nval1, "__exp10");
       replaceCall(nval);
       return true;
     }
@@ -1509,14 +1454,14 @@ bool AMDLibCalls::fold_exp10(CallInst *CI, IRBuilder<> &B, FuncInfo &FInfo)
 // fold log -> native_log2 (x) * M_RLOG2_E
 bool AMDLibCalls::fold_log(CallInst *CI, IRBuilder<> &B, FuncInfo &FInfo)
 {
-  if ((FInfo.EType == ET_F32) && (FInfo.VectorSize == 1) &&
-      (FInfo.FKind != FK_NATIVE)) {
+  if ((FInfo.ArgType == Type::FloatTyID) && (FInfo.VectorSize == 1) &&
+      (FInfo.FKind != AMDIntrinsicInfo::NATIVE)) {
     if (Constant *FPExpr = getNativeOrHsailFunction(
-        CI->getParent()->getParent()->getParent(), "log2", FInfo.EType)) {
+        CI->getParent()->getParent()->getParent(), "log2", FInfo.ArgType)) {
       Value *opr0 = CI->getArgOperand(0);
       DEBUG(errs() << "AMDIC: " << *CI << " ---> "
                    << "log2(" << *opr0 << ") * M_RLOG2_E\n");
-      Value *nval1 = B.CreateCall(FPExpr, opr0, "__log2");
+      Value *nval1 = CreateCallEx(B,FPExpr, opr0, "__log2");
       Value *nval  = B.CreateFMul(nval1,
                                   ConstantFP::get(opr0->getType(), MATH_RLOG2_E),
                                   "__log");
@@ -1530,14 +1475,15 @@ bool AMDLibCalls::fold_log(CallInst *CI, IRBuilder<> &B, FuncInfo &FInfo)
 // fold log2 -> native_log2
 bool AMDLibCalls::fold_log2(CallInst *CI, IRBuilder<> &B, FuncInfo &FInfo)
 {
-  if ((FInfo.EType == ET_F32) && (FInfo.VectorSize == 1) &&
-      (FInfo.FKind != FK_NATIVE) && (FInfo.FKind != FK_HSAIL)) {
+  if ((FInfo.ArgType == Type::FloatTyID) && (FInfo.VectorSize == 1) &&
+      (FInfo.FKind != AMDIntrinsicInfo::NATIVE) && 
+      (FInfo.FKind != AMDIntrinsicInfo::HSAIL)) {
     if (Constant *FPExpr = getNativeOrHsailFunction(
-        CI->getParent()->getParent()->getParent(), "log2", FInfo.EType)) {
+        CI->getParent()->getParent()->getParent(), "log2", FInfo.ArgType)) {
       Value *opr0 = CI->getArgOperand(0);
       DEBUG(errs() << "AMDIC: " << *CI << " ---> "
                    << "log2(" << *opr0 << ")\n");
-      Value *nval  = B.CreateCall(FPExpr, opr0, "__log2");
+      Value *nval  = CreateCallEx(B,FPExpr, opr0, "__log2");
       replaceCall(nval);
       return true;
     }
@@ -1548,14 +1494,14 @@ bool AMDLibCalls::fold_log2(CallInst *CI, IRBuilder<> &B, FuncInfo &FInfo)
 // fold log10 -> native_log2 (x) * M_RLOG2_10
 bool AMDLibCalls::fold_log10(CallInst *CI, IRBuilder<> &B, FuncInfo &FInfo)
 {
-  if ((FInfo.EType == ET_F32) && (FInfo.VectorSize == 1) &&
-      (FInfo.FKind != FK_NATIVE)) {
+  if ((FInfo.ArgType == Type::FloatTyID) && (FInfo.VectorSize == 1) &&
+      (FInfo.FKind != AMDIntrinsicInfo::NATIVE)) {
     if (Constant *FPExpr = getNativeOrHsailFunction(
-        CI->getParent()->getParent()->getParent(), "log2", FInfo.EType)) {
+        CI->getParent()->getParent()->getParent(), "log2", FInfo.ArgType)) {
       Value *opr0 = CI->getArgOperand(0);
       DEBUG(errs() << "AMDIC: " << *CI << " ---> "
                    << "log2(" << *opr0 << ") * M_RLOG2_10\n");
-      Value *nval1 = B.CreateCall(FPExpr, opr0, "__log2");
+      Value *nval1 = CreateCallEx(B,FPExpr, opr0, "__log2");
       Value *nval  = B.CreateFMul(nval1,
                                   ConstantFP::get(opr0->getType(), MATH_RLOG2_10),
                                   "__log10");
@@ -1569,15 +1515,16 @@ bool AMDLibCalls::fold_log10(CallInst *CI, IRBuilder<> &B, FuncInfo &FInfo)
 // fold sqrt -> native_sqrt (x)
 bool AMDLibCalls::fold_sqrt(CallInst *CI, IRBuilder<> &B, FuncInfo &FInfo)
 {
-  if ((FInfo.EType == ET_F32 || FInfo.EType == ET_F64) &&
+  if ((FInfo.ArgType == Type::FloatTyID || FInfo.ArgType == Type::DoubleTyID) &&
       (FInfo.VectorSize == 1) &&
-      (FInfo.FKind != FK_NATIVE) && (FInfo.FKind != FK_HSAIL)) {
+      (FInfo.FKind != AMDIntrinsicInfo::NATIVE) && 
+      (FInfo.FKind != AMDIntrinsicInfo::HSAIL)) {
     if (Constant *FPExpr = getNativeOrHsailFunction(
-        CI->getParent()->getParent()->getParent(), "sqrt", FInfo.EType)) {
+        CI->getParent()->getParent()->getParent(), "sqrt", FInfo.ArgType)) {
       Value *opr0 = CI->getArgOperand(0);
       DEBUG(errs() << "AMDIC: " << *CI << " ---> "
                    << "sqrt(" << *opr0 << ")\n");
-      Value *nval = B.CreateCall(FPExpr, opr0, "__sqrt");
+      Value *nval = CreateCallEx(B,FPExpr, opr0, "__sqrt");
       replaceCall(nval);
       return true;
     }
@@ -1597,7 +1544,8 @@ bool AMDLibCalls::fold_sincos(CallInst *CI, IRBuilder<> &B, AliasAnalysis *AA)
     LoadInst * LI = dyn_cast<LoadInst>(CArgVal);
     if (LI->getParent() == CBB) {
       BasicBlock::iterator BBI = LI;
-      if (Value * AvailableVal = llvm::FindAvailableLoadedValue(LI->getOperand(0), CBB, BBI, MaxScan, AA)) {
+      if (Value * AvailableVal = 
+        llvm::FindAvailableLoadedValue(LI->getOperand(0), CBB, BBI, MaxScan, AA)) {
         CArgVal->replaceAllUsesWith(AvailableVal);
         if (CArgVal->getNumUses() == 0)
           LI->eraseFromParent();
@@ -1608,7 +1556,15 @@ bool AMDLibCalls::fold_sincos(CallInst *CI, IRBuilder<> &B, AliasAnalysis *AA)
 
   Function * CCallee = CI->getCalledFunction();
   StringRef CName = CCallee->getName();
-  std::string PairName = genSinOrCosName(CName);
+
+  AMDIntrinsicInfo fInfo;
+  StringRef const trigName = AMDIntrinsicInfo::parseName(CName, &fInfo);
+  if (trigName.empty()) {
+    return false;
+  }
+  assert(trigName=="sin" || trigName=="cos");
+  bool const isSin = trigName=="sin";
+  std::string const PairName = fInfo.mangleName(isSin ? "cos" : "sin");
 
   for (Value::use_iterator I = CArgVal->use_begin(), E = CArgVal->use_end();
     I != E; I++) {
@@ -1625,6 +1581,9 @@ bool AMDLibCalls::fold_sincos(CallInst *CI, IRBuilder<> &B, AliasAnalysis *AA)
       continue;
 
     Function * UCallee = UI->getCalledFunction();
+    if (!UCallee) 
+      continue;
+
     StringRef UName = UCallee->getName();
     if (!UName.equals(PairName))
       continue;
@@ -1637,8 +1596,11 @@ bool AMDLibCalls::fold_sincos(CallInst *CI, IRBuilder<> &B, AliasAnalysis *AA)
       if (Count-- == 0)
         break;
       if (Inst == UI) {
-        std::string SinCosName = genSinCosName(UName);
-        Function * Fsincos = getSinCosFunc(UI, SinCosName);
+        Module *M = CI->getParent()->getParent()->getParent();
+        bool OpenCL20Module = isOpenCL20Module(*M);
+        Function * Fsincos = getSinCosFunc(UI, fInfo,
+                                OpenCL20Module ? OpenCLLangAS::opencl_generic
+                                               : OpenCLLangAS::opencl_private);
         if (!Fsincos)
           return false;
 
@@ -1646,14 +1608,27 @@ bool AMDLibCalls::fold_sincos(CallInst *CI, IRBuilder<> &B, AliasAnalysis *AA)
 
         // Merge the sin and cos.
         BasicBlock::iterator ItOld = B.GetInsertPoint();
-        AllocaInst * Alloc = insertAlloca(UI, B);
+        AllocaInst * Alloc = insertAlloca(UI, B, "__sincos_");
         B.SetInsertPoint(UI);
-        CallInst * Call = B.CreateCall2(Fsincos, UI->getArgOperand(0), Alloc);
+        CallInst *Call;
+        if (OpenCL20Module) {
+          // for OpenCL 2.0 we have only generic implementation of sincos
+          // function.
+          // The allocaInst allocates the memory in private address space.This
+          // need to be bitcasted to point to generic address space so that
+          // the function prototypes and the arguments match.
+          Type *ArgType = UI->getArgOperand(0)->getType();
+          Value *BCast = B.CreateBitCast(Alloc,
+                          ArgType->getPointerTo(OpenCLLangAS::opencl_generic));
+          Call = CreateCallEx2(B, Fsincos, UI->getArgOperand(0),BCast);
+        } else {
+          Call = CreateCallEx2(B, Fsincos, UI->getArgOperand(0),Alloc);
+        }
         Call->setCallingConv(Fsincos->getCallingConv());
         Instruction * Reload;
         Value * UArgVal = UI->getArgOperand(0);
 
-        if (UName.startswith(getSinPrefix())) {
+        if (!isSin) {
           B.SetInsertPoint(ItOld);
           UI->replaceAllUsesWith(Call);
           Reload = B.CreateLoad(Alloc);
@@ -1678,51 +1653,26 @@ bool AMDLibCalls::fold_sincos(CallInst *CI, IRBuilder<> &B, AliasAnalysis *AA)
   return false;
 }
 
-// Generate name of the sincos function from the name of a sin or cos function.
-std::string AMDLibCalls::genSinCosName(StringRef Name)
-{
-  std::pair<StringRef, StringRef> Pair;
-  std::string SinPrefix = getSinPrefix();
-
-  if (Name.startswith(SinPrefix))
-    Pair = Name.split(SinPrefix);
-  else
-    Pair = Name.split(getCosPrefix());
-
-  std::string SinCosName = getSinCosPrefix() + "p" + Pair.second.str();
-  return SinCosName;
-}
-
-// Generate name of the sin or cos function from the name of a cos or sin function.
-std::string AMDLibCalls::genSinOrCosName(StringRef Name)
-{
-  std::pair<StringRef, StringRef> Pair;
-  std::string SinPrefix = getSinPrefix();
-
-  if (Name.startswith(SinPrefix)) {
-    Pair = Name.split(SinPrefix);
-    return getCosPrefix() + Pair.second.str();
-  }
-  else {
-    Pair = Name.split(getCosPrefix());
-    return SinPrefix + Pair.second.str();
-  }
-}
-
 // Get a sincos Function with the given name and whose type matches UI.
-Function * AMDLibCalls::getSinCosFunc(CallInst * UI, std::string Name)
+Function * AMDLibCalls::getSinCosFunc(CallInst * UI, 
+                                      const AMDIntrinsicInfo& fInfo,
+                                      unsigned AS)
 {
   Module * M = UI->getParent()->getParent()->getParent();
   Function * Fsincos = NULL;
   Function * UCallee = UI->getCalledFunction();
   Type * RetTy = UCallee->getReturnType();
   Type * ArgTy = UI->getArgOperand(0)->getType();
-  Constant *Vsincos = getFunction(M, Name, 
+
+  AMDIntrinsicInfo nf = fInfo;
+  nf.HasPtr = true;
+  Constant *Vsincos = getFunction(M, "sincos", nf,
                                   RetTy, ArgTy,
-                                  ArgTy->getPointerTo(), NULL);
+                                  ArgTy->getPointerTo(AS), NULL);
   Fsincos = Vsincos ? dyn_cast_or_null<Function>(Vsincos) : NULL;
   if (Fsincos) {
-    Fsincos->removeFnAttr(Attributes::get(Fsincos->getContext(),Attributes::ReadOnly));
+    Fsincos->removeFnAttr(Attributes::get(Fsincos->getContext(),
+                                          Attributes::ReadOnly));
   }
   return Fsincos;
 }
@@ -1738,14 +1688,15 @@ BasicBlock::iterator AMDLibCalls::getEntryIns(CallInst * UI) {
 }
 
 // Insert a AllocsInst at the beginning of function entry block.
-AllocaInst * AMDLibCalls::insertAlloca(CallInst * UI, IRBuilder<> &B)
+AllocaInst * AMDLibCalls::insertAlloca(CallInst * UI, IRBuilder<> &B, 
+                                       const char *prefix)
 {
   BasicBlock::iterator ItNew = getEntryIns(UI);
   Function * UCallee = UI->getCalledFunction();
   Type * RetType = UCallee->getReturnType();
   B.SetInsertPoint(ItNew);
   AllocaInst * Alloc = B.CreateAlloca(RetType, 0,
-    getSinCosPrefix() + UI->getName());
+    std::string(prefix) + UI->getName());
   Alloc->setAlignment(RetType->getPrimitiveSizeInBits()/8);
   return Alloc;
 }
@@ -1762,19 +1713,19 @@ bool AMDLibCalls::evaluateScalarMathFunc(FuncInfo &FInfo,
   ConstantFP *fpopr1 = dyn_cast_or_null<ConstantFP>(copr1);
   ConstantFP *fpopr2 = dyn_cast_or_null<ConstantFP>(copr2);
   if (fpopr0) {
-    opr0 = (FInfo.EType == ET_F64)
+    opr0 = (FInfo.ArgType == Type::DoubleTyID)
              ? fpopr0->getValueAPF().convertToDouble()
              : (double)fpopr0->getValueAPF().convertToFloat();
   }
 
   if (fpopr1) {
-    opr1 = (FInfo.EType == ET_F64)
+    opr1 = (FInfo.ArgType == Type::DoubleTyID)
              ? fpopr1->getValueAPF().convertToDouble()
              : (double)fpopr1->getValueAPF().convertToFloat();
   }
 
   if (fpopr2) {
-    opr2 = (FInfo.EType == ET_F64)
+    opr2 = (FInfo.ArgType == Type::DoubleTyID)
              ? fpopr2->getValueAPF().convertToDouble()
              : (double)fpopr2->getValueAPF().convertToFloat();
   }
@@ -2012,7 +1963,7 @@ bool AMDLibCalls::evaluateCall(CallInst *aCI, FuncInfo &FInfo)
     if (hasTwoResults)
       nval1 = ConstantFP::get(CI->getType(), DVal1[0]);
   } else {
-    if (FInfo.EType == ET_F32) {
+    if (FInfo.ArgType == Type::FloatTyID) {
       SmallVector <float, 0> FVal0, FVal1;
       for (int i=0; i < FInfo.VectorSize; ++i)
         FVal0.push_back((float)DVal0[i]);

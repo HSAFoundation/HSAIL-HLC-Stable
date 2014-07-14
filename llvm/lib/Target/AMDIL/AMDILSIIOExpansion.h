@@ -17,8 +17,12 @@ namespace llvm {
     protected:
       virtual bool isIOInstruction(MachineInstr *MI);
       virtual void expandIOInstruction(MachineInstr *MI);
-      void expandGlobalStore(MachineInstr *MI);
-      void expandGlobalLoad(MachineInstr *MI);
+      virtual void expandGlobalStore(MachineInstr *MI) LLVM_OVERRIDE;
+      virtual void expandGlobalLoad(MachineInstr *MI) LLVM_OVERRIDE;
+      virtual void expandConstantLoad(MachineInstr *MI) LLVM_OVERRIDE;
+    virtual void expandPrivateLoad(MachineInstr *MI) LLVM_OVERRIDE;
+    virtual void expandPrivateStore(MachineInstr *MI) LLVM_OVERRIDE;
+
      virtual bool isCacheableOp(MachineInstr* MI);
   }; // class AMDILSIIOExpansionImpl
 

@@ -10,18 +10,26 @@ LIB_TARGET = LLVMX86CodeGen
 #
 ## C files
 #
+
+vpath %.c                             \
+	$(COMPONENT_DEPTH)/Disassembler
+
 vpath %.cpp                             \
 	$(COMPONENT_DEPTH)              \
 	$(COMPONENT_DEPTH)/MCTargetDesc \
 	$(COMPONENT_DEPTH)/AsmParser    \
+	$(COMPONENT_DEPTH)/Disassembler    \
 	$(COMPONENT_DEPTH)/TargetInfo   \
 	$(COMPONENT_DEPTH)/InstPrinter  \
 	$(COMPONENT_DEPTH)/Utils
+
+CFILES := $(notdir $(wildcard $(COMPONENT_DEPTH)/Disassembler/*.c))
 
 CPPFILES :=                                                          \
 	$(notdir $(wildcard $(COMPONENT_DEPTH)/*.cpp))               \
 	$(notdir $(wildcard $(COMPONENT_DEPTH)/MCTargetDesc/*.cpp))  \
 	$(notdir $(wildcard $(COMPONENT_DEPTH)/AsmParser/*.cpp))     \
+	$(notdir $(wildcard $(COMPONENT_DEPTH)/Disassembler/*.cpp))     \
 	$(notdir $(wildcard $(COMPONENT_DEPTH)/TargetInfo/*.cpp))    \
 	$(notdir $(wildcard $(COMPONENT_DEPTH)/InstPrinter/*.cpp))   \
 	$(notdir $(wildcard $(COMPONENT_DEPTH)/Utils/*.cpp))
@@ -40,6 +48,7 @@ LCINCS  = $(INCSWITCH) "$(OPENCL_DEPTH)/compiler/tools/macrodata/include"
 LCINCS += $(INCSWITCH) "$(COMPONENT_DEPTH)"
 LCINCS += $(INCSWITCH) "$(COMPONENT_DEPTH)/MCTargetDesc"
 LCINCS += $(INCSWITCH) "$(COMPONENT_DEPTH)/AsmParser"
+LCINCS += $(INCSWITCH) "$(COMPONENT_DEPTH)/Disassembler"
 LCINCS += $(INCSWITCH) "$(COMPONENT_DEPTH)/TargetInfo"
 LCINCS += $(INCSWITCH) "$(COMPONENT_DEPTH)/InstPrinter"
 LCINCS += $(INCSWITCH) "$(COMPONENT_DEPTH)/Utils"
@@ -56,6 +65,9 @@ GENFILES = \
     $(BUILD_DIR)/X86GenInstrInfo.inc \
     $(BUILD_DIR)/X86GenAsmWriter.inc \
     $(BUILD_DIR)/X86GenAsmWriter1.inc \
+    $(BUILD_DIR)/X86GenDisassemblerTables.inc  \
+    $(BUILD_DIR)/X86GenEDInfo.inc \
+    $(BUILD_DIR)/X86GenEDInfo.inc \
     $(BUILD_DIR)/X86GenDAGISel.inc \
     $(BUILD_DIR)/X86GenFastISel.inc \
     $(BUILD_DIR)/X86GenCallingConv.inc \

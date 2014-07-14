@@ -33,6 +33,7 @@ transforms_utils_SRC_FILES := \
   AMDArgumentUtils.cpp \
   AMDDbgmovePass.cpp \
   AMDLibCalls.cpp \
+  AMDIntrinsicInfo.cpp \
   BypassSlowDivision.cpp \
   SimplifyLibCalls.cpp \
   MetaRenamer.cpp

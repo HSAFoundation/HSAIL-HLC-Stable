@@ -67,6 +67,7 @@ class Brigantine
     std::auto_ptr<Scope>    m_argScope;
     DirectiveExecutable     m_func;
     unsigned                m_machine;
+    unsigned                m_profile;
 
     typedef std::vector< std::pair< ItemRef<DirectiveLabel>, SourceInfo > > RefList;
     typedef std::map<Brig::BrigStringOffset32_t, RefList> LabelMap;
@@ -82,7 +83,7 @@ public:
     /// won't syncronize it's state with it and therefore it is up to the user to
     /// supply the container in a state that allows to 'continue' writing consistently.
     /// Most common case is an empty Brig container.
-    Brigantine(BrigContainer& container) : m_container(container), m_machine(0) {}
+    Brigantine(BrigContainer& container) : m_container(container), m_machine(Brig::BRIG_MACHINE_UNDEF), m_profile(Brig::BRIG_PROFILE_UNDEF) {}
     virtual ~Brigantine() {}
 
     /// start HSAIL program. While it doesn't write anything to the container it
@@ -374,7 +375,8 @@ public:
     Dir            findInScopes(const SRef& name) const;
 
     /// return model.
-    unsigned       getMachineModel() const { return m_machine; }
+    unsigned       getMachineModel() const { assert(m_machine == Brig::BRIG_MACHINE_SMALL || m_machine == Brig::BRIG_MACHINE_LARGE); return m_machine; }
+    unsigned       getProfile()      const { assert(m_profile == Brig::BRIG_PROFILE_BASE  || m_profile == Brig::BRIG_PROFILE_FULL);  return m_profile; }
 
     /// store DWARF data.
     /// @param dwarfData - data.

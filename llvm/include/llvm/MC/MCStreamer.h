@@ -105,7 +105,11 @@ namespace llvm {
     MCContext &getContext() const { return Context; }
 
     unsigned getNumFrameInfos() {
-      return FrameInfos.size();
+      return
+#if defined(AMD_OPENCL) || 1
+        (unsigned)
+#endif
+        FrameInfos.size();
     }
 
     const MCDwarfFrameInfo &getFrameInfo(unsigned i) {
@@ -117,7 +121,11 @@ namespace llvm {
     }
 
     unsigned getNumW64UnwindInfos() {
-      return W64UnwindInfos.size();
+      return
+#if defined(AMD_OPENCL) || 1
+        (unsigned)
+#endif
+        W64UnwindInfos.size();
     }
 
     MCWin64EHUnwindInfo &getW64UnwindInfo(unsigned i) {

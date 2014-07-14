@@ -9,6 +9,7 @@
 #define DEBUG_TYPE "spirloader"
 #include "AMDSPIRLoader.h"
 #include "AMDSPIRMutator.h"
+#include "spir.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Analysis/SPIRVerifier.h"
 #include "llvm/Constants.h"
@@ -25,6 +26,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/InstIterator.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/AMDMetadataUtils.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/AMDLLVMContextHook.h"
 
@@ -49,10 +51,46 @@
 namespace clk {
 typedef unsigned int uint;
 typedef uint32_t cl_mem_fence_flags;
-#include <cl_kernel.h>
+//kernel arg access qualifier and type qualifier
+typedef enum clk_arg_qualifier_t
+{
+    Q_NONE = 0,
+
+    //for image type only, access qualifier
+    Q_READ = 1,
+    Q_WRITE = 2,
+
+    //for pointer type only
+    Q_CONST = 4, // pointee
+    Q_RESTRICT = 8,
+    Q_VOLATILE = 16,  // pointee
+    Q_PIPE = 32  // pipe
+
+} clk_arg_qualifier_t;
+
+typedef enum clk_value_type_t
+{
+    T_VOID,   T_CHAR,   T_SHORT,  T_INT,
+    T_LONG,   T_FLOAT,  T_DOUBLE, T_POINTER,
+    T_CHAR2,  T_CHAR3,  T_CHAR4,  T_CHAR8,  T_CHAR16,
+    T_SHORT2, T_SHORT3, T_SHORT4, T_SHORT8, T_SHORT16,
+    T_INT2,   T_INT3,   T_INT4,   T_INT8,   T_INT16,
+    T_LONG2,  T_LONG3,  T_LONG4,  T_LONG8,  T_LONG16,
+    T_FLOAT2, T_FLOAT3, T_FLOAT4, T_FLOAT8, T_FLOAT16,
+    T_DOUBLE2, T_DOUBLE3, T_DOUBLE4, T_DOUBLE8, T_DOUBLE16,
+    T_SAMPLER, T_SEMA, T_STRUCT, T_QUEUE
+} clk_value_type_t;
+
+typedef enum clk_address_space_t
+{
+    A_PRIVATE, A_LOCAL, A_CONSTANT, A_GLOBAL, A_REGION
+} clk_address_space_t;
+
+
+// #include <amdocl/cl_kernel.h>
 } // end of namespace clk
 
-#include <spir.h>
+//#include <khronos/headers/opencl1.2/CL/spir.h>
 
 using namespace llvm;
 using namespace spir;
@@ -148,6 +186,7 @@ int mapSpirAccessAndTypeQualifier(int accQual, int typeQual) {
   case CLS_ARG_CONST:     tqCode |= clk::Q_CONST; break;
   case CLS_ARG_RESTRICT:  tqCode |= clk::Q_RESTRICT; break;
   case CLS_ARG_VOLATILE:  tqCode |= clk::Q_VOLATILE; break;
+  case CLS_ARG_PIPE:      tqCode |= clk::Q_PIPE; break;
   default: break;
   }
   return tqCode;
@@ -229,6 +268,8 @@ int mapSpirAccessAndTypeQualifier(const std::string& spirAccQual,
       tqCode |= clk::Q_RESTRICT;
     else if (spirTypeQual == "volatile")
       tqCode |= clk::Q_VOLATILE;
+    else if (spirTypeQual == "pipe")
+      tqCode |= clk::Q_PIPE;
   };
 
   return tqCode;
@@ -716,6 +757,14 @@ public:
       retVal = llvmBuilder.CreateBitCast(To, expr->getType(),
           "tmp");
       break;
+    case Instruction::IntToPtr:
+      retVal = llvmBuilder.CreateCast(llvm::Instruction::IntToPtr, To,
+               expr->getType(), "tmp");
+      break;
+    case Instruction::PtrToInt:
+      retVal = llvmBuilder.CreateCast(llvm::Instruction::PtrToInt, To,
+               expr->getType(), "tmp");
+      break;
     default:
       DEBUG(dbgs() << "ConstExpr " << *expr << " not handled\n");
       assert(NULL);
@@ -736,8 +785,8 @@ public:
 
   // Uses in a constant expression cannot be replaced by Use::replaceAllUsesWith.
   // Two passes are used. In the first pass, constant expressions containing the
-  // use From is converted to instruction using the value To. In the second pass,
-  // a normal replaceAllUsesWith is done.
+  // use From is converted to instruction using the value To recursively. 
+  // In the second pass, a normal replaceAllUsesWith is done.
   void replaceAllUsesWith(Value* From, Value* To) {
     for (Value::use_iterator UI = From->use_begin(),
         UE = From->use_end(); UI != UE; ++UI) {
@@ -745,7 +794,8 @@ public:
         ConstantExpr* expr = dyn_cast<ConstantExpr>(user);
         Instruction* inst = dyn_cast<Instruction>(convertConstExpr(expr,
           From, To));
-        expr->replaceAllUsesWith(inst);
+        // Recursive call to handle users that are ConstantExprs themselves
+        replaceAllUsesWith(expr, inst);
         expr->dropAllReferences();
       }
     }
@@ -2549,6 +2599,7 @@ public:
     case 64: return clk::T_LONG;
     default: assert("unexpected integer size"==NULL);
     }
+    return 0;
   }
 
   // Map llvm vector type to clk type id
@@ -2591,7 +2642,6 @@ public:
       return map(vecTy);
     assert("unhandled type"==NULL);
     return -1;
-
   }
 
   // Add one entry to results knowing the type code
@@ -3636,6 +3686,81 @@ void replaceTrivialConversionFunc(Module& M) {
   deleteFunctions(dead);
 }
 
+static bool changeStructAddrSpace(Function &F, DebugInfoManager& DIManager) {
+  if (F.getCallingConv() != CallingConv::SPIR_KERNEL)
+    return false;
+
+  bool changed = false;
+  FunctionType *FTy = F.getFunctionType();
+  std::vector<Type*> ArgTy;
+  for (Function::arg_iterator I = F.arg_begin(), E = F.arg_end(); I != E; ++I) {
+    Type *Ty = I->getType();
+    PointerType *PTy = dyn_cast<PointerType>(Ty);
+    if (PTy && I->hasByValAttr()) {
+      Type *EltTy = PTy->getElementType();
+      unsigned addrSpace = PTy->getAddressSpace();
+      if (isa<StructType>(EltTy) && addrSpace == PRIVATE_ADDRESS &&
+          EltTy->isSized()) {
+        Ty = PointerType::get(EltTy, GLOBAL_ADDRESS);
+        AMDLLVMBuilder Builder(*F.getParent());
+        Builder.setInsertPointAtAlloca(&F);
+        AllocaInst *AI = Builder.emitAlloca(EltTy, 1,
+                                            std::string(I->getName()) + ".pvt");
+        I->replaceAllUsesWith(AI);
+        LoadInst *LI = Builder.emitLoad(I);
+        StoreInst *SI = Builder.emitStore(LI, AI);
+        I->mutateType(Ty);
+        changed = true;
+        DEBUG(dbgs() <<
+          "Fixed struct by val address space from private to global, kernel: " <<
+           F.getName() << " parameter: " << I->getName() << "\n");
+      }
+    }
+    ArgTy.push_back(Ty);
+  }
+  if (changed) {
+    FTy = FunctionType::get(FTy->getReturnType(), ArgTy, FTy->isVarArg());
+    Function* NewF = Function::Create(FTy, F.getLinkage(), "", F.getParent());
+    NewF->getBasicBlockList().splice(NewF->begin(), F.getBasicBlockList());
+    Function::arg_iterator NewI = NewF->arg_begin();
+    for (Function::arg_iterator I = F.arg_begin(), E = F.arg_end(); I != E;
+         ++I, ++NewI) {
+      I->replaceAllUsesWith(NewI);
+      NewI->takeName(I);
+    }
+    NewF->setCallingConv(F.getCallingConv());
+    NewF->setAttributes(F.getAttributes());
+    NewF->takeName(&F);
+
+    DIManager.replaceFunctionDI(&F, NewF);
+    updateSPIRMetadata(*F.getParent(), &F, NewF);
+  }
+  return changed;
+}
+
+// Change address space of struct by val pointers passed into a SPIR_KERNEL
+// from provate as generated clang to global as passed by RT.
+static bool changeStructAddrSpace(Module &M) {
+  if (M.empty())
+    return false;
+
+  bool changed = false;
+  std::set<Function*> deadFunc;
+  DebugInfoManager DIManager;
+  DIManager.collectFunctionDIs(M);
+  for (Module::iterator fi = M.begin(), fe = M.end(); fi != fe; ++fi) {
+    if (deadFunc.find(fi) == deadFunc.end() &&
+        changeStructAddrSpace(*fi, DIManager)) {
+      deadFunc.insert(fi);
+      changed = true;
+    }
+  }
+  if (changed)
+    deleteFunctions(deadFunc);
+
+  return changed;
+}
+
 } // end of namespace AMDSpir
 
 using namespace AMDSpir;
@@ -3680,28 +3805,18 @@ INITIALIZE_PASS_END(SPIRLoader, "spirloader", "SPIR Binary Loader",
 
 SPIRLoader::SPIRLoader() :
   ModulePass(ID),
-  mTriple(),
-  mLayout(NULL),
   mDemangleBuiltin(true){
 }
 
-SPIRLoader::SPIRLoader(StringRef TripleStr, bool demangleBuiltin)
+SPIRLoader::SPIRLoader(bool demangleBuiltin)
   : ModulePass(ID),
-    mTriple(TripleStr),
-    mLayout(NULL),
     mDemangleBuiltin(demangleBuiltin){
   initializeSPIRLoaderPass(*PassRegistry::getPassRegistry());
-}
-
-void SPIRLoader::getAnalysisUsage(AnalysisUsage &AU) const {
-  AU.addRequired<DataLayout>();
 }
 
 bool
 SPIRLoader::runOnModule(Module &M)
 {
-  mLayout = &getAnalysis<DataLayout>();
-
   static int count = 0;
   //TODO: remove this after development is done
   if (getenv("AMD_SPIR_KEEP_TEMP") != 0) {
@@ -3715,23 +3830,18 @@ SPIRLoader::runOnModule(Module &M)
     llvm::errs().flush();
   }
 
-  Triple SPIRTriple(M.getTargetTriple());
-  if (SPIRTriple.getArch() != Triple::spir &&
-      SPIRTriple.getArch() != Triple::spir64)
-      return false;
+  Triple TargetTriple(M.getTargetTriple());
+  Triple::ArchType Arch = TargetTriple.getArch();
 
-  // Always change the triple to match the target.
-  M.setTargetTriple(mTriple.getTriple());
-  M.setDataLayout(mLayout->getStringRepresentation());
+  assert(Arch != Triple::spir && Arch != Triple::spir64
+         && "Linker must set target triple before calling this pass");
 
-  // No work required if the target is HSAIL, since the backend can
-  // handle SPIR.
-  Triple::ArchType Arch = mTriple.getArch();
-  if (AMDOptions::isTargetHSAIL(mTriple.getTriple()))
-    return false;
+  if (Arch == Triple::hsail || Arch == Triple::hsail_64) {
+    DEBUG(llvm::errs() << "[changeStructAddrSpace]\n";);
+    return changeStructAddrSpace(M);
+  }
 
-  bool usesGPU = (Arch == Triple::amdil || Arch == Triple::amdil64) ||
-    AMDOptions::isTargetHSAIL(M.getTargetTriple());
+  bool usesGPU = (Arch == Triple::amdil || Arch == Triple::amdil64);
 
   LLVMContext &ctx = M.getContext();
 #define STRUCT_TYPE(A) (M.getTypeByName(A) ? M.getTypeByName(A) \
@@ -3834,8 +3944,8 @@ SPIRLoader::runOnModule(Module &M)
 
 // createSPIRLoader - Public interface to this file
 ModulePass *
-llvm::createSPIRLoader(StringRef TripleStr, bool needDemangleBuiltin)
+llvm::createSPIRLoader(bool needDemangleBuiltin)
 {
-  return new SPIRLoader(TripleStr, needDemangleBuiltin);
+  return new SPIRLoader(needDemangleBuiltin);
 }
 #endif

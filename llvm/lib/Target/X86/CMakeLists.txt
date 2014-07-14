@@ -14,6 +14,7 @@ tablegen(LLVM X86GenEDInfo.inc -gen-enhanced-disassembly-info)
 add_public_tablegen_target(X86CommonTableGen)
 
 set(sources
+  AMDX86AddrSpaceCast.cpp
   X86AsmPrinter.cpp
   X86COFFMachineModuleInfo.cpp
   X86CodeEmitter.cpp

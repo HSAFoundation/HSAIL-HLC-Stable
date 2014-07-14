@@ -85,6 +85,8 @@ defm mad24 : TernaryIntrU32<int_HSAIL_mad24_u32, "mad24_u32">;
 defm mul24 : BinaryIntrS32<int_HSAIL_mul24_s32, "mul24_s32">;
 defm mul24 : BinaryIntrU32<int_HSAIL_mul24_u32, "mul24_u32">;
 
+defm pdiv : BinaryIntrF32<int_HSAIL_div_f32, "div_f32">;
+
 defm sqrt : UnaryIntrF32<int_HSAIL_sqrt_ftz_f32, "sqrt_ftz_f32">;
 defm sqrt : UnaryIntrF64<int_HSAIL_sqrt_f64, "sqrt_f64">;
 

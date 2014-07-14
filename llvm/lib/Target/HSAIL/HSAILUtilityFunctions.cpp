@@ -299,6 +299,52 @@ size_t HSAILgetNumElements(PointerType * const PT) {
   return size;
 }
 
+Brig::BrigType16_t HSAILgetBrigType(Type* type, bool is64Bit, bool Signed) {
+  switch (type->getTypeID()) {
+  case Type::VoidTyID:
+    return Brig::BRIG_TYPE_NONE; // TODO_HSA: FIXME: void
+  case Type::FloatTyID:
+    return Brig::BRIG_TYPE_F32;
+  case Type::DoubleTyID:
+    return Brig::BRIG_TYPE_F64;
+  case Type::IntegerTyID:
+    if (type->isIntegerTy(8)) {
+      return Signed ? Brig::BRIG_TYPE_S8 : Brig::BRIG_TYPE_U8;
+    } else if (type->isIntegerTy(16)) {
+      return Signed ? Brig::BRIG_TYPE_S16 : Brig::BRIG_TYPE_U16;
+    } else if (type->isIntegerTy(32)) {
+      return Signed ? Brig::BRIG_TYPE_S32 : Brig::BRIG_TYPE_U32;
+    } else if (type->isIntegerTy(64)) {
+      return Signed ? Brig::BRIG_TYPE_S64 : Brig::BRIG_TYPE_U64;
+    } else if (type->isIntegerTy(1)) {
+      return Brig::BRIG_TYPE_B1;
+    } else {
+      type->dump();
+      assert(!"Found a case we don't handle!");
+    }
+    break;
+  case Type::PointerTyID:
+    if (OpaqueType OT = GetOpaqueType(type)) {
+      if (IsImage(OT)) return Brig::BRIG_TYPE_RWIMG;
+      if (OT == Sampler) return Brig::BRIG_TYPE_SAMP;
+    }
+    return is64Bit ? Brig::BRIG_TYPE_U64 : Brig::BRIG_TYPE_U32;
+  case Type::StructTyID:
+    // Treat struct as array of bytes.
+    return Brig::BRIG_TYPE_U8;
+  case Type::VectorTyID:
+    return HSAILgetBrigType(type->getScalarType(), is64Bit, Signed);
+  case Type::ArrayTyID:
+    return HSAILgetBrigType(dyn_cast<ArrayType>(type)->getElementType(),
+                            is64Bit, Signed);
+  default:
+    type->dump();
+    assert(!"Found a case we don't handle!");
+    break;
+  }
+  return Brig::BRIG_TYPE_U8;  // FIXME needs a value here for linux release build
+}
+
 const llvm::Value *HSAILgetBasePointerValue(const llvm::Value *V)
 {
   if (!V) {
@@ -433,6 +479,11 @@ bool isStore(const llvm::MachineInstr *MI)
   return MI->getDesc().TSFlags & (1ULL << llvm::HSAILTSFLAGS::IS_STORE);
 }
 
+bool isConv(const llvm::MachineInstr *MI)
+{
+  return MI->getDesc().TSFlags & (1ULL << llvm::HSAILTSFLAGS::IS_CONV);
+}
+
 bool HSAILisGlobalInst(const TargetMachine &TM, const llvm::MachineInstr *MI)
 {
   return strstr(TM.getInstrInfo()->getName(MI->getOpcode()), "global");
@@ -449,9 +500,15 @@ bool HSAILisGroupInst(const TargetMachine &TM, const llvm::MachineInstr *MI)
 {
   return strstr(TM.getInstrInfo()->getName(MI->getOpcode()), "group");
 }
-bool HSAILisKernargInst(const TargetMachine &TM, const llvm::MachineInstr *MI)
+bool HSAILisArgInst(const TargetMachine &TM, const llvm::MachineInstr *MI)
 {
-  return strstr(TM.getInstrInfo()->getName(MI->getOpcode()), "PARAM");
+  unsigned op = MI->getOpcode();
+  const TargetInstrInfo *TII = TM.getInstrInfo();
+  const MCInstrDesc &MCID = TII->get(op);
+  if (!MCID.mayLoad() || !MI->hasOneMemOperand()) return false;
+  unsigned as = (*MI->memoperands_begin())->getPointerInfo().getAddrSpace();
+  if (as != HSAILAS::KERNARG_ADDRESS && as != HSAILAS::ARG_ADDRESS) return false;
+  return true;
 }
 
 
@@ -479,6 +536,8 @@ HSAILgetTypeName(Type *ptr, const char *symTab,
         case Sema:          return "semaphore";
         case C32:           return "counter32";
         case C64:           return "counter64";
+        case ReserveId:     return "reserveId";
+        case CLKEventT:     return "clk_event_t";
         case UnknownOpaque: return "opaque";
       }
     }
@@ -773,3 +832,45 @@ bool hasParametrizedAtomicNoRetVersion(const llvm::MachineInstr *MI, SDNode *Nod
          && ((cast<ConstantSDNode>(Node->getOperand(0))->getZExtValue() !=
              Brig::BRIG_ATOMIC_EXCH));
 }
+
+static SDValue generateFenceIntrinsicHelper(SDValue Chain, DebugLoc dl,
+                unsigned brigMemFenceSegmentVal, SDValue brigMemoryOrder,
+                SDValue brigMemoryScope, SelectionDAG &CurDAG) {
+  unsigned fenceOp = HSAILIntrinsic::HSAIL_atomic_memfence;
+  SmallVector<SDValue, 5> Ops;
+
+  SDValue brigMemFenceSegment =
+      CurDAG.getConstant(brigMemFenceSegmentVal, MVT::getIntegerVT(32));
+  Ops.push_back(Chain);
+  Ops.push_back(CurDAG.getTargetConstant(fenceOp, MVT::i64));
+  Ops.push_back(brigMemFenceSegment);
+  Ops.push_back(brigMemoryOrder);
+  Ops.push_back(brigMemoryScope);
+  return CurDAG.getNode(ISD::INTRINSIC_VOID, dl, MVT::Other, Ops.data(),
+          Ops.size());
+}
+
+SDValue generateFenceIntrinsic(SDValue Chain, DebugLoc dl, unsigned memSeg,
+        SDValue brigMemoryOrder, SDValue brigMemoryScope, SelectionDAG &CurDAG) {
+  switch(memSeg) {
+    case llvm::HSAILAS::GLOBAL_ADDRESS:
+        return generateFenceIntrinsicHelper(Chain, dl,
+                Brig::BRIG_MEMORY_FENCE_GLOBAL, brigMemoryOrder, brigMemoryScope,
+                CurDAG);
+    case llvm::HSAILAS::GROUP_ADDRESS:
+        return generateFenceIntrinsicHelper(Chain, dl,
+                Brig::BRIG_MEMORY_FENCE_GROUP, brigMemoryOrder, brigMemoryScope,
+                CurDAG);
+    case llvm::HSAILAS::FLAT_ADDRESS: {
+        SDValue ResNode = generateFenceIntrinsicHelper(Chain, dl,
+                Brig::BRIG_MEMORY_FENCE_GLOBAL, brigMemoryOrder, brigMemoryScope,
+                CurDAG);
+        return generateFenceIntrinsicHelper(ResNode, dl,
+                Brig::BRIG_MEMORY_FENCE_GROUP, brigMemoryOrder,
+                CurDAG.getConstant(Brig::BRIG_MEMORY_SCOPE_WORKGROUP,
+                MVT::getIntegerVT(32)), CurDAG);
+    }
+    default: llvm_unreachable("unexpected memory segment ");
+  }
+}
+

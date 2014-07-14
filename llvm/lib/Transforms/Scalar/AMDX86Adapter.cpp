@@ -49,6 +49,10 @@ public:
     initializeAMDX86AdapterPass(*PassRegistry::getPassRegistry());
   }
 
+  virtual void getAnalysisUsage(AnalysisUsage &AU) const {
+    AU.addRequired<DataLayout>();
+  }
+
   virtual bool runOnModule(Module &M);
 };
 }
@@ -62,11 +66,26 @@ namespace llvm {
 ModulePass *createAMDX86AdapterPass() { return new AMDX86Adapter(); }
 }
 
+/// \brief Check wehther the type is a pointer and returns its
+/// address space.
+/// returns 0 for opaque type pointers.
+static size_t getPtrAddrSpace(Type *Ty) {
+  PointerType *PtrType = dyn_cast<PointerType>(Ty);
+  if(!PtrType) return 0;
+  StructType* StrType = dyn_cast<StructType>(PtrType->getElementType());
+  if(StrType && StrType->isOpaque()) return 0;
+  return (PtrType->getAddressSpace() );
+}
+
 /// \brief Check wehther the type is a pointer and also whether it points to
-/// non-default address space.If yes, return true.
+/// non-default address space.If it is not an opaque type, return true.
+/// Always skip opaque types because they are not "real" pointers.
 static bool isNonDefaultAddrSpacePtr(Type *Ty) {
   PointerType *PtrType = dyn_cast<PointerType>(Ty);
-  return (PtrType && PtrType->getAddressSpace());
+  if(!PtrType) return false;
+  StructType* StrType = dyn_cast<StructType>(PtrType->getElementType());
+  if(StrType && StrType->isOpaque()) return false;
+  return (PtrType->getAddressSpace() != 0);
 }
 
 /// \brief Check whether the Function signature has any of the
@@ -102,22 +121,43 @@ static bool locateFuncName(StringRef FuncName, size_t &FuncNameStart,
 ///  with all the address space of the arguments are "0".
 ///  Name mangling is also modified accordingly to match the
 ///  defintion in the x86 builtins library.
-static Function *getNewX86BuiltinFuncDecl(Function *OldFunc) {
+static Function *getNewX86BuiltinFuncDecl(Function *OldFunc, DataLayout &DL) {
 
   size_t FuncNameStart, FuncNameSize;
-  bool Failure = locateFuncName(OldFunc->getName(), FuncNameStart, FuncNameSize);
+  std::string MangledFuncName = OldFunc->getName();
+  unsigned LocalAS  = 1;
+  unsigned GlobalAS = 3;
+  bool Failure = locateFuncName(OldFunc->getName(),FuncNameStart,FuncNameSize);
   assert(!Failure);
 
-  std::string NewFuncName = OldFunc->getName();
-  size_t StartIndexPos = FuncNameStart + FuncNameSize;
-  while (true) {
-    // Find the Address space pointer arguments in the mangled name.
-    StartIndexPos = NewFuncName.find("3AS", StartIndexPos);
-    if (StartIndexPos == std::string::npos)
-      break;
-    StartIndexPos += 3; // Move right by "3" indexes from "3AS".
-    // Replace this address space with "0"
-    NewFuncName.replace(StartIndexPos, 1, "0");
+  std::string FuncName = MangledFuncName.substr(FuncNameStart,FuncNameSize);
+  std::string NewFuncName =  MangledFuncName;
+  if (FuncName.compare("async_work_group_strided_copy") == 0) {
+     Function::arg_iterator AI = OldFunc->arg_begin();
+     assert(AI != OldFunc->arg_end() && "Invalid number of arguments");
+     PointerType *PtrType = dyn_cast<PointerType>(AI->getType());
+     assert(PtrType && "Invalid argument");
+     size_t AllocatedSize = DL.getTypeAllocSize(PtrType->getElementType());
+     unsigned Arg1AddrSpace = getPtrAddrSpace(PtrType);
+     AI++;
+     assert(AI != OldFunc->arg_end() && "Invalid number of arguments");
+     PtrType = dyn_cast<PointerType>(AI->getType());
+     assert(PtrType && "Invalid argument");
+     unsigned Arg2AddrSpace = getPtrAddrSpace(AI->getType());
+     std::string AllocatedSizeStr = APInt(32,AllocatedSize).toString(10,false);
+     if (Arg1AddrSpace == GlobalAS && Arg2AddrSpace == LocalAS)
+       NewFuncName = "__" + FuncName + "_l2g_" + AllocatedSizeStr ;
+     else if (Arg1AddrSpace == LocalAS && Arg2AddrSpace == GlobalAS)
+       NewFuncName = "__" + FuncName + "_g2l_" + AllocatedSizeStr ;
+  } else {
+    size_t StartIndexPos = FuncNameStart + FuncNameSize;
+    while (true) {
+      // Find the Address space pointer arguments in the mangled name.
+      StartIndexPos = NewFuncName.find("U3AS", StartIndexPos);
+      if (StartIndexPos == std::string::npos)
+        break;
+      NewFuncName.erase(StartIndexPos, 5);
+    }
   }
 
   // Create the arguments vector for new Function.
@@ -139,10 +179,15 @@ static Function *getNewX86BuiltinFuncDecl(Function *OldFunc) {
 
   FunctionType *NewFuncType = FunctionType::get(
       OldFunc->getReturnType(), NewFuncArgs, OldFunc->isVarArg());
-  Function *NewFunc = Function::Create(NewFuncType, OldFunc->getLinkage(),
-                                       NewFuncName, OldFunc->getParent());
-  NewFunc->setCallingConv(OldFunc->getCallingConv());
-  return NewFunc;
+  Module *M = OldFunc->getParent();
+  Value *NewFunc = M->getOrInsertFunction(NewFuncName, NewFuncType);
+  if (Function *Fn = dyn_cast<Function>(NewFunc->stripPointerCasts())) {
+    Fn->setCallingConv(OldFunc->getCallingConv());
+    Fn->setLinkage(OldFunc->getLinkage());
+    return Fn;
+  }
+  assert( 0 && "X86 builtin function could not be declared");
+  return NULL;
 }
 
 /// \brief Define the x86 OpenCL builtin called by the user to call the
@@ -154,7 +199,7 @@ void createX86BuiltinFuncDefn(Function *OldFunc, Function *NewFunc) {
   OldFunc->addFnAttr(Attributes::NoUnwind);
 
   BasicBlock *EntryBlock =
-      BasicBlock::Create(getGlobalContext(), "entry", OldFunc);
+      BasicBlock::Create(OldFunc->getContext(), "entry", OldFunc);
   IRBuilder<> BBBuilder(EntryBlock);
   SmallVector<llvm::Value *, 4> NewFuncCallArgs;
 
@@ -175,28 +220,32 @@ void createX86BuiltinFuncDefn(Function *OldFunc, Function *NewFunc) {
     NewFuncCallArgs.push_back(BitCastVal);
   }
 
-  Value *CallInstVal = BBBuilder.CreateCall(NewFunc, NewFuncCallArgs, "call");
+  Value *CallInstVal = BBBuilder.CreateCall(NewFunc, NewFuncCallArgs);
+  
+  if (CallInstVal->getType()->isVoidTy()) {
+    BBBuilder.CreateRetVoid();
+	return;
+  }
   BBBuilder.CreateRet(CallInstVal);
 }
 
 /// \brief Generate right function calls for all "undefined" x86 OpenCL builtins
 /// in the whole Module. Returns true if atleast one of the x86 OpenCL builtin
 /// has been modified.
-static bool findAndDefineBuitlinCalls(Module &M) {
+static bool findAndDefineBuitlinCalls(Module &M, DataLayout &DL) {
   bool isModified = false;
   for (Module::iterator FI = M.begin(), E = M.end(); FI != E; ++FI) {
 
     // Search only for used, undefined OpenCL builtin functions,
     // which has non-default addr space pointer arguments.
-
-    if (!FI->empty() || FI->use_empty() || /* !isOpenCLBuiltinFunction(FI) || */
+    if (!FI->empty() || FI->use_empty() || !isOpenCLBuiltinFunction(FI) ||
         !hasNonDefaultAddrSpaceArg(FI))
       continue;
 
     isModified = true;
     DEBUG(dbgs() << "\n Modifying Func " << FI->getName());
     // Get the new Function declaration.
-    Function *NewFunc = getNewX86BuiltinFuncDecl(FI);
+    Function *NewFunc = getNewX86BuiltinFuncDecl(FI,DL);
     DEBUG(dbgs() << " to call " << NewFunc->getName() << " Function");
     createX86BuiltinFuncDefn(FI, NewFunc);
   }
@@ -205,5 +254,5 @@ static bool findAndDefineBuitlinCalls(Module &M) {
 
 bool AMDX86Adapter::runOnModule(Module &M) {
   DEBUG(dbgs() << "\nAMD X86 Adapter Pass\n");
-  return findAndDefineBuitlinCalls(M);
+  return findAndDefineBuitlinCalls(M, getAnalysis<DataLayout>());
 }

@@ -57,18 +57,6 @@
 
 // integer subtraction
 // a - b ==> a + (-b)
-def SUBi8rr : Pat<(sub GPRI8:$src0, GPRI8:$src1),
-    (ADDi8rr GPRI8:$src0, (NEGi8r GPRI8:$src1))>;
-def SUBv2i8rr : Pat<(sub GPRV2I8:$src0, GPRV2I8:$src1),
-    (ADDv2i8rr GPRV2I8:$src0, (NEGv2i8r GPRV2I8:$src1))>;
-def SUBv4i8rr : Pat<(sub GPRV4I8:$src0, GPRV4I8:$src1),
-    (ADDv4i8rr GPRV4I8:$src0, (NEGv4i8r GPRV4I8:$src1))>;
-def SUBi16rr : Pat<(sub GPRI16:$src0, GPRI16:$src1),
-    (ADDi16rr GPRI16:$src0, (NEGi16r GPRI16:$src1))>;
-def SUBv2i16rr : Pat<(sub GPRV2I16:$src0, GPRV2I16:$src1),
-    (ADDv2i16rr GPRV2I16:$src0, (NEGv2i16r GPRV2I16:$src1))>;
-def SUBv4i16rr : Pat<(sub GPRV4I16:$src0, GPRV4I16:$src1),
-    (ADDv4i16rr GPRV4I16:$src0, (NEGv4i16r GPRV4I16:$src1))>;
 def SUBi32rr : Pat<(sub GPR_32:$src0, GPR_32:$src1),
     (ADDi32rr GPR_32:$src0, (NEGi32r GPR_32:$src1))>;
 def SUBv2i32rr : Pat<(sub GPRV2I32:$src0, GPRV2I32:$src1),
@@ -82,10 +70,6 @@ def : Pat<(build_vector (f32 fpimm:$src)),
     (v4f32 (VCREATEv4f32r (LOADCONSTf32 fpimm:$src)))>;
 def : Pat<(build_vector (i32 imm:$src)),
     (v4i32 (VCREATEv4i32r (LOADCONSTi32 imm:$src)))>;
-def : Pat<(build_vector (i16 imm:$src)),
-    (VCREATEv4i16r (LOADCONSTi16 imm:$src))>;
-def : Pat<(build_vector (i8 imm:$src)),
-    (VCREATEv4i8r (LOADCONSTi8 imm:$src))>;
 def : Pat<(build_vector (f64 fpimm:$src)),
     (v2f64 (VCREATEv2f64r (LOADCONSTf64 fpimm:$src)))>;
 def : Pat<(build_vector (f32 fpimm:$src)),
@@ -94,10 +78,6 @@ def : Pat<(build_vector (i64 imm:$src)),
     (v2i64 (VCREATEv2i64r (LOADCONSTi64 imm:$src)))>;
 def : Pat<(build_vector (i32 imm:$src)),
     (v2i32 (VCREATEv2i32r (LOADCONSTi32 imm:$src)))>;
-def : Pat<(build_vector (i16 imm:$src)),
-    (VCREATEv2i16r (LOADCONSTi16 imm:$src))>;
-def : Pat<(build_vector (i8 imm:$src)),
-    (VCREATEv2i8r (LOADCONSTi8 imm:$src))>;
 
 // Calls:
 def : Pat<(IL_call tglobaladdr:$dst),

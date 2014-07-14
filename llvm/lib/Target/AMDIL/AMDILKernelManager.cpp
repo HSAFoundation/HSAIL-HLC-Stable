@@ -115,9 +115,11 @@ void printRegName(AMDILAsmPrinter *RegNames,
 // setup of kernel arguments are done during lowering instead of being done
 // during AsmPrinter pass.
 unsigned AMDILKernelManager::getActualArgReg(unsigned FormalReg) {
+#if 0
   if (!mSTM->isSupported(AMDIL::Caps::UseMacroForCall)) {
     return FormalReg;
   }
+#endif
 
   if (isXComponentReg(FormalReg))
     return FormalReg - AMDIL::INx0 + AMDIL::Rx1;
@@ -356,8 +358,8 @@ AMDILKernelManager::AMDILKernelManager(MachineFunction *MF)
 
   mKernelName = MF->getName();
   mName = AMDSymbolNames::undecorateKernelFunctionName(mKernelName);
-  mStubName = mSTM->isSupported(AMDIL::Caps::UseMacroForCall)?
-      AMDSymbolNames::decorateStubFunctionName(mName):mName;
+  mStubName = (1 || mSTM->isSupported(AMDIL::Caps::UseMacroForCall)) ?
+      AMDSymbolNames::decorateStubFunctionName(mName) : mName;
 
 }
 
@@ -384,8 +386,10 @@ void AMDILKernelManager::processArgMetadata(raw_ostream &O, uint32_t Buf)
   int raw_uav_buffer = mSTM->getResourceID(AMDIL::RAW_UAV_ID);
   bool MultiUAV = mSTM->isSupported(AMDIL::Caps::MultiUAV);
   bool ArenaSegment = mSTM->isSupported(AMDIL::Caps::ArenaSegment);
-  int NumWriteImages = mMFI->get_num_write_images();
-  if (NumWriteImages == OPENCL_MAX_WRITE_IMAGES || MultiUAV || ArenaSegment) {
+  unsigned NumWriteImages = mMFI->get_num_write_images();
+  if (MultiUAV ||
+      ArenaSegment ||
+      NumWriteImages == mSTM->getMaxNumWriteImages()) {
     if (mSTM->getGeneration() <= AMDIL::NORTHERN_ISLANDS) {
       raw_uav_buffer = mSTM->getResourceID(AMDIL::ARENA_UAV_ID);
     }
@@ -476,8 +480,13 @@ void AMDILKernelManager::processArgMetadata(raw_ostream &O, uint32_t Buf)
                                                (ROArg + WOArg))) {
                 uint32_t offset = 0;
                 offset += WOArg;
-                ImageArg += "WO:" + itostr(offset & 0x7);
-                O << "dcl_uav_id(" << ((offset) & 0x7) << ")_type(";
+                ImageArg += "WO:" + itostr(offset);
+                if (mSTM->getGeneration() <= AMDIL::NORTHERN_ISLANDS) {
+                  O << "dcl_uav";
+                } else {
+                  O << "dcl_typed_uav";
+                }
+                O << "_id(" << (offset) << ")_type(";
                 if (i1d)
                   O << "1d";
                 else if (i1da)
@@ -730,7 +739,7 @@ void AMDILKernelManager::printDecls(AMDILAsmPrinter *AsmPrinter,
       || mSTM->getGeneration() == AMDIL::NORTHERN_ISLANDS) {
     if ((mSTM->getResourceID(AMDIL::RAW_UAV_ID) < 11 &&
           mMFI->get_num_write_images()
-         != OPENCL_MAX_WRITE_IMAGES
+         != mSTM->getMaxNumWriteImages()
          && !mSTM->isSupported(AMDIL::Caps::MultiUAV))
         || mSTM->getResourceID(AMDIL::RAW_UAV_ID) == 11) {
       if (!mMFI->usesMem(AMDIL::RAW_UAV_ID) &&
@@ -1183,8 +1192,8 @@ void AMDILKernelManager::printKernelArgs(raw_ostream &O, bool IsWrapper) {
         } else {
           ID = mSTM->getResourceID(AMDIL::ARENA_UAV_ID);
         }
-      } else if ((mMFI->get_num_write_images()) != OPENCL_MAX_WRITE_IMAGES &&
-                 !mSTM->isSupported(AMDIL::Caps::ArenaSegment) &&
+      } else if (!mSTM->isSupported(AMDIL::Caps::ArenaSegment) &&
+                 (mMFI->get_num_write_images() != mSTM->getMaxNumWriteImages())&&
                  mMFI->uav_count(mSTM->getResourceID(AMDIL::RAW_UAV_ID))) {
         ID = mSTM->getResourceID(AMDIL::RAW_UAV_ID);;
       } else if (mMFI->uav_size() > 1){
@@ -1217,8 +1226,7 @@ void AMDILKernelManager::printKernelArgs(raw_ostream &O, bool IsWrapper) {
     }
   }
   if (IsWrapper) {
-    O << ";privateid:" << mSTM->getResourceID(AMDIL::SCRATCH_ID)
-      << "\n";
+    O << ";privateid:" << mSTM->getResourceID(AMDIL::SCRATCH_ID) << '\n';
   }
   if (IsWrapper) {
     SmallString<32> ArgKernel("llvm.argtypename.annotations.");
@@ -1249,25 +1257,13 @@ void AMDILKernelManager::printKernelArgs(raw_ostream &O, bool IsWrapper) {
 
 void AMDILKernelManager::printArgCopies(raw_ostream &O,
                                         AMDILAsmPrinter *RegNames) {
-  Function::const_arg_iterator I = mMF->getFunction()->arg_begin();
-  Function::const_arg_iterator Ie = mMF->getFunction()->arg_end();
-  uint32_t Counter = 0;
   uint32_t ArgSize = mMFI->getArgSize();
-  bool CopyArg = !mSTM->isSupported(AMDIL::Caps::UseMacroForCall);
-
-  if (CopyArg) {
-    O << "dcl_literal l3, 0x00000018, 0x00000010, 0x00000008, 0xFFFFFFFF\n";
-    O << "dcl_literal l5, 0x00000000, 0x00000004, 0x00000008, 0x0000000C\n";
-  }
-
-  if (mMFI->getArgSize()) {
-    O << "dcl_cb cb1";
-    O << "[" << (ArgSize >> 4) << "]\n";
+  if (ArgSize != 0) {
+    O << "dcl_cb cb1[" << (ArgSize >> 4) << "]\n";
     mMFI->setUsesMem(AMDIL::CONSTANT_ID);
   }
 
-  const Function *F = mMF->getFunction();
-  // Get the stack size
+  // Get the stack size.
   uint32_t StackSize = mMFI->getStackSize();
   uint32_t PrivateSize = mMFI->getScratchSize();
   uint32_t StackOffset = PrivateSize;
@@ -1276,22 +1272,13 @@ void AMDILKernelManager::printArgCopies(raw_ostream &O,
 
   uint32_t literalId = uint32_t(-1);
 
-  if (mSTM->usesHardware(AMDIL::Caps::PrivateMem)
-      && !mSTM->overridesFlatAS()) {
+  if (mSTM->usesHardware(AMDIL::Caps::PrivateMem) && !mSTM->overridesFlatAS()) {
     // TODO: If the size is too large, we need to fall back to software emulated
     // instead of using the hardware capability.
 
-    uint64_t Size;
-    if (CopyArg) {
-      Size = (StackSize >> 4) +
-      (mSTM->isSupported(AMDIL::Caps::Debug) ? 1 : 0);
-    } else {
-      Size = getReservedStackSize() >> 4;
-    }
-
-    if (Size > 4096) {
+    uint64_t Size = getReservedStackSize() >> 4;
+    if (Size > 4096)
       mMFI->addErrorMsg(amd::CompilerErrorMessage[INSUFFICIENT_PRIVATE_RESOURCES]);
-    }
 
     if (Size > 0) {
       uint32_t ResID = mSTM->getResourceID(AMDIL::SCRATCH_ID);
@@ -1303,207 +1290,26 @@ void AMDILKernelManager::printArgCopies(raw_ostream &O,
       if (mSTM->usesHardware(AMDIL::Caps::PrivateUAV)) {
         O << "dcl_typeless_uav_id(" << ResID
           << ")_stride(4)_length(" << (Size << 4) << ")_access(private)\n";
-        if (CopyArg && mSTM->isSupported(AMDIL::Caps::Debug)) {
-          int NewSize = (Size - 1) << 4;
-          uint32_t id = mAMI->getUniqueLiteralId();
-          O << "dcl_literal l" << id << ", "
-            << NewSize << ","
-            << NewSize << ","
-            << NewSize << ","
-            << NewSize << "\n";
-          O << "uav_raw_store_id(" << ResID << ") mem0, l"
-            << id << ", r1023\n";
-        }
       } else {
         O << "dcl_indexed_temp_array x"
-          << ResID << "["
+          << ResID << '['
           << Size << "]\n";
-        if (CopyArg && mSTM->isSupported(AMDIL::Caps::Debug)) {
-          O << "mov x" << ResID << "[" << Size - 1 << "], r1023\n";
-        }
       }
-      if (CopyArg) {
-      literalId = mAMI->getUniqueLiteralId();
-        O << "dcl_literal l" << literalId << ", " << StackSize << ", "
-          << PrivateSize << ", 16, "
-          << ((StackSize == PrivateSize) ? 0 : StackOffset) << "\n";
-
-        O << "iadd r0.x, " << RegNames->getRegisterName(AMDIL::T1) << ".x, l"
-        << literalId << ".w\n"
-        << "mov " << RegNames->getRegisterName(AMDIL::FP)
-        << ", l" << literalId << ".0\n";
     }
   }
-  }
-  if (CopyArg) {
-  I = mMF->getFunction()->arg_begin();
-  unsigned CurReg = 0;
-  for (I = mMF->getFunction()->arg_begin(); I != Ie; ++I) {
-    Type *CurType = I->getType();
-    unsigned int Buffer = 1;
-    O << "; Kernel arg setup: " << I->getName().str() << "\n";
-    if (CurType->isIntegerTy() || CurType->isFloatingPointTy()) {
-      switch (CurType->getPrimitiveSizeInBits()) {
-      default:
-        printConstantToRegMapping(RegNames, CurReg, O, Counter, Buffer, 1);
-        break;
-      case 16:
-        printConstantToRegMapping(RegNames, CurReg, O, Counter, Buffer, 1,
-                                  "l3.y" );
-        break;
-      case 8:
-        printConstantToRegMapping(RegNames, CurReg, O, Counter, Buffer, 1, "l3.x" );
-        break;
-      }
-    } else if (const VectorType *VT = dyn_cast<VectorType>(CurType)) {
-      Type *ET = VT->getElementType();
-      int NumEle = VT->getNumElements();
-      switch (ET->getPrimitiveSizeInBits()) {
-      default:
-        printConstantToRegMapping(RegNames, CurReg, O, Counter, Buffer,
-                                  (NumEle + 2) >> 2);
-        break;
-      case 64:
-        if (NumEle == 3) {
-          O << "mov ";
-          printRegName(RegNames, getActualArgReg(mMFI->getArgReg(CurReg++)), O, true);
-          O << ", cb" << Buffer << "[" << Counter << "].xy\n";
-          O << "mov ";
-          printRegName(RegNames, getActualArgReg(mMFI->getArgReg(CurReg++)), O, true);
-          O << ", cb" << Buffer << "[" << Counter << "].zw\n";
-          ++Counter;
-          O << "mov ";
-          printRegName(RegNames, getActualArgReg(mMFI->getArgReg(CurReg++)), O, true);
-          O << ", cb" << Buffer << "[" << Counter << "].xy\n";
-          Counter++;
-        } else {
-          printConstantToRegMapping(RegNames, CurReg, O, Counter, Buffer,
-                                    NumEle >> 1);
-        }
-        break;
-      case 16:
-        if (NumEle == 2) {
-          printConstantToRegMapping(RegNames, CurReg, O, Counter,
-                                    Buffer, 1, "l3.y", 1092);
-        } else {
-          printConstantToRegMapping(RegNames, CurReg, O, Counter,
-                                    Buffer, (NumEle + 2) >> 2, "l3.y", 1093);
-        }
-        break;
-      case 8:
-        if (NumEle == 2) {
-          printConstantToRegMapping(RegNames, CurReg, O, Counter,
-                                    Buffer, 1, "l3.x", 1090);
-        } else {
-          printConstantToRegMapping(RegNames, CurReg, O, Counter,
-                                    Buffer, (NumEle + 2) >> 2, "l3.x", 1091);
-        }
-        break;
-      }
-    } else if (const PointerType *PT = dyn_cast<PointerType>(CurType)) {
-      Type *CT = PT->getElementType();
-      const StructType *ST = dyn_cast<StructType>(CT);
-      if (ST && ST->isOpaque()) {
-        bool i1d  = ST->getName().startswith("struct._image1d_t");
-        bool i1da = ST->getName().startswith("struct._image1d_array_t");
-        bool i1db = ST->getName().startswith("struct._image1d_buffer_t");
-        bool i2d  = ST->getName().startswith("struct._image2d_t");
-        bool i2da = ST->getName().startswith("struct._image2d_array_t");
-        bool i3d  = ST->getName().startswith("struct._image3d_t");
-        bool is_image = i1d || i1da || i1db || i2d || i2da || i3d;
 
-        if (is_image) {
-          if (mSTM->isSupported(AMDIL::Caps::Images)) {
-            printConstantToRegMapping(RegNames, CurReg, O, Counter, Buffer,
-                1, NULL, 0, is_image);
-          } else {
-            mMFI->addErrorMsg(
-                amd::CompilerErrorMessage[NO_IMAGE_SUPPORT]);
-            ++CurReg;
-          }
-        } else {
-          printConstantToRegMapping(RegNames, CurReg, O, Counter, Buffer, 1);
-        }
-      } else if (CT->isStructTy()
-                 && PT->getAddressSpace() == AMDILAS::PRIVATE_ADDRESS) {
-        StructType *ST = dyn_cast<StructType>(CT);
-        bool i1d  = ST->getName().startswith("struct._image1d_t");
-        bool i1da = ST->getName().startswith("struct._image1d_array_t");
-        bool i1db = ST->getName().startswith("struct._image1d_buffer_t");
-        bool i2d  = ST->getName().startswith("struct._image2d_t");
-        bool i2da = ST->getName().startswith("struct._image2d_array_t");
-        bool i3d  = ST->getName().startswith("struct._image3d_t");
-        bool is_image = i1d || i1da || i1db || i2d || i2da || i3d;
-
-        if (is_image) {
-          if (mSTM->isSupported(AMDIL::Caps::Images)) {
-            printConstantToRegMapping(RegNames, CurReg, O, Counter, Buffer,
-                1, NULL, 0, is_image);
-          } else {
-            mMFI->addErrorMsg(amd::CompilerErrorMessage[NO_IMAGE_SUPPORT]);
-            ++CurReg;
-          }
-        } else {
-          const DataLayout *DL = mTM->getDataLayout();
-          size_t StructSize
-            = DL->RoundUpAlignment(DL->getTypeAllocSize(ST), 16);
-
-          //StackOffset += StructSize;
-          O << "mov ";
-          printRegName(RegNames, getActualArgReg(mMFI->getArgReg(CurReg)), O, true);
-          O << ", r0.x\n";
-          assert(literalId != uint32_t(-1) && "Use undefined literal");
-          printCopyStructPrivate(ST, O, StructSize,
-                                 Buffer, literalId, Counter);
-          ++CurReg;
-        }
-      } else if (CT->isIntOrIntVectorTy()
-                 || CT->isFPOrFPVectorTy()
-                 || CT->isArrayTy()
-                 || CT->isPointerTy()
-                 || PT->getAddressSpace() != AMDILAS::PRIVATE_ADDRESS) {
-        if (PT->getAddressSpace() == AMDILAS::CONSTANT_ADDRESS) {
-          const AMDILKernel *Kernel = mAMI->getKernel(mKernelName);
-          printConstantToRegMapping(RegNames, CurReg, O, Counter, Buffer,
-              1, NULL, 0, false,
-              mAMI->usesHWConstant(Kernel, I->getName()));
-        } else if (PT->getAddressSpace() == AMDILAS::REGION_ADDRESS) {
-          // TODO: If we are Region address space, the first Region pointer, no
-          // array pointers exist, and hardware RegionMem is enabled then we can
-          // zero out register as the initial offset is zero.
-          printConstantToRegMapping(RegNames, CurReg, O, Counter, Buffer, 1);
-        } else if (PT->getAddressSpace() == AMDILAS::LOCAL_ADDRESS) {
-          // TODO: If we are local address space, the first local pointer, no
-          // array pointers exist, and hardware LocalMem is enabled then we can
-          // zero out register as the initial offset is zero.
-          printConstantToRegMapping(RegNames, CurReg, O, Counter, Buffer, 1);
-        } else {
-          printConstantToRegMapping(RegNames, CurReg, O, Counter, Buffer, 1);
-        }
-      } else {
-        llvm_unreachable("Current type is not supported!");
-        mMFI->addErrorMsg(amd::CompilerErrorMessage[INTERNAL_ERROR]);
-        ++CurReg;
-      }
-    } else {
-      llvm_unreachable("Current type is not supported!");
-      mMFI->addErrorMsg(amd::CompilerErrorMessage[INTERNAL_ERROR]);
-      ++CurReg;
-    }
-  }
-  }
   if (mSTM->usesHardware(AMDIL::Caps::ConstantMem)) {
     const AMDILKernel *Kernel = mAMI->getKernel(mKernelName);
     uint32_t ConstNum = 0;
-    for (unsigned I = 0, MaxCBs = mSTM->getMaxNumCBs();
-         I < MaxCBs; ++I) {
+    for (unsigned I = 0, MaxCBs = mSTM->getMaxNumCBs(); I < MaxCBs; ++I) {
       if (Kernel->constSizes[I]) {
-        O << "dcl_cb cb" << I + CB_BASE_OFFSET;
-        O << "[" << (((Kernel->constSizes[I] + 15) & ~15) >> 4) << "]\n";
+        O << "dcl_cb cb" << I + CB_BASE_OFFSET
+          << '[' << (((Kernel->constSizes[I] + 15) & ~15) >> 4) << "]\n";
         ++ConstNum;
         mMFI->setUsesMem(AMDIL::CONSTANT_ID);
       }
     }
+
     // TODO: If we run out of constant resources, we need to push some of the
     // constant pointers to the software emulated section.
     if (ConstNum > mSTM->getMaxNumCBs()) {

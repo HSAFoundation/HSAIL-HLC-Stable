@@ -1183,8 +1183,6 @@ class AsmStr<string a="", string b="", string c="", string d="", string e=""> {
 }
 
 // Predicate defs
-def HSAILArchGeneric      : Predicate<"!Subtarget->usesFlatAddr()">;
-def HSAILArchUsesFlatAddr : Predicate<"Subtarget->usesFlatAddr()">;
 def HSAILisKernel         : Predicate<"isKernelFunc()">;
 def HSAILisNotKernel      : Predicate<"!isKernelFunc()">;
 

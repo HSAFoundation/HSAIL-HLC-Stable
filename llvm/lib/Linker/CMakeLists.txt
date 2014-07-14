@@ -3,4 +3,6 @@ add_llvm_library(LLVMLinker
   LinkItems.cpp
   LinkModules.cpp
   Linker.cpp
+  AMDResolveLinker.cpp
+  AMDPrelinkOpt.cpp
   )

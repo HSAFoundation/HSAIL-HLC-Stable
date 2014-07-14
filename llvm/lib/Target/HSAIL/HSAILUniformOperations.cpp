@@ -24,8 +24,6 @@ namespace llvm {
     cl::desc("Uniform operation analysis depth treshold"),
     cl::location(UniformOperationsAnalysisDepth),
     cl::init(20));
-
-  bool EnableUniformForNonConst;
 }
 
 char HSAILUniformOperations::ID = 0;
@@ -78,7 +76,8 @@ namespace llvm
           Brig::BrigWidth currWidth = processLoad(F, currInstr, walk);
           if ( currWidth != Brig::BRIG_WIDTH_1 ) {
             if (!constLoads.count(currInstr)) {
-              if( !hasStoreAtThePath(F, currInstr) )
+              if( !hasStoreAtThePath(F, currInstr) &&
+                  isKernelFunc(F.getFunction()) ) // A store may be in a caller
               {
                 constLoads.insert(currInstr);
               }
@@ -181,18 +180,9 @@ HSAILUniformOperations::IsConstBase( MachineFunction &F, MachineOperand &MO )
     case HSAILAS::GLOBAL_ADDRESS:
       return Brig::BRIG_WIDTH_ALL;
     case HSAILAS::CONSTANT_ADDRESS:
+    case HSAILAS::KERNARG_ADDRESS:
       constLoads.insert(inst);
       return Brig::BRIG_WIDTH_ALL;
-    case HSAILAS::PRIVATE_ADDRESS:
-      {
-        // EPR# 391731 workaround. struct_by_val
-        // kernargs are currently passed with ADDSPACE_PRIVATE.
-        // So we have a weird ld_global_* with private addrpace.
-        if ( HSAILisGlobalInst( TM, inst ) ) {
-          return Brig::BRIG_WIDTH_ALL;
-        }
-        return Brig::BRIG_WIDTH_1;
-      }
     default:
       return Brig::BRIG_WIDTH_1;
     }
@@ -280,18 +270,16 @@ HSAILUniformOperations::IsConstBase( MachineFunction &F, MachineOperand &MO )
         case HSAIL::get_local_id_i:
         case HSAIL::get_lane_id:
         case HSAIL::get_dynwave_id:
-        case HSAIL::ld_rarg_b1:
-        case HSAIL::ld_rarg_f32:
-        case HSAIL::ld_rarg_f64:
-        case HSAIL::ld_rarg_u8:
-        case HSAIL::ld_rarg_u16:
-        case HSAIL::ld_rarg_u32:
-        case HSAIL::ld_rarg_u64:
             return Brig::BRIG_WIDTH_1;
         case HSAIL::get_group_id_i:
         case HSAIL::get_cu:
             return Brig::BRIG_WIDTH_WAVESIZE;
       }
+
+      // TODO_HSA: Process uniform call values.
+      //           Return arguments are actually can have uniform values as
+      //           long as the call target is uniform, has readnone attribute,
+      //           and all its arguments are uniform.
 
       // HSA TODO: uncomment as soon call support is ready
       //if ( inst->isCall())

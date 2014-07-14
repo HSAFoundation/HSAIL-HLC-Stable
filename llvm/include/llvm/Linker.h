@@ -254,8 +254,7 @@ class Linker {
       Module* Src,              ///< Module linked into \p Dest
       std::string* ErrorMsg = 0 /// Error/diagnostic string
     ) { 
-      return LinkModules(Composite, Src, Linker::DestroySource,
-                         ReferenceMap, ErrorMsg); 
+      return LinkModules(Composite, Src, Linker::DestroySource, ErrorMsg);
     }
 
     /// This is the heart of the linker. This method will take unconditional
@@ -270,16 +269,14 @@ class Linker {
     /// @returns True if an error occurs, false otherwise.
     /// @brief Generically link two modules together.
 
+#if defined(AMD_OPENCL) || 1
     static bool LinkModules(Module* Dest, Module* Src, unsigned Mode,
-                            std::map<const Value*, bool> &ReferenceMap,
-                            std::string* ErrorMsg,
-                            bool useRefMap = false);
+                            std::map<const Value*, bool>* ReferenceMap,
+                            std::string* ErrorMsg);
+#endif
 
     static bool LinkModules(Module* Dest, Module* Src, unsigned Mode,
-                            std::string* ErrorMsg)
-    {
-      return LinkModules(Dest, Src, Mode, ReferenceMap, ErrorMsg);
-    }
+                            std::string* ErrorMsg);
 
     /// This function looks through the Linker's LibPaths to find a library with
     /// the name \p Filename. If the library cannot be found, the returned path
@@ -295,7 +292,6 @@ class Linker {
     /// Read in and parse the bitcode file named by FN and return the
     /// Module it contains (wrapped in an auto_ptr), or 0 if an error occurs.
     std::auto_ptr<Module> LoadObject(const sys::Path& FN);
-    static std::map<const Value*, bool> ReferenceMap;
 
     bool warning(StringRef message);
     bool error(StringRef message);

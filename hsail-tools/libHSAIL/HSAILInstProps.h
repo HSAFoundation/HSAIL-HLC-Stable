@@ -14,6 +14,21 @@ namespace HSAIL_PROPS
 
 #include "HSAILBrigProps_gen.hpp"
 
+inline bool isTypeProp(unsigned propId)
+{
+    switch(propId)
+    {
+    case PROP_COORDTYPE:
+    case PROP_IMAGETYPE:
+    case PROP_SIGNALTYPE:
+    case PROP_SOURCETYPE:
+    case PROP_TYPE:
+        return true;
+    default:
+        return false;
+    }
+}
+
 //==============================================================================
 // Ids of non-Brig properties defined in HDL
 
@@ -38,6 +53,23 @@ enum // Non-Brig properties
 
     PROP_MAXID
 };
+
+inline bool isOperandProp(unsigned propId)
+{
+    switch(propId)
+    {
+    case PROP_D0:
+    case PROP_D1:                 
+    case PROP_S0:
+    case PROP_S1:
+    case PROP_S2:
+    case PROP_S3:
+    case PROP_S4:
+        return true;
+    default: 
+        return false;
+    }
+}
 
 //==============================================================================
 // Ids of property attributes

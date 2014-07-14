@@ -57,8 +57,8 @@ LOCAL_CPPFLAGS :=	\
 	-fno-tree-vectorize \
 	-DUNIX_OS \
 	-DqLittleEndian \
-	-D OPENCL_MAJOR=1 \
-	-D OPENCL_MINOR=2 \
+	-D OPENCL_MAJOR=2 \
+	-D OPENCL_MINOR=0 \
 	-D WITH_TARGET_HSAIL \
 	-D WITH_AQL \
 	-D WITH_ONLINE_COMPILER \
@@ -68,7 +68,11 @@ LOCAL_CPPFLAGS :=	\
 	-D ATI_BITS_32 \
 	-D ATI_COMP_GCC \
 	-D AMD_LLVM_INTERNAL \
-	-D AMD_HSAIL
+	-D AMD_HSAIL \
+
+#TODO
+#	-std=c++11 \
+	-nostdinc++
 
 # Make sure bionic is first so we can include system headers.
 LOCAL_C_INCLUDES :=	\
@@ -77,7 +81,7 @@ LOCAL_C_INCLUDES :=	\
 	$(LLVM_ROOT_PATH)/host/include	\
 	$(LLVM_ROOT_PATH)/linux/include	\
 	$(LOCAL_C_INCLUDES) \
-	
+
 #	bionic \
 	external/stlport/stlport \
 

@@ -27,6 +27,8 @@ namespace llvm {
     Sema,
     Sampler,
     Event,
+    ReserveId,
+    CLKEventT,
     UnknownOpaque
   };
 

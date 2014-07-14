@@ -46,10 +46,8 @@ namespace {
           return InlineCost::getNever();
       }
 
-      Function *Caller = CS.getCaller();
       // Support function call in amdil
-      if (!Caller->getFnAttributes().hasAttribute(Attributes::NoInline) &&
-          Callee->getFnAttributes().hasAttribute(Attributes::NoInline)) {
+      if (Callee->getFnAttributes().hasAttribute(Attributes::NoInline)) {
         DEBUG_WITH_TYPE("noinline",
           llvm::dbgs() << "[AMDILInlineAll::getInlineCost] "
             << CS.getCalledFunction()->getName()

@@ -11,6 +11,7 @@ x86_codegen_TBLGEN_TABLES := \
   X86GenCallingConv.inc
 
 x86_codegen_SRC_FILES := \
+  AMDX86AddrSpaceCast.cpp \
   X86AsmPrinter.cpp \
   X86COFFMachineModuleInfo.cpp \
   X86CodeEmitter.cpp \

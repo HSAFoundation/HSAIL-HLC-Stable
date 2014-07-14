@@ -2751,7 +2751,7 @@ print cpp(<<"EOT");
     |class InstValidator : public PropValidator 
     |{
     |public:
-    |    InstValidator(unsigned model) : PropValidator(model) {}
+    |    InstValidator(unsigned model, unsigned profile) : PropValidator(model, profile) {}
     |    void validateInst(Inst inst);
 EOT
 
@@ -2814,7 +2814,7 @@ print cpp(<<"EOT");
     |class PropDescImpl : public PropValidator
     |{
     |public:
-    |     PropDescImpl(unsigned model) : PropValidator(model) {}
+    |     PropDescImpl(unsigned model, unsigned profile) : PropValidator(model, profile) {}
     |
     |public:
     |    static const unsigned* getPropVals(unsigned propId, unsigned& num); // should include XXX_VAL_INVALID for invalid values (non-brig only)

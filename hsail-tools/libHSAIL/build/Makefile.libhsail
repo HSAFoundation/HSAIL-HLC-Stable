@@ -4,7 +4,8 @@ include $(ASM_DEPTH)/asmdefs
 MYPERL=$(DK_ROOT)/perl/5.16.1/bin/perl -I "$(DK_ROOT)/perl/5.16.1/lib"
 
 ifeq ($(BUILD_HSA_TARGET),yes)
-DIST_INCLUDE_TARGETS = Brig.h Brig_new.hpp
+DIST_INCLUDE_TARGETS = Brig.h Brig_new.hpp hsail_c.h
+DIST_LIB_TARGETS = $(LIB_TARGET)$(LIB_EXT)
 endif
 
 LIB_TARGET = LIBHSAIL

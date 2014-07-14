@@ -42,29 +42,8 @@ private:
     DirectiveKernel testKernel;     // kernel for which test code is generated
     Operand operandTab[O_MAXID];    // operands used for testing. Created at first access
 
-private: // Symbols used for testing
-    DirectiveFunction sym_func;
-
-    DirectiveVariable sym_global_var;
-    DirectiveVariable sym_group_var;
-    DirectiveVariable sym_private_var;
-    DirectiveVariable sym_readonly_var;
-
-    DirectiveVariable sym_global_roimg;
-    DirectiveVariable sym_global_rwimg;
-    DirectiveVariable sym_readonly_roimg;
-    DirectiveVariable sym_readonly_rwimg;
-
-    DirectiveVariable sym_global_samp; 
-    DirectiveVariable sym_readonly_samp;
-
-    DirectiveVariable sym_global_sig32; 
-    DirectiveVariable sym_readonly_sig32;
-
-    DirectiveVariable sym_global_sig64; 
-    DirectiveVariable sym_readonly_sig64;
-
-    DirectiveFbarrier sym_fbarrier;
+private: 
+    Directive symTab[SYM_MAXID];       // Symbols used for testing
 
     //==========================================================================
 
@@ -75,7 +54,12 @@ private:
     //==========================================================================
 
 public:
-    Context(string file = "") : BrigContext(machineModel == BRIG_MACHINE_SMALL, !enableComments), fileName(file)
+
+    // Used for two different purposes.
+    // 1. If 'file' is not empty, create context for a set of instructions (added separately).
+    // 2. If 'file' is empty, create special 'playground' context for generation of temporary samples.
+    //    This context and all generated code is never saved (i.e. thrown away when TestTGen exits).
+    Context(string file = "") : BrigContext(machineModel, profile, !enableComments), fileName(file)
     {
         emitVersion();
         if (instSubset.isSet(SUBSET_GCN))   emitExtension("amd:gcn");
@@ -83,18 +67,31 @@ public:
         genSymbols();
     }
 
-    Context(string file, const Sample s) : BrigContext(machineModel == BRIG_MACHINE_SMALL, !enableComments), fileName(file)
+    // Used to create context for tests which include just one instruction specified by sample
+    Context(string file, const Sample s, bool isPositive) : BrigContext(machineModel, profile, !enableComments), fileName(file)
     {
+        assert(!file.empty());
+
         emitVersion();
 
-        if      (HSAIL_ASM::isGcnInst(s.getOpcode()))   emitExtension("amd:gcn");
-        else if (HSAIL_ASM::isImageInst(s.getOpcode())) emitExtension("IMAGE");
+        if (HSAIL_ASM::isGcnInst(s.getOpcode()))
+        {
+            assert(instSubset.isSet(SUBSET_GCN));
+            emitExtension("amd:gcn");
+        }
+        else if (HSAIL_ASM::hasImageExtProps(s.getInst()))
+        {
+            // positive tests must not include image-specific props unless "-image" option is specified
+            // negative tests may include image-specific types even if "-image" option is not specified
+            assert(instSubset.isSet(SUBSET_IMAGE) || !isPositive); 
+            emitExtension("IMAGE");
+        }
 
-        genSymbol(s.get(PROP_S0));
-        genSymbol(s.get(PROP_S1));
-        genSymbol(s.get(PROP_S2));
-        genSymbol(s.get(PROP_S3));
-        genSymbol(s.get(PROP_S4));
+        genSymbol(operandId2SymId(s.get(PROP_S0)));
+        genSymbol(operandId2SymId(s.get(PROP_S1)));
+        genSymbol(operandId2SymId(s.get(PROP_S2)));
+        genSymbol(operandId2SymId(s.get(PROP_S3)));
+        genSymbol(operandId2SymId(s.get(PROP_S4)));
     }
 
     //==========================================================================
@@ -253,10 +250,13 @@ private:
     bool    isOperandCreated(unsigned oprId) const { assert(O_MINID < oprId && oprId < O_MAXID); return oprId == O_NULL || operandTab[oprId]; }
     Operand readOperand(unsigned oprId)      const { assert(O_MINID < oprId && oprId < O_MAXID); return operandTab[oprId]; }
 
-    Operand getOperand(unsigned oprId);     // create if not created yet
+    Operand getOperand(unsigned oprId);                 // create if not created yet
 
-    void genSymbols();                      // Create all symbols
-    void genSymbol(unsigned operandId);     // Create only symbol required for operandId
+    void genSymbols();                                  // Create all symbols
+    void genSymbol(unsigned symId);                     // Create only symbol required for operandId
+    Operand emitOperandRef(unsigned symId);
+
+    Directive emitSymbol(unsigned symId);
 
     //==========================================================================
 

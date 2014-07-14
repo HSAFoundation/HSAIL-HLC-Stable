@@ -372,7 +372,6 @@ class StImage1d<Intrinsic intr, string asm, ValueType ValTy,
                         "$src6"),
         [(intr (ValTy GPR32:$src1), (ValTy GPR32:$src2), 
           (ValTy GPR32:$src3), (ValTy GPR32:$src4),
-            //(wrapper texternalsym:$src5), 
             (iPTR imm:$src5), 
             (CoordTy GPR32:$src6))]>;
 
@@ -384,7 +383,6 @@ class StImage2d<Intrinsic intr, string asm, ValueType ValTy,
                         "( $src6, $src7 )"),
         [(intr (ValTy GPR32:$src1), (ValTy GPR32:$src2), 
           (ValTy GPR32:$src3), (ValTy GPR32:$src4),
-            //(wrapper texternalsym:$src5), 
             (iPTR imm:$src5), 
             (CoordTy GPR32:$src6), (CoordTy GPR32:$src7))]>;
 
@@ -397,10 +395,33 @@ class StImage3d<Intrinsic intr, string asm, ValueType ValTy,
                         "( $src6, $src7, $src8, $src9 )"),
         [(intr (ValTy GPR32:$src1), (ValTy GPR32:$src2), 
           (ValTy GPR32:$src3), (ValTy GPR32:$src4),
-            //(wrapper texternalsym:$src5), 
             (iPTR imm:$src5), 
             (CoordTy GPR32:$src6), (CoordTy GPR32:$src7),
             (CoordTy GPR32:$src8), (CoordTy GPR32:$src9))]>;
+
+//image 2.0 2d depth
+class StImage2dDepth<Intrinsic intr, string asm, ValueType ValTy,
+        ValueType CoordTy> :  HSAILInst<(outs),
+        (ins GPR32:$src1,
+            IMAGEMEM32:$src2, GPR32:$src3, GPR32:$src4),
+        !strconcat(asm, "\t $src1, [$src2], "
+                        "( $src3, $src4 )"),
+        [(intr (ValTy GPR32:$src1),
+            (iPTR imm:$src2),
+            (CoordTy GPR32:$src3), (CoordTy GPR32:$src4))]>;
+
+//image 2.0 2d array depth
+class StImage2dArrayDepth<Intrinsic intr, string asm, ValueType ValTy,
+        ValueType CoordTy> :  HSAILInst<(outs),
+        (ins GPR32:$src1,
+            IMAGEMEM32:$src2,
+			GPR32:$src3, GPR32:$src4, GPR32:$src5, GPR32:$src6),
+        !strconcat(asm, "\t $src1, [$src2], "
+                        "( $src3, $src4, $src5, $src6 )"),
+        [(intr (ValTy GPR32:$src1),
+            (iPTR imm:$src2),
+            (CoordTy GPR32:$src3), (CoordTy GPR32:$src4),
+			(CoordTy GPR32:$src5), (CoordTy GPR32:$src6))]>;
 
 let needSpecialProcessing=1 in {
 // store image 1d
@@ -450,6 +471,15 @@ def stimagei_3d_i32 : StImage3d<int_HSAIL_stimagei_3d_i32,
       "stimage_v4_3d_s32_rwimg_u32", i32, i32>;
 def stimageui_3d_i32 : StImage3d<int_HSAIL_stimageui_3d_i32,
       "stimage_v4_3d_u32_rwimg_u32", i32, i32>;
+
+// store image 2d depth
+def stimagef_2ddepth_i32 : StImage2dDepth<int_HSAIL_stimagef_2ddepth_i32,
+      "stimage_2ddepth_f32_rwimg_u32", f32, i32>;
+
+// Store image 2d array depth
+def stimagef_2dadepth_i32 : StImage2dArrayDepth<int_HSAIL_stimagef_2dadepth_i32,
+      "stimage_2dadepth_f32_rwimg_u32", f32, i32>;
+
 }
 
 // HSAIL095 image store
@@ -488,6 +518,30 @@ class StImage3d_095<Intrinsic intr, string asm, ValueType ValTy,
             (i64 GPR64:$src5), 
             (CoordTy GPR32:$src6), (CoordTy GPR32:$src7),
             (CoordTy GPR32:$src8), (CoordTy GPR32:$src9))]>;
+
+//image 2.0 2d depth
+class StImage2dDepth_095<Intrinsic intr, string asm, ValueType ValTy,
+        ValueType CoordTy> :  HSAILInst<(outs),
+        (ins GPR32:$src1,
+            IMAGEMEM32:$src2, GPR32:$src3, GPR32:$src4),
+        !strconcat(asm, "\t $src1, [$src2], "
+                        "( $src3, $src4 )"),
+        [(intr (ValTy GPR32:$src1),
+            (iPTR imm:$src2),
+            (CoordTy GPR32:$src3), (CoordTy GPR32:$src4))]>;
+
+//image 2.0 2d array depth
+class StImage2dArrayDepth_095<Intrinsic intr, string asm, ValueType ValTy,
+        ValueType CoordTy> :  HSAILInst<(outs),
+        (ins GPR32:$src1,
+            IMAGEMEM32:$src2,
+			GPR32:$src3, GPR32:$src4, GPR32:$src5, GPR32:$src6),
+        !strconcat(asm, "\t $src1, [$src2], "
+                        "( $src3, $src4, $src5, $src6 )"),
+        [(intr (ValTy GPR32:$src1),
+            (iPTR imm:$src2),
+            (CoordTy GPR32:$src3), (CoordTy GPR32:$src4),
+			(CoordTy GPR32:$src5), (CoordTy GPR32:$src6))]>;
 
 let needSpecialProcessing=1 in {
 // store image 1d
@@ -537,6 +591,14 @@ def stimagei_3d_i32_095 : StImage3d_095<int_HSAIL_stimagei_3d_i32,
       "stimage_v4_3d_s32_rwimg_u32", i32, i32>;
 def stimageui_3d_i32_095 : StImage3d_095<int_HSAIL_stimageui_3d_i32,
       "stimage_v4_3d_u32_rwimg_u32", i32, i32>;
+
+// store image 2d depth
+def stimagef_2ddepth_i32_095 : StImage2dDepth_095<int_HSAIL_stimagef_2ddepth_i32,
+      "stimage_2ddepth_f32_rwimg_u32", f32, i32>;
+
+// Store image 2d array depth
+def stimagef_2dadepth_i32_095 : StImage2dArrayDepth_095<int_HSAIL_stimagef_2dadepth_i32,
+      "stimage_2dadepth_f32_rwimg_u32", f32, i32>;
 }
 
 
@@ -547,40 +609,40 @@ class QueryImage_095<Intrinsic intr, string asm> : HSAILInst<
         !strconcat(asm, "\t $dst, $src"),
         [(set (i32 GPR32:$dst), (intr (i64 GPR64:$src)))]>;
 
-def query_width_1d_095 : QueryImage_095<int_HSAIL_query_width_1d,  "queryimagewidth_u32_rwimg">; 
-def query_width_1db_095: QueryImage_095<int_HSAIL_query_width_1db, "queryimagewidth_u32_rwimg">;
-def query_width_1da_095: QueryImage_095<int_HSAIL_query_width_1da, "queryimagewidth_u32_rwimg">;
-def query_width_2d_095 : QueryImage_095<int_HSAIL_query_width_2d,  "queryimagewidth_u32_rwimg">;
-def query_width_2da_095: QueryImage_095<int_HSAIL_query_width_2da, "queryimagewidth_u32_rwimg">;
-def query_width_3d_095 : QueryImage_095<int_HSAIL_query_width_3d,  "queryimagewidth_u32_rwimg">;
+def query_width_1d_095 : QueryImage_095<int_HSAIL_query_width_1d,  "queryimage_1d_width_u32_rwimg">; 
+def query_width_1db_095: QueryImage_095<int_HSAIL_query_width_1db, "queryimage_1db_width_u32_rwimg">;
+def query_width_1da_095: QueryImage_095<int_HSAIL_query_width_1da, "queryimage_1da_width_u32_rwimg">;
+def query_width_2d_095 : QueryImage_095<int_HSAIL_query_width_2d,  "queryimage_2d_width_u32_rwimg">;
+def query_width_2da_095: QueryImage_095<int_HSAIL_query_width_2da, "queryimage_2da_width_u32_rwimg">;
+def query_width_3d_095 : QueryImage_095<int_HSAIL_query_width_3d,  "queryimage_3d_width_u32_rwimg">;
 def query_width_2ddepth_095  : QueryImage_095<int_HSAIL_query_width_2ddepth,  "queryimage_2ddepth_width_u32_rwimg">;
 def query_width_2dadepth_095 : QueryImage_095<int_HSAIL_query_width_2dadepth, "queryimage_2dadepth_width_u32_rwimg">;
 
 
-def query_height_2d_095 : QueryImage_095<int_HSAIL_query_height_2d,  "queryimageheight_u32_rwimg">;
-def query_height_2da_095: QueryImage_095<int_HSAIL_query_height_2da, "queryimageheight_u32_rwimg">;
-def query_height_3d_095 : QueryImage_095<int_HSAIL_query_height_3d,  "queryimageheight_u32_rwimg">;
+def query_height_2d_095 : QueryImage_095<int_HSAIL_query_height_2d,  "queryimage_2d_height_u32_rwimg">;
+def query_height_2da_095: QueryImage_095<int_HSAIL_query_height_2da, "queryimage_2da_height_u32_rwimg">;
+def query_height_3d_095 : QueryImage_095<int_HSAIL_query_height_3d,  "queryimage_3d_height_u32_rwimg">;
 def query_height_2ddepth_095  : QueryImage_095<int_HSAIL_query_height_2ddepth,  "queryimage_2ddepth_height_u32_rwimg">;
 def query_height_2dadepth_095 : QueryImage_095<int_HSAIL_query_height_2dadepth, "queryimage_2dadepth_height_u32_rwimg">;
 
-def query_depth_095 : QueryImage_095<int_HSAIL_query_depth_3d, "queryimagedepth_u32_rwimg">;
+def query_depth_095 : QueryImage_095<int_HSAIL_query_depth_3d, "queryimage_3d_depth_u32_rwimg">;
 
-def query_format_1d_095 : QueryImage_095<int_HSAIL_query_format_1d,  "queryimageformat_u32_rwimg">; 
-def query_format_1db_095: QueryImage_095<int_HSAIL_query_format_1db, "queryimageformat_u32_rwimg">;
-def query_format_1da_095: QueryImage_095<int_HSAIL_query_format_1da, "queryimageformat_u32_rwimg">;
-def query_format_2d_095 : QueryImage_095<int_HSAIL_query_format_2d,  "queryimageformat_u32_rwimg">;
-def query_format_2da_095: QueryImage_095<int_HSAIL_query_format_2da, "queryimageformat_u32_rwimg">;
-def query_format_3d_095 : QueryImage_095<int_HSAIL_query_format_3d,  "queryimageformat_u32_rwimg">;
+def query_format_1d_095 : QueryImage_095<int_HSAIL_query_format_1d,  "queryimage_1d_channeltype_u32_rwimg">; 
+def query_format_1db_095: QueryImage_095<int_HSAIL_query_format_1db, "queryimage_1db_channeltype_u32_rwimg">;
+def query_format_1da_095: QueryImage_095<int_HSAIL_query_format_1da, "queryimage_1da_channeltype_u32_rwimg">;
+def query_format_2d_095 : QueryImage_095<int_HSAIL_query_format_2d,  "queryimage_2d_channeltype_u32_rwimg">;
+def query_format_2da_095: QueryImage_095<int_HSAIL_query_format_2da, "queryimage_2da_channeltype_u32_rwimg">;
+def query_format_3d_095 : QueryImage_095<int_HSAIL_query_format_3d,  "queryimage_3d_channeltype_u32_rwimg">;
 
-def query_order_1d_095 : QueryImage_095<int_HSAIL_query_order_1d,  "queryimageorder_u32_rwimg">; 
-def query_order_1db_095: QueryImage_095<int_HSAIL_query_order_1db, "queryimageorder_u32_rwimg">;
-def query_order_1da_095: QueryImage_095<int_HSAIL_query_order_1da, "queryimageorder_u32_rwimg">;
-def query_order_2d_095 : QueryImage_095<int_HSAIL_query_order_2d,  "queryimageorder_u32_rwimg">;
-def query_order_2da_095: QueryImage_095<int_HSAIL_query_order_2da, "queryimageorder_u32_rwimg">;
-def query_order_3d_095 : QueryImage_095<int_HSAIL_query_order_3d,  "queryimageorder_u32_rwimg">;
+def query_order_1d_095 : QueryImage_095<int_HSAIL_query_order_1d,  "queryimage_1d_channelorder_u32_rwimg">; 
+def query_order_1db_095: QueryImage_095<int_HSAIL_query_order_1db, "queryimage_1db_channelorder_u32_rwimg">;
+def query_order_1da_095: QueryImage_095<int_HSAIL_query_order_1da, "queryimage_1da_channelorder_u32_rwimg">;
+def query_order_2d_095 : QueryImage_095<int_HSAIL_query_order_2d,  "queryimage_2d_channelorder_u32_rwimg">;
+def query_order_2da_095: QueryImage_095<int_HSAIL_query_order_2da, "queryimage_2da_channelorder_u32_rwimg">;
+def query_order_3d_095 : QueryImage_095<int_HSAIL_query_order_3d,  "queryimage_3d_channelorder_u32_rwimg">;
 
-def query_array_1da_095: QueryImage_095<int_HSAIL_query_array_1da, "queryimagearray_u32_rwimg">;
-def query_array_2da_095: QueryImage_095<int_HSAIL_query_array_2da, "queryimagearray_u32_rwimg">;
+def query_array_1da_095: QueryImage_095<int_HSAIL_query_array_1da, "queryimage_1da_array_u32_rwimg">;
+def query_array_2da_095: QueryImage_095<int_HSAIL_query_array_2da, "queryimage_2da_array_u32_rwimg">;
 def query_array_2dadepth_095 : QueryImage_095<int_HSAIL_query_array_2dadepth, "queryimage_2dadepth_array_u32_rwimg">;
 
 def query_channelorder_2ddepth_095  : QueryImage_095<int_HSAIL_query_channelorder_2ddepth,  "queryimage_2ddepth_channelorder_u32_rwimg">;
@@ -596,43 +658,42 @@ def query_channeltype_2dadepth_095 : QueryImage_095<int_HSAIL_query_channeltype_
 class QueryImage<Intrinsic intr, string asm> : HSAILInst<
         (outs GPR32:$dst), (ins IMAGEMEM32:$src),
         !strconcat(asm, "\t $dst, [$src]"),
-        //[(set (i32 GPR32:$dst), (intr (wrapper texternalsym:$src)))]>;
         [(set (i32 GPR32:$dst), (intr (iPTR imm:$src)))]>;
 
 let needSpecialProcessing=1 in {
-def query_width_1d  : QueryImage<int_HSAIL_query_width_1d,  "queryimagewidth_u32_rwimg">; 
-def query_width_1db : QueryImage<int_HSAIL_query_width_1db, "queryimagewidth_u32_rwimg">;
-def query_width_1da : QueryImage<int_HSAIL_query_width_1da, "queryimagewidth_u32_rwimg">;
-def query_width_2d  : QueryImage<int_HSAIL_query_width_2d,  "queryimagewidth_u32_rwimg">;
-def query_width_2da : QueryImage<int_HSAIL_query_width_2da, "queryimagewidth_u32_rwimg">;
-def query_width_3d  : QueryImage<int_HSAIL_query_width_3d,  "queryimagewidth_u32_rwimg">;
+def query_width_1d  : QueryImage<int_HSAIL_query_width_1d,  "queryimage_1d_width_u32_rwimg">; 
+def query_width_1db : QueryImage<int_HSAIL_query_width_1db, "queryimage_1db_width_u32_rwimg">;
+def query_width_1da : QueryImage<int_HSAIL_query_width_1da, "queryimage_1da_width_u32_rwimg">;
+def query_width_2d  : QueryImage<int_HSAIL_query_width_2d,  "queryimage_2d_width_u32_rwimg">;
+def query_width_2da : QueryImage<int_HSAIL_query_width_2da, "queryimage_2da_width_u32_rwimg">;
+def query_width_3d  : QueryImage<int_HSAIL_query_width_3d,  "queryimage_3d_width_u32_rwimg">;
 def query_width_2ddepth  : QueryImage<int_HSAIL_query_width_2ddepth,  "queryimage_2ddepth_width_u32_rwimg">;
 def query_width_2dadepth : QueryImage<int_HSAIL_query_width_2dadepth, "queryimage_2dadepth_width_u32_rwimg">;
 
-def query_height_2d  : QueryImage<int_HSAIL_query_height_2d,  "queryimageheight_u32_rwimg">;
-def query_height_2da : QueryImage<int_HSAIL_query_height_2da, "queryimageheight_u32_rwimg">;
-def query_height_3d  : QueryImage<int_HSAIL_query_height_3d,  "queryimageheight_u32_rwimg">;
+def query_height_2d  : QueryImage<int_HSAIL_query_height_2d,  "queryimage_2d_height_u32_rwimg">;
+def query_height_2da : QueryImage<int_HSAIL_query_height_2da, "queryimage_2da_height_u32_rwimg">;
+def query_height_3d  : QueryImage<int_HSAIL_query_height_3d,  "queryimage_3d_height_u32_rwimg">;
 def query_height_2ddepth  : QueryImage<int_HSAIL_query_height_2ddepth,  "queryimage_2ddepth_height_u32_rwimg">;
 def query_height_2dadepth : QueryImage<int_HSAIL_query_height_2dadepth, "queryimage_2dadepth_height_u32_rwimg">;
 
-def query_depth : QueryImage<int_HSAIL_query_depth_3d, "queryimagedepth_u32_rwimg">;
+def query_depth : QueryImage<int_HSAIL_query_depth_3d, "queryimage_3d_depth_u32_rwimg">;
 
-def query_format_1d  : QueryImage<int_HSAIL_query_format_1d,  "queryimageformat_u32_rwimg">; 
-def query_format_1db : QueryImage<int_HSAIL_query_format_1db, "queryimageformat_u32_rwimg">;
-def query_format_1da : QueryImage<int_HSAIL_query_format_1da, "queryimageformat_u32_rwimg">;
-def query_format_2d  : QueryImage<int_HSAIL_query_format_2d,  "queryimageformat_u32_rwimg">;
-def query_format_2da : QueryImage<int_HSAIL_query_format_2da, "queryimageformat_u32_rwimg">;
-def query_format_3d  : QueryImage<int_HSAIL_query_format_3d,  "queryimageformat_u32_rwimg">;
+def query_format_1d  : QueryImage<int_HSAIL_query_format_1d,  "queryimage_1d_channeltype_u32_rwimg">; 
+def query_format_1db : QueryImage<int_HSAIL_query_format_1db, "queryimage_1db_channeltype_u32_rwimg">;
+def query_format_1da : QueryImage<int_HSAIL_query_format_1da, "queryimage_1da_channeltype_u32_rwimg">;
+def query_format_2d  : QueryImage<int_HSAIL_query_format_2d,  "queryimage_2d_channeltype_u32_rwimg">;
+def query_format_2da : QueryImage<int_HSAIL_query_format_2da, "queryimage_2da_channeltype_u32_rwimg">;
+def query_format_3d  : QueryImage<int_HSAIL_query_format_3d,  "queryimage_3d_channeltype_u32_rwimg">;
 
-def query_order_1d  : QueryImage<int_HSAIL_query_order_1d,  "queryimageorder_u32_rwimg">; 
-def query_order_1db : QueryImage<int_HSAIL_query_order_1db, "queryimageorder_u32_rwimg">;
-def query_order_1da : QueryImage<int_HSAIL_query_order_1da, "queryimageorder_u32_rwimg">;
-def query_order_2d  : QueryImage<int_HSAIL_query_order_2d,  "queryimageorder_u32_rwimg">;
-def query_order_2da : QueryImage<int_HSAIL_query_order_2da, "queryimageorder_u32_rwimg">;
-def query_order_3d  : QueryImage<int_HSAIL_query_order_3d,  "queryimageorder_u32_rwimg">;
+def query_order_1d  : QueryImage<int_HSAIL_query_order_1d,  "queryimage_1d_channelorder_u32_rwimg">; 
+def query_order_1db : QueryImage<int_HSAIL_query_order_1db, "queryimage_1db_channelorder_u32_rwimg">;
+def query_order_1da : QueryImage<int_HSAIL_query_order_1da, "queryimage_1da_channelorder_u32_rwimg">;
+def query_order_2d  : QueryImage<int_HSAIL_query_order_2d,  "queryimage_2d_channelorder_u32_rwimg">;
+def query_order_2da : QueryImage<int_HSAIL_query_order_2da, "queryimage_2da_channelorder_u32_rwimg">;
+def query_order_3d  : QueryImage<int_HSAIL_query_order_3d,  "queryimage_3d_channelorder_u32_rwimg">;
 
-def query_array_1da : QueryImage<int_HSAIL_query_array_1da, "queryimagearray_u32_rwimg">;
-def query_array_2da : QueryImage<int_HSAIL_query_array_2da, "queryimagearray_u32_rwimg">;
+def query_array_1da : QueryImage<int_HSAIL_query_array_1da, "queryimage_1da_array_u32_rwimg">;
+def query_array_2da : QueryImage<int_HSAIL_query_array_2da, "queryimage_2da_array_u32_rwimg">;
 def query_array_2dadepth : QueryImage<int_HSAIL_query_array_2dadepth, "queryimage_2dadepth_array_u32_rwimg">;
 
 def query_channelorder_2ddepth  : QueryImage<int_HSAIL_query_channelorder_2ddepth,  "queryimage_2ddepth_channelorder_u32_rwimg">;

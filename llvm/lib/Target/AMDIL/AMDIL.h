@@ -82,8 +82,6 @@
 #define HW_MAX_NUM_CB 8
 #define MAX_NUM_UNIQUE_UAVS 8
 #define OPENCL_MAX_NUM_ATOMIC_COUNTERS 8
-#define OPENCL_MAX_READ_IMAGES 128
-#define OPENCL_MAX_WRITE_IMAGES 8
 #define OPENCL_MAX_SAMPLERS 16
 #define OPENCL_MAX_NUM_SEMAPHORES 15
 
@@ -123,6 +121,7 @@
 #define OCL_DEVICE_GODAVARI    0x04000000
 #define OCL_DEVICE_BERMUDA     0x08000000 //<-- Internal Only!
 #define OCL_DEVICE_FIJI        0x10000000 //<-- Internal Only!
+#define OCL_DEVICE_CARRIZO     0x20000000 //<-- Internal Only!
 #define OCL_DEVICE_ALL         0x1FFFFFFF
 
 #define NUM_EXTRA_SLOTS_PER_IMAGE 1
@@ -266,7 +265,28 @@ enum AddressSpaces {
   GLOBAL_HOST_ADDRESS = 5, // Address space with global host endianness.
   CONSTANT_HOST_ADDRESS = 6, // Address space with constant host endianness.
   FLAT_ADDRESS     = 7, // Address space for flat memory.
-  ADDRESS_NONE     = 8  // Address space for unknown memory.
+  ADDRESS_NONE     = 8,  // Address space for unknown memory.
+
+  // Do not re-order the CONSTANT_BUFFER_* enums. Several places depend on this
+  // order to be able to dynamically index a constant buffer, for example:
+  //
+  // ConstantBufferAS = CONSTANT_BUFFER_0 + CBIdx
+
+  CONSTANT_BUFFER_0 = 9,
+  CONSTANT_BUFFER_1 = 10,
+  CONSTANT_BUFFER_2 = 11,
+  CONSTANT_BUFFER_3 = 12,
+  CONSTANT_BUFFER_4 = 13,
+  CONSTANT_BUFFER_5 = 14,
+  CONSTANT_BUFFER_6 = 15,
+  CONSTANT_BUFFER_7 = 16,
+  CONSTANT_BUFFER_8 = 17,
+  CONSTANT_BUFFER_9 = 18,
+  CONSTANT_BUFFER_10 = 19,
+  CONSTANT_BUFFER_11 = 20,
+  CONSTANT_BUFFER_12 = 21,
+  CONSTANT_BUFFER_13 = 22,
+  CONSTANT_BUFFER_14 = 23
 };
 
 // We are piggybacking on the CommentFlag enum in MachineInstr.h to

@@ -102,23 +102,6 @@ public:
 }
 
 MCCodeEmitter* 
-llvm::createHSAIL_32MCCodeEmitterForLLVM30(const MCInstrInfo &II,
-                                     const MCSubtargetInfo &STI,
-                                     MCContext &Ctx)
-{
-  return new DummyMCCodeEmitter(II, STI, Ctx);
-}
-
-
-MCCodeEmitter* 
-llvm::createHSAIL_64MCCodeEmitterForLLVM30(const MCInstrInfo &II,
-                                     const MCSubtargetInfo &STI,
-                                     MCContext &Ctx)
-{
-  return new DummyMCCodeEmitter(II, STI, Ctx);
-}
-
-MCCodeEmitter* 
 llvm::createHSAIL_32MCCodeEmitterForLLVM32(const MCInstrInfo &II,
                                      const MCRegisterInfo &MRI,
                                      const MCSubtargetInfo &STI,

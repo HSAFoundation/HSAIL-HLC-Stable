@@ -13,7 +13,6 @@
 #include "HSAIL.h"
 #include "HSAILLLVMVersion.h"
 #include "HSAILSubtarget.h"
-#include "InstPrinter/HSAILInstPrinter.h"
 #include "llvm/GlobalVariable.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/CodeGen/AsmPrinter.h"
@@ -30,6 +29,8 @@
 #include "libHSAIL/HSAILItems.h"
 #include "libHSAIL/HSAILParser.h"
 #include "libHSAIL/HSAILBrigantine.h"
+
+class StoreInitializer;
 
 namespace llvm {
 
@@ -50,6 +51,9 @@ class Module;
 class raw_ostream;
 
 class LLVM_LIBRARY_VISIBILITY BRIGAsmPrinter : public AsmPrinter {
+
+  friend class ::StoreInitializer;
+
   const HSAILSubtarget *Subtarget;
 
   // Used for the callee part of the calling convention and be cleared
@@ -99,6 +103,9 @@ public:
   virtual void EmitInstruction(const MachineInstr *);
 
   virtual void EmitFunctionEntryLabel();
+
+  /// Emit ld_rarg or st_parg
+  void EmitLdStArg(const MachineInstr *MI, bool isLoad);
 
   /// isBlockOnlyReachableByFallthough - Return true if the basic block has
   /// exactly one predecessor and the control transfer mechanism between
@@ -168,17 +175,13 @@ protected:
   HSAIL_ASM::BrigContainer bc;
   HSAIL_ASM::Brigantine brigantine;
 
-  std::vector< HSAIL_ASM::DirectiveVariable > call_paramlist;
-  std::vector< HSAIL_ASM::DirectiveVariable > ret_list;
-
   const char * getRegisterName(unsigned RegNo);
 
   void BrigEmitGlobalInit(HSAIL_ASM::DirectiveVariable, Constant *);
   void BrigEmitOperand(const MachineInstr *MI, unsigned opNum, HSAIL_ASM::Inst inst, int Offset=0 );
   void BrigEmitOperandLdStAddress(const MachineInstr *MI, unsigned opNum, HSAIL_ASM::Inst inst, int opOffset );
   void BrigEmitOperandAddress(const MachineInstr *MI, unsigned opNum, HSAIL_ASM::Inst inst, int Offset );
-  void BrigEmitOperandArgRef(const MachineInstr *MI, unsigned opNum, const char * prefix, HSAIL_ASM::Inst inst, int Offset );
-  void BrigEmitVecArgDeclaration(const MachineInstr *MI, unsigned opPreg, const char * prefix, unsigned opSize);
+  void BrigEmitVecArgDeclaration(const MachineInstr *MI);
   void BrigEmitOperandImage(const MachineInstr *MI, unsigned& opNum, HSAIL_ASM::Inst inst, unsigned& operand);
   void BrigEmitImageInst(const MachineInstr *MI, HSAIL_ASM::InstImage inst, int Offset );
 
@@ -249,20 +252,22 @@ private:
                               HSAIL_ARG_TYPE arg_type = ARG_TYPE_NONE);
   std::string getHSAILReg(Type* type);
 
-  Brig::BrigSegment8_t getHSAILSegment(const GlobalVariable* gv);
-  Brig::BrigType16_t getBrigType(Type* type);
+  Brig::BrigSegment8_t getHSAILSegment(unsigned AddressSpace) const;
+  Brig::BrigSegment8_t getHSAILSegment(const GlobalVariable* gv) const;
 
   bool canInitHSAILAddressSpace(const GlobalVariable* gv) const;
   void EmitBasicBlockStart(const MachineBasicBlock *MBB);
   // returns an offset of corresponding DirectiveVariable
-  uint64_t EmitFunctionArgument(Type* type, bool isKernel);
-  void EmitFunctionReturn(Type* type, bool isKernel);
+  uint64_t EmitFunctionArgument(Type* type, bool isKernel,
+                                const StringRef argName, bool isSExt);
+  void EmitFunctionReturn(Type* type, bool isKernel, const StringRef RetName,
+                          bool isSExt);
 
   bool usesGCNAtomicCounter(void);
 
   HSAIL_ASM::OperandReg getBrigReg(MachineOperand s);
 
-  HSAIL_ASM::DirectiveVariable EmitLocalArray(const GlobalVariable *GV, Brig::BrigSegment8_t segment);
+  HSAIL_ASM::DirectiveVariable EmitLocalVariable(const GlobalVariable *GV, Brig::BrigSegment8_t segment);
 
   Brig::BrigAlignment8_t getBrigAlignment(unsigned align_value);
 };

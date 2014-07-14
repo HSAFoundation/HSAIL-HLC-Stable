@@ -59,22 +59,38 @@ static void InitLibcallNames(const char **Names) {
   Names[RTLIB::SDIV_I8] = "__divqi3";
   Names[RTLIB::SDIV_I16] = "__divhi3";
   Names[RTLIB::SDIV_I32] = "__divsi3";
+#if defined(AMD_OPENCL) || 1
+  Names[RTLIB::SDIV_I64] = "__amdrt_div_i64";
+#else
   Names[RTLIB::SDIV_I64] = "__divdi3";
+#endif
   Names[RTLIB::SDIV_I128] = "__divti3";
   Names[RTLIB::UDIV_I8] = "__udivqi3";
   Names[RTLIB::UDIV_I16] = "__udivhi3";
   Names[RTLIB::UDIV_I32] = "__udivsi3";
+#if defined(AMD_OPENCL) || 1
+  Names[RTLIB::UDIV_I64] = "__amdrt_div_u64";
+#else
   Names[RTLIB::UDIV_I64] = "__udivdi3";
+#endif
   Names[RTLIB::UDIV_I128] = "__udivti3";
   Names[RTLIB::SREM_I8] = "__modqi3";
   Names[RTLIB::SREM_I16] = "__modhi3";
   Names[RTLIB::SREM_I32] = "__modsi3";
+#if defined(AMD_OPENCL) || 1
+  Names[RTLIB::SREM_I64] = "__amdrt_mod_i64";
+#else
   Names[RTLIB::SREM_I64] = "__moddi3";
+#endif
   Names[RTLIB::SREM_I128] = "__modti3";
   Names[RTLIB::UREM_I8] = "__umodqi3";
   Names[RTLIB::UREM_I16] = "__umodhi3";
   Names[RTLIB::UREM_I32] = "__umodsi3";
+#if defined(AMD_OPENCL) || 1
+  Names[RTLIB::UREM_I64] = "__amdrt_mod_u64";
+#else
   Names[RTLIB::UREM_I64] = "__umoddi3";
+#endif
   Names[RTLIB::UREM_I128] = "__umodti3";
 
   // These are generally not available.
@@ -206,12 +222,20 @@ static void InitLibcallNames(const char **Names) {
   Names[RTLIB::FPTOUINT_F32_I8] = "__fixunssfqi";
   Names[RTLIB::FPTOUINT_F32_I16] = "__fixunssfhi";
   Names[RTLIB::FPTOUINT_F32_I32] = "__fixunssfsi";
+#if defined(AMD_OPENCL) || 1
+  Names[RTLIB::FPTOUINT_F32_I64] = "__amdrt_cvt_f32_to_u64";
+#else
   Names[RTLIB::FPTOUINT_F32_I64] = "__fixunssfdi";
+#endif
   Names[RTLIB::FPTOUINT_F32_I128] = "__fixunssfti";
   Names[RTLIB::FPTOUINT_F64_I8] = "__fixunsdfqi";
   Names[RTLIB::FPTOUINT_F64_I16] = "__fixunsdfhi";
   Names[RTLIB::FPTOUINT_F64_I32] = "__fixunsdfsi";
+#if defined(AMD_OPENCL) || 1
+  Names[RTLIB::FPTOUINT_F64_I64] = "__amdrt_cvt_f64_to_u64";
+#else
   Names[RTLIB::FPTOUINT_F64_I64] = "__fixunsdfdi";
+#endif
   Names[RTLIB::FPTOUINT_F64_I128] = "__fixunsdfti";
   Names[RTLIB::FPTOUINT_F80_I32] = "__fixunsxfsi";
   Names[RTLIB::FPTOUINT_F80_I64] = "__fixunsxfdi";

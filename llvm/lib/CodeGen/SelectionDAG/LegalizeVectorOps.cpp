@@ -133,11 +133,26 @@ SDValue VectorLegalizer::LegalizeOp(SDValue Op) {
   if (Op.getOpcode() == ISD::LOAD) {
     LoadSDNode *LD = cast<LoadSDNode>(Op.getNode());
     ISD::LoadExtType ExtType = LD->getExtensionType();
-    if (LD->getMemoryVT().isVector() && ExtType != ISD::NON_EXTLOAD) {
-      if (TLI.isLoadExtLegal(LD->getExtensionType(), LD->getMemoryVT()))
+
+    EVT LdVT = LD->getMemoryVT();
+    if (LdVT.isVector() && ExtType != ISD::NON_EXTLOAD) {
+      if (!LdVT.isSimple()) {
+        Changed = true;
+        return LegalizeOp(ExpandLoad(Op));
+      }
+
+      switch (TLI.getLoadExtAction(ExtType, LdVT.getSimpleVT())) {
+      default:
+        llvm_unreachable("This action is not supported yet!");
+      case TargetLowering::Legal:
         return TranslateLegalizeResults(Op, Result);
-      Changed = true;
-      return LegalizeOp(ExpandLoad(Op));
+      case TargetLowering::Custom:
+        Changed = true;
+        return TranslateLegalizeResults(Op, TLI.LowerOperation(Result, DAG));
+      case TargetLowering::Expand:
+        Changed = true;
+        return LegalizeOp(ExpandLoad(Op));
+      }
     }
   } else if (Op.getOpcode() == ISD::STORE) {
     StoreSDNode *ST = cast<StoreSDNode>(Op.getNode());
@@ -150,7 +165,7 @@ SDValue VectorLegalizer::LegalizeOp(SDValue Op) {
         return TranslateLegalizeResults(Op, Result);
       case TargetLowering::Custom:
         Changed = true;
-        return LegalizeOp(TLI.LowerOperation(Result, DAG));
+        return TranslateLegalizeResults(Op, TLI.LowerOperation(Result, DAG));
       case TargetLowering::Expand:
         Changed = true;
         return LegalizeOp(ExpandStore(Op));

@@ -42,7 +42,9 @@ namespace {
 }
 
 char AMDSymbolLinkage::ID = 0;
-INITIALIZE_PASS(AMDSymbolLinkage, "amdfunctionlinkage", "Mark non-kernel functions with InternalLinkage", false, false);
+INITIALIZE_PASS_BEGIN(AMDSymbolLinkage, "amdfunctionlinkage", "Mark non-kernel functions with InternalLinkage", false, false)
+INITIALIZE_AG_DEPENDENCY(OpenCLSymbols)
+INITIALIZE_PASS_END(AMDSymbolLinkage, "amdfunctionlinkage", "Mark non-kernel functions with InternalLinkage", false, false)
 
 ModulePass *
 llvm::createAMDSymbolLinkagePass(bool isWhole,

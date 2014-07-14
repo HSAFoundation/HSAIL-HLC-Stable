@@ -18,3 +18,5 @@ def : Proc<"goose",      [FeatureByteAddress, FeatureImages, FeatureFP64
                           /* FeatureShortOps, FeatureHalfOps */]>; //<--Internal Only! Bermuda
 def : Proc<"hoatzin",    [FeatureByteAddress, FeatureImages, FeatureFP64
                           /*FeatureShortOps, FeatureHalfOps*/ ]>; //<--Internal Only! Fiji
+def : Proc<"peacock",    [FeatureByteAddress, FeatureImages, FeatureFP64
+                          /*FeatureShortOps, FeatureHalfOps*/ ]>; //<--Internal Only! Carrizo

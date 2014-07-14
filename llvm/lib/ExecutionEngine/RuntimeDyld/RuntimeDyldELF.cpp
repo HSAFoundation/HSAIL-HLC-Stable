@@ -191,7 +191,8 @@ void RuntimeDyldELF::resolveX86_64Relocation(const SectionEntry &Section,
                                              uint64_t Offset,
                                              uint64_t Value,
                                              uint32_t Type,
-                                             int64_t Addend) {
+                                             int64_t  Addend,
+                                             uint64_t SymOffset) {
   switch (Type) {
   default:
     llvm_unreachable("Relocation type not implemented yet!");
@@ -216,6 +217,21 @@ void RuntimeDyldELF::resolveX86_64Relocation(const SectionEntry &Section,
                  << " at " << format("%p\n",Target));
     break;
   }
+  case ELF::R_X86_64_GOTPCREL: {
+    // findGOTEntry returns the 'G + GOT' part of the relocation calculation
+    // based on the load/target address of the GOT (not the current/local addr).
+    uint64_t GOTAddr = findGOTEntry(Value, SymOffset);
+    uint32_t *Target = reinterpret_cast<uint32_t*>(Section.Address + Offset);
+    uint64_t  FinalAddress = Section.LoadAddress + Offset;
+    // The processRelocationRef method combines the symbol offset and the addend
+    // and in most cases that's what we want.  For this relocation type, we need
+    // the raw addend, so we subtract the symbol offset to get it.
+    int64_t RealOffset = GOTAddr + Addend - SymOffset - FinalAddress;
+    assert(RealOffset <= INT32_MAX && RealOffset >= INT32_MIN);
+    int32_t TruncOffset = (RealOffset & 0xFFFFFFFF);
+    *Target = TruncOffset;
+    break;
+  }
   case ELF::R_X86_64_PC32: {
     // Get the placeholder value from the generated object since
     // a previous relocation attempt may have overwritten the loaded version
@@ -229,6 +245,16 @@ void RuntimeDyldELF::resolveX86_64Relocation(const SectionEntry &Section,
     *Target = TruncOffset;
     break;
   }
+  case ELF::R_X86_64_PC64: {
+    // Get the placeholder value from the generated object since
+    // a previous relocation attempt may have overwritten the loaded version
+    uint64_t *Placeholder = reinterpret_cast<uint64_t*>(Section.ObjAddress
+                                                                   + Offset);
+    uint64_t *Target = reinterpret_cast<uint64_t*>(Section.Address + Offset);
+    uint64_t  FinalAddress = Section.LoadAddress + Offset;
+    *Target = *Placeholder + Value + Addend - FinalAddress;
+    break;
+  }
   }
 }
 
@@ -236,7 +262,8 @@ void RuntimeDyldELF::resolveX86Relocation(const SectionEntry &Section,
                                           uint64_t Offset,
                                           uint32_t Value,
                                           uint32_t Type,
-                                          int32_t Addend) {
+                                          int32_t Addend,
+                                          uint32_t SymOffset) {
   switch (Type) {
   case ELF::R_386_32: {
     // Get the placeholder value from the generated object since
@@ -258,6 +285,37 @@ void RuntimeDyldELF::resolveX86Relocation(const SectionEntry &Section,
     *Target = RealOffset;
     break;
     }
+#if defined(AMD_OPENCL) || 1
+  case ELF::R_386_GOTPC: {
+    // Calculates GOT + A - P, the distance to the GOT based on the load/target and addend
+    uint64_t GOTAddr = getSectionLoadAddress(GOTSectionID);
+    uint32_t *Target = reinterpret_cast<uint32_t*>(Section.Address + Offset);
+    uint64_t  FinalAddress = Section.LoadAddress + Offset;
+    // The processRelocationRef method combines the symbol offset and the addend
+    // and in most cases that's what we want.  For this relocation type, we need
+    // the raw addend, so we subtract the symbol offset to get it.
+    int64_t RealOffset = GOTAddr + Addend - FinalAddress + 3;
+    assert(RealOffset <= INT32_MAX && RealOffset >= INT32_MIN);
+    int32_t TruncOffset = (RealOffset & 0xFFFFFFFF);
+    *Target = TruncOffset;
+    break;
+  }
+  case ELF::R_386_GOTOFF:  {
+    // Calculates P + A - GOT
+    //uint64_t GOTAddr = findGOTEntry(Value, SymOffset);
+    uint64_t GOTAddr = getSectionLoadAddress(GOTSectionID);
+    uint32_t *Target = reinterpret_cast<uint32_t*>(Section.Address + Offset);
+    //uint64_t  FinalAddress = Section.LoadAddress + Offset;
+    // The processRelocationRef method combines the symbol offset and the addend
+    // and in most cases that's what we want.  For this relocation type, we need
+    // the raw addend, so we subtract the symbol offset to get it.
+    int64_t RealOffset = Value + Addend - GOTAddr;
+    assert(RealOffset <= INT32_MAX && RealOffset >= INT32_MIN);
+    int32_t TruncOffset = (RealOffset & 0xFFFFFFFF);
+    *Target += TruncOffset;
+    break;
+  }
+#endif
     default:
       // There are other relocation types, but it appears these are the
       // only ones currently used by the LLVM ELF object writer
@@ -447,7 +505,7 @@ void RuntimeDyldELF::findOPDEntrySection(ObjectImage &Obj,
       // Finally compares the Symbol value and the target symbol offset
       // to check if this .opd entry refers to the symbol the relocation
       // points to.
-      if (Rel.Addend != (intptr_t)TargetSymbolOffset)
+      if (Rel.Addend != (int64_t)TargetSymbolOffset)
         continue;
 
       section_iterator tsi(Obj.end_sections());
@@ -549,14 +607,24 @@ void RuntimeDyldELF::resolveRelocation(const SectionEntry &Section,
                                        uint64_t Value,
                                        uint32_t Type,
                                        int64_t Addend) {
+  resolveRelocation(Section, Offset, Value, Type, Addend, 0);
+}
+
+void RuntimeDyldELF::resolveRelocation(const SectionEntry &Section,
+                                       uint64_t Offset,
+                                       uint64_t Value,
+                                       uint32_t Type,
+                                       int64_t Addend,
+                                       uint64_t SymOffset) {
   switch (Arch) {
   case Triple::x86_64:
-    resolveX86_64Relocation(Section, Offset, Value, Type, Addend);
+    resolveX86_64Relocation(Section, Offset, Value, Type, Addend, SymOffset);
     break;
   case Triple::x86:
     resolveX86Relocation(Section, Offset,
                          (uint32_t)(Value & 0xffffffffL), Type,
-                         (uint32_t)(Addend & 0xffffffffL));
+                         (uint32_t)(Addend & 0xffffffffL),
+                         (uint32_t)(SymOffset & 0xffffffffL));
     break;
   case Triple::arm:    // Fall through.
   case Triple::thumb:
@@ -582,7 +650,6 @@ void RuntimeDyldELF::processRelocationRef(const ObjRelocationInfo &Rel,
                                           ObjSectionToIDMap &ObjSectionToID,
                                           const SymbolTableMap &Symbols,
                                           StubMap &Stubs) {
-
   uint32_t RelType = (uint32_t)(Rel.Type & 0xffffffffL);
   intptr_t Addend = (intptr_t)Rel.AdditionalInfo;
   const SymbolRef &Symbol = Rel.Symbol;
@@ -601,14 +668,16 @@ void RuntimeDyldELF::processRelocationRef(const ObjRelocationInfo &Rel,
   Symbol.getType(SymType);
   if (lsi != Symbols.end()) {
     Value.SectionID = lsi->second.first;
-    Value.Addend = lsi->second.second;
+    Value.Offset = lsi->second.second;
+    Value.Addend = lsi->second.second + Addend;
   } else {
     // Search for the symbol in the global symbol table
     SymbolTableMap::const_iterator gsi =
         GlobalSymbolTable.find(TargetName.data());
     if (gsi != GlobalSymbolTable.end()) {
       Value.SectionID = gsi->second.first;
-      Value.Addend = gsi->second.second;
+      Value.Offset = gsi->second.second;
+      Value.Addend = gsi->second.second + Addend;
     } else {
       switch (SymType) {
         case SymbolRef::ST_Debug: {
@@ -630,6 +699,7 @@ void RuntimeDyldELF::processRelocationRef(const ObjRelocationInfo &Rel,
           Value.Addend = Addend;
           break;
         }
+        case SymbolRef::ST_Data:
         case SymbolRef::ST_Unknown: {
           Value.SymbolName = TargetName.data();
           Value.Addend = Addend;
@@ -811,8 +881,140 @@ void RuntimeDyldELF::processRelocationRef(const ObjRelocationInfo &Rel,
       else
         addRelocationForSection(RE, Value.SectionID);
     }
-  } else {
-    RelocationEntry RE(Rel.SectionID, Rel.Offset, RelType, Value.Addend);
+  } else if (Arch == Triple::x86_64 && RelType == ELF::R_X86_64_PLT32) {
+    // The way the PLT relocations normally work is that the linker allocates the
+    // PLT and this relocation makes a PC-relative call into the PLT.  The PLT
+    // entry will then jump to an address provided by the GOT.  On first call, the
+    // GOT address will point back into PLT code that resolves the symbol.  After
+    // the first call, the GOT entry points to the actual function.
+    //
+    // For local functions we're ignoring all of that here and just replacing
+    // the PLT32 relocation type with PC32, which will translate the relocation
+    // into a PC-relative call directly to the function. For external symbols we
+    // can't be sure the function will be within 2^32 bytes of the call site, so
+    // we need to create a stub, which calls into the GOT.  This case is
+    // equivalent to the usual PLT implementation except that we use the stub
+    // mechanism in RuntimeDyld (which puts stubs at the end of the section)
+    // rather than allocating a PLT section.
+    if (Value.SymbolName) {
+      // This is a call to an external function.
+      // Look for an existing stub.
+      SectionEntry &Section = Sections[Rel.SectionID];
+      StubMap::const_iterator i = Stubs.find(Value);
+      uintptr_t StubAddress;
+      if (i != Stubs.end()) {
+        StubAddress = uintptr_t(Section.Address) + i->second;
+        DEBUG(dbgs() << " Stub function found\n");
+      } else {
+        // Create a new stub function (equivalent to a PLT entry).
+        DEBUG(dbgs() << " Create a new stub function\n");
+
+        uintptr_t BaseAddress = uintptr_t(Section.Address);
+        uintptr_t StubAlignment = getStubAlignment();
+        StubAddress = (BaseAddress + Section.StubOffset +
+                      StubAlignment - 1) & -StubAlignment;
+       unsigned StubOffset = StubAddress - BaseAddress;
+        Stubs[Value] = StubOffset;
+        createStubFunction((uint8_t *)StubAddress);
+
+        // Create a GOT entry for the external function.
+        GOTEntries.push_back(Value);
+
+        // Make our stub function a relative call to the GOT entry.
+        RelocationEntry RE(Rel.SectionID, StubOffset + 2,
+                           ELF::R_X86_64_GOTPCREL, -4);
+        addRelocationForSymbol(RE, Value.SymbolName);
+
+        // Bump our stub offset counter
+        Section.StubOffset = StubOffset + getMaxStubSize();
+      }
+
+      // Make the target call a call into the stub table.
+      resolveRelocation(Section, Rel.Offset, StubAddress,
+                      ELF::R_X86_64_PC32, Addend);
+    } else {
+      RelocationEntry RE(Rel.SectionID, Rel.Offset, ELF::R_X86_64_PC32, Value.Addend,
+                         Value.Offset);
+      addRelocationForSection(RE, Value.SectionID);
+    }
+  }
+#if defined(AMD_OPENCL) || 1
+   else if (Arch == Triple::x86 && RelType == ELF::R_386_PLT32) {
+    // The way the PLT relocations normally work is that the linker allocates the
+    // PLT and this relocation makes a PC-relative call into the PLT.  The PLT
+    // entry will then jump to an address provided by the GOT.  On first call, the
+    // GOT address will point back into PLT code that resolves the symbol.  After
+    // the first call, the GOT entry points to the actual function.
+    //
+    // For local functions we're ignoring all of that here and just replacing
+    // the PLT32 relocation type with PC32, which will translate the relocation
+    // into a PC-relative call directly to the function. For external symbols we
+    // can't be sure the function will be within 2^32 bytes of the call site, so
+    // we need to create a stub, which calls into the GOT.  This case is
+    // equivalent to the usual PLT implementation except that we use the stub
+    // mechanism in RuntimeDyld (which puts stubs at the end of the section)
+    // rather than allocating a PLT section.
+    if (Value.SymbolName) {
+      // This is a call to an external function.
+      // Look for an existing stub.
+      SectionEntry &Section = Sections[Rel.SectionID];
+      StubMap::const_iterator i = Stubs.find(Value);
+      uintptr_t StubAddress;
+      if (i != Stubs.end()) {
+        StubAddress = uintptr_t(Section.Address) + i->second;
+        DEBUG(dbgs() << " Stub function found\n");
+      } else {
+        // Create a new stub function (equivalent to a PLT entry).
+        DEBUG(dbgs() << " Create a new stub function\n");
+
+        uintptr_t BaseAddress = uintptr_t(Section.Address);
+        uintptr_t StubAlignment = getStubAlignment();
+        StubAddress = (BaseAddress + Section.StubOffset +
+                      StubAlignment - 1) & -StubAlignment;
+       unsigned StubOffset = StubAddress - BaseAddress;
+        Stubs[Value] = StubOffset;
+        createStubFunction((uint8_t *)StubAddress);
+
+        // Create a GOT entry for the external function.
+        GOTEntries.push_back(Value);
+
+        // Make our stub function a relative call to the GOT entry.
+        RelocationEntry RE(Rel.SectionID, StubOffset + 2,
+                           ELF::R_386_GOTPC, -4);
+        addRelocationForSymbol(RE, Value.SymbolName);
+
+        // Bump our stub offset counter
+        Section.StubOffset = StubOffset + getMaxStubSize();
+      }
+
+      // Make the target call a call into the stub table.
+      resolveRelocation(Section, Rel.Offset, StubAddress,
+                      ELF::R_386_PC32, Addend);
+    } else {
+      RelocationEntry RE(Rel.SectionID, Rel.Offset, ELF::R_386_PC32, Value.Addend,
+                         Value.Offset);
+      addRelocationForSection(RE, Value.SectionID);
+    }
+  } else if (Arch == Triple::x86 && RelType == ELF::R_386_GOTOFF) {
+    GOTEntries.push_back(Value);
+    RelocationEntry RE(Rel.SectionID, Rel.Offset, RelType, Value.Addend,
+                       Value.Offset);
+    if (Value.SymbolName)
+      addRelocationForSymbol(RE, Value.SymbolName);
+    else
+      addRelocationForSection(RE, Value.SectionID);
+  } else if (Arch == Triple::x86 && RelType == ELF::R_386_GOTPC) {
+    GOTEntries.push_back(Value);
+    RelocationEntry RE(Rel.SectionID, Rel.Offset, RelType, Value.Addend,
+                       Value.Offset);
+    addRelocationForSymbol(RE, Value.SymbolName);
+   }
+#endif
+  else {
+    if (Arch == Triple::x86_64 && RelType == ELF::R_X86_64_GOTPCREL) {
+      GOTEntries.push_back(Value);
+    }
+    RelocationEntry RE(Rel.SectionID, Rel.Offset, RelType, Value.Addend, Value.Offset);
     if (Value.SymbolName)
       addRelocationForSymbol(RE, Value.SymbolName);
     else
@@ -825,6 +1027,103 @@ unsigned RuntimeDyldELF::getCommonSymbolAlignment(const SymbolRef &Sym) {
   uint64_t Align;
   Check(Sym.getValue(Align));
   return Align;
+}
+
+void RuntimeDyldELF::updateGOTEntries(StringRef Name, uint64_t Addr) {
+  for (int i = 0, e = GOTEntries.size(); i != e; ++i) {
+    if (GOTEntries[i].SymbolName != 0 && GOTEntries[i].SymbolName == Name) {
+      GOTEntries[i].Offset = Addr;
+    }
+  }
+}
+
+size_t RuntimeDyldELF::getGOTEntrySize() {
+  // We don't use the GOT in all of these cases, but it's essentially free
+  // to put them all here.
+  size_t Result = 0;
+  switch (Arch) {
+  case Triple::x86_64:
+  case Triple::ppc64:
+    Result = sizeof(uint64_t);
+    break;
+  case Triple::x86:
+  case Triple::arm:
+  case Triple::thumb:
+  case Triple::mips:
+  case Triple::mipsel:
+    Result = sizeof(uint32_t);
+    break;
+  default: llvm_unreachable("Unsupported CPU type!");
+  }
+  return Result;
+}
+
+uint64_t RuntimeDyldELF::findGOTEntry(uint64_t LoadAddress,
+                                      uint64_t Offset) {
+  assert(GOTSectionID != 0
+         && "Attempting to lookup GOT entry but the GOT was never allocated.");
+  if (GOTSectionID == 0) {
+    return 0;
+  }
+
+  size_t GOTEntrySize = getGOTEntrySize();
+
+  // Find the matching entry in our vector.
+  int GOTIndex = -1;
+  uint64_t SymbolOffset = 0;
+  for (int i = 0, e = GOTEntries.size(); i != e; ++i) {
+    if (GOTEntries[i].SymbolName == 0) {
+      if (getSectionLoadAddress(GOTEntries[i].SectionID) == LoadAddress &&
+          GOTEntries[i].Offset == Offset) {
+        GOTIndex = i;
+        SymbolOffset = GOTEntries[i].Offset;
+        break;
+      }
+    } else {
+      // GOT entries for external symbols use the addend as the address when
+      // the external symbol has been resolved.
+      if (GOTEntries[i].Offset == LoadAddress) {
+        GOTIndex = i;
+        // Don't use the Addend here.  The relocation handler will use it.
+        break;
+      }
+    }
+  }
+  assert(GOTIndex != -1 && "Unable to find requested GOT entry.");
+  if (GOTIndex == -1)
+    return 0;
+
+  if (GOTEntrySize == sizeof(uint64_t)) {
+    uint64_t *LocalGOTAddr = (uint64_t*)getSectionAddress(GOTSectionID);
+    // Fill in this entry with the address of the symbol being referenced.
+    LocalGOTAddr[GOTIndex] = LoadAddress + SymbolOffset;
+  } else {
+    uint32_t *LocalGOTAddr = (uint32_t*)getSectionAddress(GOTSectionID);
+    // Fill in this entry with the address of the symbol being referenced.
+    LocalGOTAddr[GOTIndex] = (uint32_t)(LoadAddress + SymbolOffset);
+  }
+
+  // Calculate the load address of this entry
+  return getSectionLoadAddress(GOTSectionID) + (GOTIndex * GOTEntrySize);
+}
+
+void RuntimeDyldELF::finalizeLoad() {
+  // Allocate the GOT if necessary
+  size_t numGOTEntries = GOTEntries.size();
+  if (numGOTEntries != 0) {
+    // Allocate memory for the section
+    unsigned SectionID = Sections.size();
+    size_t TotalSize = numGOTEntries * getGOTEntrySize();
+    uint8_t *Addr = MemMgr->allocateDataSection(TotalSize, getGOTEntrySize(),
+                                                SectionID);
+    if (!Addr)
+      report_fatal_error("Unable to allocate memory for GOT!");
+    Sections.push_back(SectionEntry(".got", Addr, TotalSize, TotalSize, 0));
+    // For now, initialize all GOT entries to zero.  We'll fill them in as
+    // needed when GOT-based relocations are applied.
+    memset(Addr, 0, TotalSize);
+    GOTSectionID = SectionID;
+  }
 }
 
 bool RuntimeDyldELF::isCompatibleFormat(const ObjectBuffer *Buffer) const {

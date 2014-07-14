@@ -671,6 +671,8 @@ def IL_OP_BALLOT                : ILOpCode<453, "ballot">;
 def IL_OP_READFIRSTLANE         : ILOpCode<454, "readfirstlane">;
 def IL_OP_LANE_ID               : ILOpCode<455, "lane_id">;
 def IL_OP_RECEIVELANE           : ILOpCode<456, "receivelane">;
+def IL_OP_LDS_LOAD64            : ILOpCode<457, "lds_load64">;
+def IL_OP_LDS_STORE64           : ILOpCode<458, "lds_store64">;
 
 // CI opcodes
 def IL_OP_DROUND_NEAR : ILOpCode<500, "dround_nearest">;

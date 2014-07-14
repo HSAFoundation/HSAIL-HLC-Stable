@@ -400,10 +400,6 @@ unsigned AMDILInstrInfo::getBranchInstr(const MachineOperand &Op) const {
   switch (MI->getDesc().OpInfo[0].RegClass) {
   default:
     return AMDIL::BRANCHi32br;
-  case AMDIL::GPRI8RegClassID:
-    return AMDIL::BRANCHi8br;
-  case AMDIL::GPRI16RegClassID:
-    return AMDIL::BRANCHi16br;
   case AMDIL::GPR_32RegClassID:
     return AMDIL::BRANCHi32br;
   case AMDIL::GPR_64RegClassID:
@@ -615,38 +611,20 @@ void AMDILInstrInfo::storeRegToStackSlot(MachineBasicBlock &MBB,
   default:
     Opc = AMDIL::PRIVATESTOREv4i32r;
     break;
-  case AMDIL::GPRI16RegClassID:
-    Opc = AMDIL::PRIVATESTOREi16r;
-    break;
   case AMDIL::GPR_32RegClassID:
     Opc = AMDIL::PRIVATESTOREi32r;
-    break;
-  case AMDIL::GPRI8RegClassID:
-    Opc = AMDIL::PRIVATESTOREi8r;
     break;
   case AMDIL::GPR_64RegClassID:
     Opc = AMDIL::PRIVATESTOREi64r;
     break;
-  case AMDIL::GPRV2I16RegClassID:
-    Opc = AMDIL::PRIVATESTOREv2i16r;
-    break;
   case AMDIL::GPRV2I32RegClassID:
     Opc = AMDIL::PRIVATESTOREv2i32r;
-    break;
-  case AMDIL::GPRV2I8RegClassID:
-    Opc = AMDIL::PRIVATESTOREv2i8r;
     break;
   case AMDIL::GPRV2I64RegClassID:
     Opc = AMDIL::PRIVATESTOREv2i64r;
     break;
-  case AMDIL::GPRV4I16RegClassID:
-    Opc = AMDIL::PRIVATESTOREv4i16r;
-    break;
   case AMDIL::GPRV4I32RegClassID:
     Opc = AMDIL::PRIVATESTOREv4i32r;
-    break;
-  case AMDIL::GPRV4I8RegClassID:
-    Opc = AMDIL::PRIVATESTOREv4i8r;
     break;
   }
 
@@ -716,38 +694,20 @@ void AMDILInstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
   default:
     Opc = AMDIL::PRIVATELOADv4i32r;
     break;
-  case AMDIL::GPRI16RegClassID:
-    Opc = AMDIL::PRIVATELOADi16r;
-    break;
   case AMDIL::GPR_32RegClassID:
     Opc = AMDIL::PRIVATELOADi32r;
-    break;
-  case AMDIL::GPRI8RegClassID:
-    Opc = AMDIL::PRIVATELOADi8r;
     break;
   case AMDIL::GPR_64RegClassID:
     Opc = AMDIL::PRIVATELOADi64r;
     break;
-  case AMDIL::GPRV2I16RegClassID:
-    Opc = AMDIL::PRIVATELOADv2i16r;
-    break;
   case AMDIL::GPRV2I32RegClassID:
     Opc = AMDIL::PRIVATELOADv2i32r;
-    break;
-  case AMDIL::GPRV2I8RegClassID:
-    Opc = AMDIL::PRIVATELOADv2i8r;
     break;
   case AMDIL::GPRV2I64RegClassID:
     Opc = AMDIL::PRIVATELOADv2i64r;
     break;
-  case AMDIL::GPRV4I16RegClassID:
-    Opc = AMDIL::PRIVATELOADv4i16r;
-    break;
   case AMDIL::GPRV4I32RegClassID:
     Opc = AMDIL::PRIVATELOADv4i32r;
-    break;
-  case AMDIL::GPRV4I8RegClassID:
-    Opc = AMDIL::PRIVATELOADv4i8r;
     break;
   }
 

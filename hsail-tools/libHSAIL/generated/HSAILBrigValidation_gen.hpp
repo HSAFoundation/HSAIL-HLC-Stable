@@ -162,8 +162,8 @@ bool ValidatorImpl::ValidateBrigDirectiveFields(Directive item) const
            validate_fld_Depth(item, it.brig()->depth, "DirectiveImageProperties", "depth");
            validate_fld_Array(item, it.brig()->array, "DirectiveImageProperties", "array");
            validate_BrigImageGeometry(item, it.brig()->geometry, "DirectiveImageProperties", "geometry");
-           validate_BrigImageOrder(item, it.brig()->order, "DirectiveImageProperties", "order");
-           validate_BrigImageFormat(item, it.brig()->format, "DirectiveImageProperties", "format");
+           validate_BrigImageChannelOrder(item, it.brig()->channelOrder, "DirectiveImageProperties", "channelOrder");
+           validate_BrigImageChannelType(item, it.brig()->channelType, "DirectiveImageProperties", "channelType");
            validate_fld_Reserved(item, it.brig()->reserved, "DirectiveImageProperties", "reserved");
        }
        break;
@@ -243,10 +243,10 @@ bool ValidatorImpl::ValidateBrigDirectiveFields(Directive item) const
            DirectiveSamplerProperties it = item;
 
            validate_BrigCodeOffset(item, it.brig()->code, "DirectiveSamplerProperties", "code");
-           validate_BrigSamplerModifier(item, it.brig()->modifier, "DirectiveSamplerProperties", "modifier");
-           validate_BrigSamplerBoundaryMode(item, it.brig()->boundaryU, "DirectiveSamplerProperties", "boundaryU");
-           validate_BrigSamplerBoundaryMode(item, it.brig()->boundaryV, "DirectiveSamplerProperties", "boundaryV");
-           validate_BrigSamplerBoundaryMode(item, it.brig()->boundaryW, "DirectiveSamplerProperties", "boundaryW");
+           validate_BrigSamplerCoordNormalization(item, it.brig()->coord, "DirectiveSamplerProperties", "coord");
+           validate_BrigSamplerFilter(item, it.brig()->filter, "DirectiveSamplerProperties", "filter");
+           validate_BrigSamplerAddressing(item, it.brig()->addressing, "DirectiveSamplerProperties", "addressing");
+           validate_fld_Reserved(item, it.brig()->reserved, "DirectiveSamplerProperties", "reserved");
        }
        break;
 
@@ -395,21 +395,6 @@ bool ValidatorImpl::ValidateBrigInstFields(Inst item) const
        }
        break;
 
-       case BRIG_INST_ATOMIC_IMAGE:
-       {
-           InstAtomicImage it = item;
-
-           validate_BrigOpcode(item, it.brig()->opcode, "InstAtomicImage", "opcode");
-           validate_BrigType(item, it.brig()->type, "InstAtomicImage", "type");
-           validate_BrigType(item, it.brig()->imageType, "InstAtomicImage", "imageType");
-           validate_BrigType(item, it.brig()->coordType, "InstAtomicImage", "coordType");
-           validate_BrigImageGeometry(item, it.brig()->geometry, "InstAtomicImage", "geometry");
-           validate_BrigAtomicOperation(item, it.brig()->atomicOperation, "InstAtomicImage", "atomicOperation");
-           validate_fld_EquivClass(item, it.brig()->equivClass, "InstAtomicImage", "equivClass");
-           validate_fld_Reserved(item, it.brig()->reserved, "InstAtomicImage", "reserved");
-       }
-       break;
-
        case BRIG_INST_BASIC:
        {
            InstBasic it = item;
@@ -522,6 +507,31 @@ bool ValidatorImpl::ValidateBrigInstFields(Inst item) const
            validate_BrigAluModifier(item, it.brig()->modifier, "InstMod", "modifier");
            validate_BrigPack(item, it.brig()->pack, "InstMod", "pack");
            validate_fld_Reserved(item, it.brig()->reserved, "InstMod", "reserved");
+       }
+       break;
+
+       case BRIG_INST_QUERY_IMAGE:
+       {
+           InstQueryImage it = item;
+
+           validate_BrigOpcode(item, it.brig()->opcode, "InstQueryImage", "opcode");
+           validate_BrigType(item, it.brig()->type, "InstQueryImage", "type");
+           validate_BrigType(item, it.brig()->imageType, "InstQueryImage", "imageType");
+           validate_BrigImageGeometry(item, it.brig()->geometry, "InstQueryImage", "geometry");
+           validate_BrigImageQuery(item, it.brig()->imageQuery, "InstQueryImage", "imageQuery");
+       }
+       break;
+
+       case BRIG_INST_QUERY_SAMPLER:
+       {
+           InstQuerySampler it = item;
+
+           validate_BrigOpcode(item, it.brig()->opcode, "InstQuerySampler", "opcode");
+           validate_BrigType(item, it.brig()->type, "InstQuerySampler", "type");
+           validate_BrigSamplerQuery(item, it.brig()->samplerQuery, "InstQuerySampler", "samplerQuery");
+           for (unsigned i = 0; i < 3; i++) {
+               validate_fld_Reserved(item, it.brig()->reserved[i], "InstQuerySampler", "reserved");
+           }
        }
        break;
 

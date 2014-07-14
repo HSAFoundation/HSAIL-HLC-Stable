@@ -82,26 +82,6 @@ void setBrigProp(Inst inst, unsigned propId, unsigned val, bool ignoreErrors)
         }
         break;
 
-        case BRIG_INST_ATOMIC_IMAGE:
-        {
-            InstAtomicImage it = inst;
-        
-            switch(propId)
-            {
-            case PROP_OPCODE: it.opcode() = val; break;
-            case PROP_TYPE: it.type() = val; break;
-            case PROP_IMAGETYPE: it.imageType() = val; break;
-            case PROP_COORDTYPE: it.coordType() = val; break;
-            case PROP_GEOMETRY: it.geometry() = val; break;
-            case PROP_ATOMICOPERATION: it.atomicOperation() = val; break;
-            case PROP_EQUIVCLASS: it.equivClass() = val; break;
-            default:
-                assert(ignoreErrors);
-                break;
-            }
-        }
-        break;
-
         case BRIG_INST_BASIC:
         {
             InstBasic it = inst;
@@ -263,6 +243,40 @@ void setBrigProp(Inst inst, unsigned propId, unsigned val, bool ignoreErrors)
         }
         break;
 
+        case BRIG_INST_QUERY_IMAGE:
+        {
+            InstQueryImage it = inst;
+        
+            switch(propId)
+            {
+            case PROP_OPCODE: it.opcode() = val; break;
+            case PROP_TYPE: it.type() = val; break;
+            case PROP_IMAGETYPE: it.imageType() = val; break;
+            case PROP_GEOMETRY: it.geometry() = val; break;
+            case PROP_IMAGEQUERY: it.imageQuery() = val; break;
+            default:
+                assert(ignoreErrors);
+                break;
+            }
+        }
+        break;
+
+        case BRIG_INST_QUERY_SAMPLER:
+        {
+            InstQuerySampler it = inst;
+        
+            switch(propId)
+            {
+            case PROP_OPCODE: it.opcode() = val; break;
+            case PROP_TYPE: it.type() = val; break;
+            case PROP_SAMPLERQUERY: it.samplerQuery() = val; break;
+            default:
+                assert(ignoreErrors);
+                break;
+            }
+        }
+        break;
+
         case BRIG_INST_QUEUE:
         {
             InstQueue it = inst;
@@ -388,26 +402,6 @@ unsigned getBrigProp(Inst inst, unsigned propId, bool ignoreErrors, unsigned def
             case PROP_SEGMENT: return it.segment();
             case PROP_MEMORYORDER: return it.memoryOrder();
             case PROP_MEMORYSCOPE: return it.memoryScope();
-            case PROP_ATOMICOPERATION: return it.atomicOperation();
-            case PROP_EQUIVCLASS: return it.equivClass();
-            default:
-                assert(ignoreErrors);
-                break;
-            }
-        }
-        break;
-
-        case BRIG_INST_ATOMIC_IMAGE:
-        {
-            InstAtomicImage it = inst;
-        
-            switch(propId)
-            {
-            case PROP_OPCODE: return it.opcode();
-            case PROP_TYPE: return it.type();
-            case PROP_IMAGETYPE: return it.imageType();
-            case PROP_COORDTYPE: return it.coordType();
-            case PROP_GEOMETRY: return it.geometry();
             case PROP_ATOMICOPERATION: return it.atomicOperation();
             case PROP_EQUIVCLASS: return it.equivClass();
             default:
@@ -571,6 +565,40 @@ unsigned getBrigProp(Inst inst, unsigned propId, bool ignoreErrors, unsigned def
             case PROP_ROUND: return it.modifier().round();
             case PROP_FTZ: return it.modifier().ftz();
             case PROP_PACK: return it.pack();
+            default:
+                assert(ignoreErrors);
+                break;
+            }
+        }
+        break;
+
+        case BRIG_INST_QUERY_IMAGE:
+        {
+            InstQueryImage it = inst;
+        
+            switch(propId)
+            {
+            case PROP_OPCODE: return it.opcode();
+            case PROP_TYPE: return it.type();
+            case PROP_IMAGETYPE: return it.imageType();
+            case PROP_GEOMETRY: return it.geometry();
+            case PROP_IMAGEQUERY: return it.imageQuery();
+            default:
+                assert(ignoreErrors);
+                break;
+            }
+        }
+        break;
+
+        case BRIG_INST_QUERY_SAMPLER:
+        {
+            InstQuerySampler it = inst;
+        
+            switch(propId)
+            {
+            case PROP_OPCODE: return it.opcode();
+            case PROP_TYPE: return it.type();
+            case PROP_SAMPLERQUERY: return it.samplerQuery();
             default:
                 assert(ignoreErrors);
                 break;

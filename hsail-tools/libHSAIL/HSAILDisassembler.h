@@ -71,7 +71,8 @@ private:
     mutable std::ostream *stream;
     mutable int           indent;
     mutable bool          hasErr;
-    mutable unsigned      machineModel;
+    mutable unsigned      mModel;
+    mutable unsigned      mProfile;
     unsigned              m_options;
 
     static const int BRIG_OPERANDS_NUM = 5;
@@ -90,8 +91,9 @@ public:
     };
 
     Disassembler(BrigContainer& c, EFloatDisassemblyMode fmode=FloatDisassemblyModeRawBits)
-        : brig(c), err(0), stream(0), indent(0), hasErr(false), machineModel(Brig::BRIG_MACHINE_UNDEF)
-        , m_options(fmode)
+        : brig(c), err(0), stream(0), indent(0), hasErr(false), 
+          mModel(Brig::BRIG_MACHINE_LARGE), mProfile(Brig::BRIG_PROFILE_FULL),
+          m_options(fmode)
     {}
 
     void setOutputOptions(unsigned mask) { m_options = mask; }
@@ -99,9 +101,9 @@ public:
     int run(std::ostream &s) const;       // Disassemble all BRIG container to stream
     int run(const char* path) const;      // Disassemble all BRIG container to file
 
-    std::string get(Directive d, unsigned model);   // Disassemble one directive as string
-    std::string get(Inst i, unsigned model);        // Disassemble one instruction as string
-    std::string get(Operand i, unsigned model);     // Disassemble one operand as string
+    std::string get(Directive d, unsigned model, unsigned profile);   // Disassemble one directive as string
+    std::string get(Inst i,      unsigned model, unsigned profile);   // Disassemble one instruction as string
+    std::string get(Operand i,   unsigned model, unsigned profile);   // Disassemble one operand as string
 
     void log(std::ostream &s);                 // Request errors logging into stream s
     bool hasError() const { return hasErr; }   // Return error flag
@@ -182,13 +184,14 @@ private:
     void printInst(InstAtomic i) const;
     void printInst(InstImage i) const;
     void printInst(InstLane i) const;
-    void printInst(InstAtomicImage i) const;
     void printInst(InstMemFence i) const;
     void printInst(InstQueue i) const;
     void printInst(InstSeg i) const;
     void printInst(InstSegCvt i) const;
     void printInst(InstSourceType i) const;
     void printInst(InstSignal i) const;
+    void printInst(InstQueryImage i) const;
+    void printInst(InstQuerySampler i) const;
     void printNop() const;
 
     void printCallArgs(Inst i) const;
@@ -234,7 +237,11 @@ private:
     const char* cmpOp2str(unsigned opcode) const;
     const char* atomicOperation2str(unsigned op) const;
     const char* imageGeometry2str(unsigned g) const;
-    const char* imgMod2str(unsigned im) const;
+    const char* samplerCoordNormalization2str(unsigned val) const;
+    const char* samplerFilter2str(unsigned val) const;
+    const char* samplerAddressing2str(unsigned val) const;
+    const char* samplerQuery2str(unsigned g) const;
+    const char* imageQuery2str(unsigned g) const;
     const char* machineModel2str(unsigned machineModel) const;
     const char* profile2str(unsigned profile) const;
     const char* ftz2str(unsigned ftz) const;
@@ -244,11 +251,8 @@ private:
     const char* memoryScope2str(unsigned flags) const;
     const char* class2str(unsigned val) const;
     const char* v2str(Operand opr) const;
-    const char* imageFormat2str(Brig::BrigImageFormat8_t fmt) const;
-    const char* imageOrder2str(Brig::BrigImageOrder8_t order) const;
-    const char* filter2str(uint8_t val) const;
-    const char* coord2str(bool inUnnormalized) const;
-    const char* boundaryMode2str(uint8_t val) const;
+    const char* imageChannelType2str(Brig::BrigImageChannelType8_t fmt) const;
+    const char* imageChannelOrder2str(Brig::BrigImageChannelOrder8_t order) const;
     const char* width2str(unsigned val) const;
     const char* const2str(bool isConst) const;
     const char* nonull2str(bool isNoNull) const;

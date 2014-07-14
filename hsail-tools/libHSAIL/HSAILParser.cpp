@@ -329,7 +329,7 @@ Inst parseMnemoBasicOrMod(Scanner& scanner, Brigantine& bw) {
         inst.type() = type;
 
         // NB: getDefRounding must be called after all other fields are initialized
-        inst.modifier().round() = round.isInitialized() ? round.value() : getDefRounding(inst, bw.getMachineModel());
+        inst.modifier().round() = round.isInitialized() ? round.value() : getDefRounding(inst, bw.getMachineModel(), bw.getProfile());
 
         return inst;
     } else {
@@ -413,7 +413,7 @@ Inst parseMnemoMem(Scanner& scanner, Brigantine& bw, int* outVector/* out */) {
     inst.type()       = type;
     inst.segment()    = segment.isInitialized() ?    Brig::BrigSegment(segment.value())    : Brig::BRIG_SEGMENT_FLAT;
     inst.equivClass() = equivClass.isInitialized() ? equivClass.value() : 0;
-    inst.width()      = width.isInitialized() ?      width.value()      : getDefWidth(inst, bw.getMachineModel());
+    inst.width()      = width.isInitialized() ?      width.value()      : getDefWidth(inst, bw.getMachineModel(), bw.getProfile());
     inst.align()      = align.isInitialized() ?      align.value()      : Brig::BRIG_ALIGNMENT_1;
     inst.modifier().isConst()  = isConst.isInitialized();
 
@@ -449,7 +449,7 @@ Inst parseMnemoBr(Scanner& scanner, Brigantine& bw) {
         // This will be fixed later, after parsing operands
         inst.width() = Brig::BRIG_WIDTH_NONE;
     } else {
-        inst.width() = getDefWidth(inst, bw.getMachineModel());
+        inst.width() = getDefWidth(inst, bw.getMachineModel(), bw.getProfile());
     }
 
     return inst;
@@ -487,7 +487,7 @@ Inst parseMnemoCvt(Scanner& scanner, Brigantine& bw) {
     inst.modifier().ftz()   = ftz.isInitialized();
     
     // NB: getDefRounding must be called after all other fields are initialized
-    inst.modifier().round() = round.isInitialized() ? round.value() : getDefRounding(inst, bw.getMachineModel());
+    inst.modifier().round() = round.isInitialized() ? round.value() : getDefRounding(inst, bw.getMachineModel(), bw.getProfile());
 
     return inst;
 }
@@ -514,7 +514,7 @@ Inst parseMnemoAtomic(Scanner& scanner, Brigantine& bw) {
 
 Inst parseMnemoMemFence(Scanner& scanner, Brigantine& bw) {
     unsigned  const opCode      = scanner.eatToken(EInstruction);
-    OptionalU const segment     = scanner.tryEatToken(EMSegment);
+    OptionalU const fence       = scanner.tryEatToken(EMMemoryFenceSegments);
     unsigned  const memoryOrder = scanner.eatToken(EMMemoryOrder);
     unsigned  const memoryScope = scanner.eatToken(EMMemoryScope);
     scanner.eatToken(EMNone);
@@ -522,15 +522,7 @@ Inst parseMnemoMemFence(Scanner& scanner, Brigantine& bw) {
 
     InstMemFence inst = bw.addInst<InstMemFence>(opCode,Brig::BRIG_TYPE_NONE);
 
-    if (!segment.isInitialized()) {
-      inst.segments() = Brig::BRIG_MEMORY_FENCE_BOTH;
-    } else if (segment.value() == Brig::BRIG_SEGMENT_GLOBAL) {
-      inst.segments() = Brig::BRIG_MEMORY_FENCE_GLOBAL;
-    } else if (segment.value() == Brig::BRIG_SEGMENT_GROUP) { 
-      inst.segments() = Brig::BRIG_MEMORY_FENCE_GROUP;
-    } else {
-      scanner.syntaxError("Invalid segment for memory fence");
-    }
+    inst.segments()    = fence.isInitialized() ? fence.value() : Brig::BRIG_MEMORY_FENCE_BOTH;
     inst.memoryOrder() = memoryOrder;
     inst.memoryScope() = memoryScope;
     return inst;
@@ -567,23 +559,31 @@ Inst parseMnemoImage(Scanner& scanner, Brigantine& bw) {
     return parseMnemoImage(scanner,bw,NULL);
 }
 
-Inst parseMnemoAtomicImage(Scanner& scanner, Brigantine& bw) {
+Inst parseMnemoQueryImage(Scanner& scanner, Brigantine& bw) {
     unsigned  const opCode          = scanner.eatToken(EInstruction);
-    unsigned  const atomicOperation = scanner.eatToken(EMAtomicOp);
     unsigned  const geom            = scanner.eatToken(EMGeom);
-    OptionalU const equivClass      = tryParseEquiv(scanner);
+    unsigned  const query           = scanner.eatToken(EMImageQuery);
     unsigned  const dstType         = scanner.eatToken(EMType);
     unsigned  const imgType         = scanner.eatToken(EMType);
-    unsigned  const coordType       = scanner.eatToken(EMType);
     scanner.eatToken(EMNone);
     // parse done
 
-    InstAtomicImage inst   = bw.addInst<InstAtomicImage>(opCode,dstType);
-    inst.equivClass()      = equivClass.isInitialized() ? equivClass.value() : 0;
-    inst.atomicOperation() = atomicOperation;
+    InstQueryImage inst    = bw.addInst<InstQueryImage>(opCode,dstType);
     inst.geometry()        = geom;
+    inst.imageQuery()      = query;
     inst.imageType()       = imgType;
-    inst.coordType()       = coordType;
+    return inst;
+}
+
+Inst parseMnemoQuerySampler(Scanner& scanner, Brigantine& bw) {
+    unsigned  const opCode          = scanner.eatToken(EInstruction);
+    unsigned  const query           = scanner.eatToken(EMSamplerQuery);
+    unsigned  const dstType         = scanner.eatToken(EMType);
+    scanner.eatToken(EMNone);
+    // parse done
+
+    InstQuerySampler inst  = bw.addInst<InstQuerySampler>(opCode,dstType);
+    inst.samplerQuery()    = query;
     return inst;
 }
 
@@ -600,7 +600,7 @@ Inst parseMnemoLane(Scanner& scanner, Brigantine& bw, int* outVector/* out */) {
 
     InstLane inst = bw.addInst<InstLane>(opCode);
     inst.sourceType() = stype.isInitialized() ? stype.value() : Brig::BRIG_TYPE_NONE;
-    inst.width() = width.isInitialized() ? width.value() : getDefWidth(inst, bw.getMachineModel());
+    inst.width() = width.isInitialized() ? width.value() : getDefWidth(inst, bw.getMachineModel(), bw.getProfile());
     inst.type() = dtype;
 
     if (outVector!=NULL) {
@@ -1227,17 +1227,17 @@ DirectiveImageProperties Parser::parseImageProperties()
             }
             props.array() = readPositiveInt<Brig::BRIG_TYPE_U32>(m_scanner);
             break;
-        case EKWImageFormat:
-            if (props.format() != Brig::BRIG_FORMAT_UNKNOWN) {
-                syntaxError("Format already set");
+        case EKWImageChannelType:
+            if (props.channelType() != Brig::BRIG_CHANNEL_TYPE_UNKNOWN) {
+                syntaxError("Channel type already set");
             }
-            props.format() = eatToken(EImageFormat);
+            props.channelType() = eatToken(EImageFormat);
             break;
-        case EKWImageOrder:
-            if (props.order() != Brig::BRIG_ORDER_UNKNOWN) {
-                syntaxError("Order already set");
+        case EKWImageChannelOrder:
+            if (props.channelOrder() != Brig::BRIG_CHANNEL_ORDER_UNKNOWN) {
+                syntaxError("Channel order already set");
             }
-            props.order() = eatToken(EImageOrder);
+            props.channelOrder() = eatToken(EImageOrder);
             break;
         case EKWImageGeometry:
             if (props.geometry() != Brig::BRIG_GEOMETRY_UNKNOWN) {
@@ -1251,10 +1251,10 @@ DirectiveImageProperties Parser::parseImageProperties()
     } while (tryEatToken(EComma));
     eatToken(ERParen);
 
-    if (props.geometry() == Brig::BRIG_GEOMETRY_UNKNOWN) syntaxError("Missing image geometry", &srcInfo);
-    if (props.order()    == Brig::BRIG_ORDER_UNKNOWN)    syntaxError("Missing image order",    &srcInfo);
-    if (props.format()   == Brig::BRIG_FORMAT_UNKNOWN)   syntaxError("Missing image format",   &srcInfo);
-    if (props.width()    == 0)                           syntaxError("Missing image width",    &srcInfo);
+    if (props.geometry()     == Brig::BRIG_GEOMETRY_UNKNOWN)      syntaxError("Missing image geometry",      &srcInfo);
+    if (props.channelOrder() == Brig::BRIG_CHANNEL_ORDER_UNKNOWN) syntaxError("Missing image channel order", &srcInfo);
+    if (props.channelType()  == Brig::BRIG_CHANNEL_TYPE_UNKNOWN)  syntaxError("Missing image channel type",  &srcInfo);
+    if (props.width()        == 0)                                syntaxError("Missing image width",         &srcInfo);
 
     unsigned geom = props.geometry();
 
@@ -1303,20 +1303,14 @@ DirectiveSamplerProperties Parser::parseSamplerProperties()
             propMask |= bit;
         }
         switch(t) {
-        case EKWSamplerBoundaryU:
-            props.boundaryU() = eatToken(ESamplerBoundaryMode);
-            break;
-        case EKWSamplerBoundaryV:
-            props.boundaryV() = eatToken(ESamplerBoundaryMode);
-            break;
-        case EKWSamplerBoundaryW:
-            props.boundaryW() = eatToken(ESamplerBoundaryMode);
+        case EKWSamplerAddressing:
+            props.addressing() = eatToken(ESamplerAddressingMode);
             break;
         case EKWSamplerCoord:
-            props.modifier().isUnnormalized() = eatToken(ESamplerCoord)==0; 
+            props.coord() = eatToken(ESamplerCoord);
             break;
         case EKWSamplerFilter:
-            props.modifier().filter() = eatToken(ESamplerFilter);
+            props.filter() = eatToken(ESamplerFilter);
             break;
         default:
             syntaxError("Invalid sampler object property name",&srcInfo);
@@ -1329,14 +1323,8 @@ DirectiveSamplerProperties Parser::parseSamplerProperties()
             continue;
         }
         switch(prop) {
-        case EKWSamplerBoundaryU:
-            syntaxError("boundaryu value missing");
-            break;
-        case EKWSamplerBoundaryV:
-            syntaxError("boundaryv value missing");
-            break;
-        case EKWSamplerBoundaryW:
-            syntaxError("boundaryw value missing");
+        case EKWSamplerAddressing:
+            syntaxError("addressing value missing");
             break;
         case EKWSamplerCoord:
             syntaxError("coord value missing");
@@ -1408,6 +1396,7 @@ DirectiveVariable Parser::parseDecl(bool isArg, bool isLocal,const DeclPrefix& d
     switch(dType) {
     case Brig::BRIG_TYPE_ROIMG:
     case Brig::BRIG_TYPE_RWIMG:
+    case Brig::BRIG_TYPE_WOIMG:
         sym = m_bw.addImage(name,segment,&srcInfo);
         sym.type() = dType;
         break;
@@ -1534,6 +1523,7 @@ void Parser::parseBlock()
             {
             case Brig::BRIG_TYPE_ROIMG:
             case Brig::BRIG_TYPE_RWIMG:
+            case Brig::BRIG_TYPE_WOIMG:
             case Brig::BRIG_TYPE_SAMP:
                 // this is to avoid parsing values (see below) as opaque types
                 syntaxError("invalid blocknumeric type");
@@ -1566,7 +1556,7 @@ Inst Parser::parseInst()
             SourceInfo const srcInfo = sourceInfo(peek());
             res = parseMnemo(m_scanner, m_bw);
 
-            const char* errMsg = preValidateInst(res, m_bw.getMachineModel());
+            const char* errMsg = preValidateInst(res, m_bw.getMachineModel(), m_bw.getProfile());
             if (errMsg) syntaxError(errMsg);
 
             res.annotate(srcInfo);
@@ -1640,7 +1630,7 @@ Inst Parser::parseInstLdSt()
     int vector=1;
     Inst inst = parseMnemoMem(m_scanner,m_bw,&vector);
 
-    const char* errMsg = preValidateInst(inst, m_bw.getMachineModel());
+    const char* errMsg = preValidateInst(inst, m_bw.getMachineModel(), m_bw.getProfile());
     if (errMsg) syntaxError(errMsg);
 
     inst.annotate(srcInfo);
@@ -1661,7 +1651,7 @@ Inst Parser::parseInstLane()
     int vector=1;
     Inst inst = parseMnemoLane(m_scanner, m_bw, &vector);
 
-    const char* errMsg = preValidateInst(inst, m_bw.getMachineModel());
+    const char* errMsg = preValidateInst(inst, m_bw.getMachineModel(), m_bw.getProfile());
     if (errMsg) syntaxError(errMsg);
 
     inst.annotate(srcInfo);
@@ -1682,7 +1672,7 @@ Inst Parser::parseInstCombineExpand(unsigned operandIdx)
     int vector=1;
     Inst inst = parseMnemoSourceType(m_scanner,m_bw,&vector);
 
-    const char* errMsg = preValidateInst(inst, m_bw.getMachineModel());
+    const char* errMsg = preValidateInst(inst, m_bw.getMachineModel(), m_bw.getProfile());
     if (errMsg) syntaxError(errMsg);
 
     inst.annotate(srcInfo);
@@ -1705,7 +1695,7 @@ Inst Parser::parseInstImage()
     int vector=1;
     Inst inst = parseMnemoImage(m_scanner,m_bw,&vector);
 
-    const char* errMsg = preValidateInst(inst, m_bw.getMachineModel());
+    const char* errMsg = preValidateInst(inst, m_bw.getMachineModel(), m_bw.getProfile());
     if (errMsg) syntaxError(errMsg);
 
     inst.annotate(srcInfo);
@@ -1842,7 +1832,7 @@ void Parser::parseNoOperands(Inst )
 
 void Parser::parseOperandGeneric(Inst inst, unsigned opndIdx)
 {
-    unsigned const reqType = getOperandType(inst, opndIdx, m_bw.getMachineModel());
+    unsigned const reqType = getOperandType(inst, opndIdx, m_bw.getMachineModel(), m_bw.getProfile());
     m_bw.setOperand(inst,opndIdx,parseOperandGeneric(reqType));
 }
 

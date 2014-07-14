@@ -20,10 +20,6 @@
 #include "llvm/Support/ELF.h"
 using namespace llvm;
 
-HSAILMCAsmInfoDarwin::HSAILMCAsmInfoDarwin(const Triple &Triple) {}
-
-extern cl::opt<bool> disableBrigLowering;
-
 HSAILELFMCAsmInfo::HSAILELFMCAsmInfo(const Triple &T, bool is64Bit)
 {
   GlobalPrefix = "";
@@ -34,17 +30,17 @@ HSAILELFMCAsmInfo::HSAILELFMCAsmInfo(const Triple &T, bool is64Bit)
   HasLEB128 = false;
   HasDotTypeDotSizeDirective = false;
   HasSingleParameterDotFile = false;
+  AllowPeriodsInName = false;
 
-  // 1) only BRIG lowering is capable of handling the output of DWARF generation
-  // 2) we must set SupportsDebugInformation to true in order for debug info  to 
-  //    be generated.  This shouldn't cause unwanted output, because if the FE 
-  //    does not produce debug metadata (no -g option) then there won't be (much)
-  //    debug info generated.
-  //    TODO: we may need to especially ensure that when -g is not passed to the FE,
-  //          BRIGAsmPrinter does not create large ".text", etc., sections in order to
-  //          save space and I/O time.
+  // We must set SupportsDebugInformation to true in order for debug info  to 
+  // be generated.  This shouldn't cause unwanted output, because if the FE 
+  // does not produce debug metadata (no -g option) then there won't be (much)
+  // debug info generated.
+  // TODO: we may need to especially ensure that when -g is not passed to the FE,
+  //        BRIGAsmPrinter does not create large ".text", etc., sections in order to
+  //        save space and I/O time.
   //
-  SupportsDebugInformation = ! disableBrigLowering;
+  SupportsDebugInformation = true;
 
   PointerSize = is64Bit ? 8 : 4;
 
@@ -64,6 +60,4 @@ HSAILELFMCAsmInfo::getNonexecutableStackSection(MCContext &Ctx) const
 {
   return NULL;
 }
-
-HSAILMCAsmInfoCOFF::HSAILMCAsmInfoCOFF(const Triple &Triple) {}
 

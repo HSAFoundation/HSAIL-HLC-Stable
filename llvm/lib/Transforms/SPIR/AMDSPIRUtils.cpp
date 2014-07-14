@@ -4,10 +4,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/Function.h"
 #include "llvm/Transforms/AMDSPIRUtils.h"
 
+#include "llvm/Constants.h"
+#include "llvm/Function.h"
+#include "llvm/Module.h"
+
 #include "cxxabi.h"
+
 
 namespace llvm {
 
@@ -23,5 +27,28 @@ bool isOpenCLBuiltinFunction(Function *Fn) {
   if (status || !DemangledName)
     return false;
   return true;
+}
+
+/// \brief Check whether the Module has OpenCL 2.0 metadata.
+bool isOpenCL20Module(Module &M) {
+
+  NamedMDNode *OCLVersion = M.getNamedMetadata("opencl.ocl.version");
+
+  if (!OCLVersion || OCLVersion->getNumOperands() < 1)
+    return false;
+
+  MDNode *Ver = OCLVersion->getOperand(0);
+  if (Ver->getNumOperands() != 2)
+    return false;
+
+  ConstantInt *Major = dyn_cast<ConstantInt>(Ver->getOperand(0));
+  ConstantInt *Minor = dyn_cast<ConstantInt>(Ver->getOperand(1));
+  if (!(Major && Minor))
+    return false;
+
+  if (Major->getZExtValue() == 2)
+    return true;
+
+  return false;
 }
 }

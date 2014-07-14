@@ -1,21 +1,26 @@
 LOCAL_PATH:= $(call my-dir)
 
 linker_SRC_FILES := \
+  AMDPrelinkOpt.cpp \
+  AMDResolveLinker.cpp \
+  LinkArchives.cpp \
+  Linker.cpp \
+  LinkItems.cpp \
   LinkModules.cpp \
-  Linker.cpp
+
 
 # For the host
 # =====================================================
-include $(CLEAR_VARS)
-include $(CLEAR_TBLGEN_VARS)
+#include $(CLEAR_VARS)
+#include $(CLEAR_TBLGEN_VARS)
 
 LOCAL_SRC_FILES := $(linker_SRC_FILES)
 
 LOCAL_MODULE:= AMDlibLLVMLinker 
 LOCAL_MODULE_TAGS := optional
 
-include $(LLVM_HOST_BUILD_MK)
-include $(BUILD_HOST_STATIC_LIBRARY)
+#include $(LLVM_HOST_BUILD_MK)
+#include $(BUILD_HOST_STATIC_LIBRARY)
 
 # For the device
 # =====================================================

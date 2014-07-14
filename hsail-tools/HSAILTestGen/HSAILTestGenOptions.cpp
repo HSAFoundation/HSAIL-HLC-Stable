@@ -45,6 +45,14 @@ cl::opt<BrigMachineModel>
                        clEnumValN(BRIG_MACHINE_SMALL, "small", "Small model"),
                        clEnumValEnd));
 
+cl::opt<BrigProfile>
+    profile("profile",
+            cl::desc("Profile"),
+            cl::init(BRIG_PROFILE_FULL),
+            cl::values(clEnumValN(BRIG_PROFILE_FULL, "full", "Full profile (default)"),
+                       clEnumValN(BRIG_PROFILE_BASE, "base", "Base profile"),
+                       clEnumValEnd));
+
 cl::bits<InstSubsetType> 
     instSubset(cl::desc("Subset of instructions (standard HSAIL instructions if not specified)"),
             cl::values(clEnumValN(SUBSET_STD,   "std",   "Standard HSAIL instructions"),

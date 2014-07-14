@@ -408,7 +408,7 @@ private:
         if (fmt == FILE_FORMAT_BIF) {
             elfHeader.e_type = ET_REL;
             elfHeader.e_machine = Policy::EM_HSAIL_;
-            elfHeader.e_flags = 0x16; // mimic objgen
+            elfHeader.e_flags = 0x1;
         }
 
         elfHeader.e_ehsize = sizeof(elfHeader);
@@ -550,6 +550,35 @@ struct MemoryAdapter : public ReadWriteAdapter {
     }
 };
 
+struct istreamAdapter : public ReadAdapter {
+    std::istream&   is;
+
+    istreamAdapter(std::istream& is_, std::ostream &errs_)
+        : IOAdapter(errs_)
+        , ReadAdapter(errs_)
+        , is(is_)
+    {}
+    ~istreamAdapter() {}
+
+    virtual int pread(char* data, size_t numBytes, uint64_t offset) const {
+        if ((offset + numBytes) > static_cast<uint64_t>((std::numeric_limits<std::streamoff>::max)())) {
+            errs << "Reading beyond the end of the buffer" << std::endl;
+            return 1;
+        }
+        is.seekg(static_cast<std::streamoff>(offset), std::ios_base::beg);
+        if (is.fail()) {
+            errs << "stream seek error" << std::endl;
+            return 1;
+        }
+        is.read(data, static_cast<std::streamsize>(numBytes));
+        if (is.fail() || static_cast<size_t>(is.gcount()) < numBytes) {
+            errs << "error reading stream" << std::endl;
+            return 1;
+        }
+        return 0;
+    }
+};
+
 // TBD this is the only non-forward dependency on iostream
 std::ostream& BrigIO::defaultErrs() {
     return std::cerr;
@@ -593,6 +622,14 @@ std::auto_ptr<ReadAdapter> BrigIO::memoryReadingAdapter(
 {
     return std::auto_ptr<ReadAdapter>(
             new MemoryAdapter((char*)buf, size, errs) );
+}
+
+std::auto_ptr<ReadAdapter> BrigIO::istreamReadingAdapter(
+                    std::istream& is, 
+                    std::ostream& errs)
+{
+    return std::auto_ptr<ReadAdapter>(
+            new istreamAdapter(is, errs));
 }
 
 int BrigIO::load(BrigContainer &dst, 

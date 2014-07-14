@@ -1,11 +1,13 @@
 LOCAL_PATH:= $(call my-dir)
 
 spir_SRC_FILES := \
+	AMDMetadataUtils.cpp \
 	AMDSPIRLoader.cpp \
 	AMDSPIRMutator.cpp \
+	AMDSPIRUtils.cpp \
 	cxa_demangle.cpp \
 	khrext.cpp \
-	SPIRVerifier.cpp
+	SPIRVerifier.cpp \
 
 # For the device
 # =====================================================

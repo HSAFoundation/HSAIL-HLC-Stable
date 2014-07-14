@@ -61,10 +61,102 @@ ObjectImage *RuntimeDyldImpl::createObjectImage(ObjectBuffer *InputBuffer) {
   return new ObjectImageCommon(InputBuffer);
 }
 
+#if defined(AMD_OPENCL) || 1
+uint64_t RuntimeDyldImpl::computeSectionSize(const SectionRef &Section,
+                                               ObjSectionToIDMap &LocalSections) {
+  ObjSectionToIDMap::iterator i = LocalSections.find(Section);
+  if (i != LocalSections.end()) {
+    return 0;
+  }
+
+  LocalSections[Section] = 1;
+
+  unsigned StubBufSize = 0,
+           StubSize = getMaxStubSize();
+  error_code err;
+  if (StubSize > 0) {
+    for (relocation_iterator i = Section.begin_relocations(),
+         e = Section.end_relocations(); i != e; i.increment(err), Check(err))
+      StubBufSize += StubSize;
+  }
+
+  bool IsRequired;
+  uint64_t DataSize;
+  Check(Section.isRequiredForExecution(IsRequired));
+  Check(Section.getSize(DataSize));
+
+  return IsRequired ? DataSize + StubSize : 0;
+}
+
+uint64_t RuntimeDyldImpl::computeTotalSize(const ObjectImage* obj) {
+  uint64_t totalSize = 0;
+
+  // Used sections from the object file
+  ObjSectionToIDMap LocalSections;
+
+  // Maximum required total memory to allocate all common symbols
+  uint64_t CommonSize = 0;
+
+  error_code err;
+
+  // Parse symbols
+  for (symbol_iterator i = obj->begin_symbols(), e = obj->end_symbols();
+       i != e; i.increment(err)) {
+    Check(err);
+    object::SymbolRef::Type SymType;
+    Check(i->getType(SymType));
+
+    uint32_t flags;
+    Check(i->getFlags(flags));
+
+    bool isCommon = flags & SymbolRef::SF_Common;
+    if (isCommon) {
+      // Add the common symbols to a list.  We'll allocate them all below.
+      uint64_t Align = getCommonSymbolAlignment(*i);
+      uint64_t Size = 0;
+      Check(i->getSize(Size));
+      CommonSize += Size + Align;
+    } else {
+      if (SymType == object::SymbolRef::ST_Function ||
+          SymType == object::SymbolRef::ST_Data ||
+          SymType == object::SymbolRef::ST_Unknown) {
+        section_iterator si = obj->end_sections();
+        Check(i->getSection(si));
+        if (si == obj->end_sections()) continue;
+        uint64_t Alignment64;
+        Check((*si).getAlignment(Alignment64));
+        totalSize += computeSectionSize(*si, LocalSections) + Alignment64;
+
+      }
+    }
+  }
+
+  totalSize += CommonSize;
+
+  // Parse relocations
+  for (section_iterator si = obj->begin_sections(),
+       se = obj->end_sections(); si != se; si.increment(err)) {
+    Check(err);
+    uint64_t Alignment64;
+    Check((*si).getAlignment(Alignment64));
+    totalSize += computeSectionSize(*si, LocalSections) + Alignment64;
+  }
+
+  return totalSize;
+}
+#endif
+
 ObjectImage *RuntimeDyldImpl::loadObject(ObjectBuffer *InputBuffer) {
   OwningPtr<ObjectImage> obj(createObjectImage(InputBuffer));
   if (!obj)
     report_fatal_error("Unable to create object image from memory buffer!");
+
+#if defined(AMD_OPENCL) || 1
+  uint64_t TotalSectionsSize = computeTotalSize(obj.get());
+  uint64_t GOTTableReserveSize = 4096;
+
+  MemMgr->reserveMemory(TotalSectionsSize + GOTTableReserveSize);
+#endif
 
   Arch = (Triple::ArchType)obj->getArch();
 
@@ -171,6 +263,9 @@ ObjectImage *RuntimeDyldImpl::loadObject(ObjectBuffer *InputBuffer) {
       processRelocationRef(RI, *obj, LocalSections, LocalSymbols, Stubs);
     }
   }
+
+  // Give the subclasses a chance to tie-up any loose ends.
+  finalizeLoad();
 
   return obj.take();
 }
@@ -381,6 +476,10 @@ uint8_t *RuntimeDyldImpl::createStubFunction(uint8_t *Addr) {
     writeInt32BE(Addr+40, 0x4E800420); // bctr
 
     return Addr;
+  } else if (Arch == Triple::x86_64) {
+    *Addr      = 0xFF; // jmp
+    *(Addr+1)  = 0x25; // rip
+    // 32-bit PC-relative address of the GOT entry will be stored at Addr+2
   }
   return Addr;
 }
@@ -437,6 +536,7 @@ void RuntimeDyldImpl::resolveExternalSymbols() {
       // MemoryManager.
       uint8_t *Addr = (uint8_t*) MemMgr->getPointerToNamedFunction(Name.data(),
                                                                    true);
+      updateGOTEntries(Name, (uint64_t)Addr);
       DEBUG(dbgs() << "Resolving relocations Name: " << Name
               << "\t" << format("%p", Addr)
               << "\n");

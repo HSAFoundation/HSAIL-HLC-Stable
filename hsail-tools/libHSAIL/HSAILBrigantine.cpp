@@ -112,6 +112,7 @@ DirectiveVersion Brigantine::version(
     version.brigMinor()  = Brig::BRIG_VERSION_BRIG_MINOR;
     version.machineModel() = machineModel;
     version.profile() = profile;
+    m_profile = profile;
     m_machine = machineModel;
     return version;
 }
@@ -646,7 +647,7 @@ OperandAddress Brigantine::createRef(
     if (!symName.empty()) {
         DirectiveVariable nameDS = findInScopes<DirectiveVariable>(symName);
         if (!nameDS) {
-            brigWriteError("Symbol not found",srcInfo);
+            brigWriteError((std::string("Symbol not found: ") + symName.begin).c_str(),srcInfo);
             return OperandAddress();
         }
         operand.symbol() = nameDS;
@@ -787,7 +788,7 @@ void Brigantine::setOperand(Inst inst, int oprIdx, Operand opnd)
             if ((opcode == Brig::BRIG_OPCODE_BRN  && oprIdx == 0) ||
                 (opcode == Brig::BRIG_OPCODE_CBR  && oprIdx == 1) ||
                 (opcode == Brig::BRIG_OPCODE_CALL && oprIdx == 1)) {
-                 br.width() = getDefWidth(br, getMachineModel());
+                 br.width() = getDefWidth(br, getMachineModel(), getProfile());
             }
         }
     }

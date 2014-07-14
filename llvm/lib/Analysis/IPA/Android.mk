@@ -6,7 +6,8 @@ analysis_ipa_SRC_FILES := \
   FindUsedTypes.cpp \
   GlobalsModRef.cpp \
   IPA.cpp \
-  AMDOpenCLSymbols.cpp
+  AMDOpenCLSymbols.cpp \
+  AMDLocalArrayUsage.cpp
 
 # For the host
 # =====================================================

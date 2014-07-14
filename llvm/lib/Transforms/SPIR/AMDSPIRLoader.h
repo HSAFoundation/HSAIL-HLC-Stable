@@ -30,17 +30,13 @@ namespace spir {
   class SPIRLoader : public llvm::ModulePass {
     public:
       SPIRLoader();
-      SPIRLoader(llvm::StringRef, bool demangleBuiltin = true);
+      SPIRLoader(bool demangleBuiltin);
       virtual ~SPIRLoader() {}
-
-      virtual void getAnalysisUsage(llvm::AnalysisUsage &AU) const LLVM_OVERRIDE;
 
       virtual bool runOnModule(llvm::Module &M);
 
       static char ID; // Pass identification
     private:
-      llvm::Triple mTriple;
-      const llvm::DataLayout *mLayout;
       bool mDemangleBuiltin;
   }; // end SPIRLoader class
 

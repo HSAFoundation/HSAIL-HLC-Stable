@@ -283,11 +283,6 @@ public:
   virtual unsigned
   getRARegister() const;
 
-  /// getReservedLocalBaseReg - Get the register used as the spill (or local)
-  /// base register in flat addressing mode.
-  virtual unsigned int
-  getReservedLocalBaseReg(const MachineFunction &MF) const;
-
   /// getRegPressureLimit - Return the register pressure "high water mark" for
   /// the specific register class. The scheduler is in high register pressure
   /// mode (for the specific register class) if it goes over the limit.

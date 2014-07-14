@@ -99,7 +99,7 @@ public:
     f32_t(const float* rhs) : m_uint32(*reinterpret_cast<const uint32_t*>(rhs)) {}
     bool operator==(const f32_t& rv) const { return m_uint32 == rv.m_uint32; }
     bool operator!=(const f32_t& rv) const { return !(*this==rv); }
-    uint32_t rawBits() { return m_uint32; }
+    uint32_t rawBits() const { return m_uint32; }
     static f32_t fromRawBits(uint32_t bits) { 
       f32_t res;
       res.m_uint32 = bits;
@@ -129,7 +129,7 @@ public:
     f64_t(const double* rhs) : m_uint64(*reinterpret_cast<const uint64_t*>(rhs)) { }
     bool operator==(const f64_t& rv) const { return m_uint64==rv.m_uint64; }
     bool operator!=(const f64_t& rv) const { return !(*this==rv); }
-    uint64_t rawBits() { return m_uint64; }
+    uint64_t rawBits() const { return m_uint64; }
     static f64_t fromRawBits(uint64_t bits) { 
       f64_t res;
       res.m_uint64 = bits;

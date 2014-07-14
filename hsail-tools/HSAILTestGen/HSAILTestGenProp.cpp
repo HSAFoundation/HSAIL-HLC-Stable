@@ -48,7 +48,7 @@ static const unsigned valMapDesc[] = // from HDL to TestGen
 
     OPERAND_VAL_ADDR,       O_ADDRESS_FLAT_REG, O_ADDRESS_FLAT_OFF, 
                             O_ADDRESS_GLOBAL_VAR, O_ADDRESS_READONLY_VAR, O_ADDRESS_GROUP_VAR, O_ADDRESS_PRIVATE_VAR,
-                            O_ADDRESS_GLOBAL_ROIMG, O_ADDRESS_GLOBAL_RWIMG, O_ADDRESS_GLOBAL_SAMP, O_ADDRESS_GLOBAL_SIG32, O_ADDRESS_GLOBAL_SIG64,
+                            O_ADDRESS_GLOBAL_ROIMG, O_ADDRESS_GLOBAL_WOIMG, O_ADDRESS_GLOBAL_RWIMG, O_ADDRESS_GLOBAL_SAMP, O_ADDRESS_GLOBAL_SIG32, O_ADDRESS_GLOBAL_SIG64,
                             O_ADDRESS_READONLY_ROIMG, O_ADDRESS_READONLY_RWIMG, O_ADDRESS_READONLY_SAMP, O_ADDRESS_READONLY_SIG32, O_ADDRESS_READONLY_SIG64, 0,
 
     OPERAND_VAL_FUNC,       O_FUNCTIONREF, 0,
@@ -59,6 +59,7 @@ static const unsigned valMapDesc[] = // from HDL to TestGen
     OPERAND_VAL_FBARRIER,   O_FBARRIERREF, 0,
 
     OPERAND_VAL_ROIMAGE,    O_ADDRESS_GLOBAL_ROIMG, O_ADDRESS_READONLY_ROIMG, 0, 
+    OPERAND_VAL_WOIMAGE,    O_ADDRESS_GLOBAL_WOIMG, 0, 
     OPERAND_VAL_RWIMAGE,    O_ADDRESS_GLOBAL_RWIMG, O_ADDRESS_READONLY_RWIMG, 0, 
     OPERAND_VAL_SAMPLER,    O_ADDRESS_GLOBAL_SAMP,  O_ADDRESS_READONLY_SAMP,  0,
 
@@ -78,23 +79,77 @@ const unsigned* getValMapDesc(unsigned* size) { *size = sizeof(valMapDesc) / siz
 //=============================================================================
 //=============================================================================
 
-const char* NAME_FUNC            = "&TestFunc";
-const char* NAME_GLOBAL_VAR      = "&GlobalVar";
-const char* NAME_GROUP_VAR       = "&GroupVar";
-const char* NAME_PRIVATE_VAR     = "&PrivateVar";
-const char* NAME_READONLY_VAR    = "&ReadonlyVar";
-const char* NAME_GLOBAL_ROIMG    = "&GlobalROImg";
-const char* NAME_GLOBAL_RWIMG    = "&GlobalRWImg";
-const char* NAME_READONLY_ROIMG  = "&ReadonlyROImg";
-const char* NAME_READONLY_RWIMG  = "&ReadonlyRWImg";
-const char* NAME_GLOBAL_SAMP     = "&GlobalSamp"; 
-const char* NAME_READONLY_SAMP   = "&ReadonlySamp";
-const char* NAME_GLOBAL_SIG32    = "&GlobalSig32"; 
-const char* NAME_READONLY_SIG32  = "&ReadonlySig32";
-const char* NAME_GLOBAL_SIG64    = "&GlobalSig64"; 
-const char* NAME_READONLY_SIG64  = "&ReadonlySig64";
-const char* NAME_FBARRIER        = "&Fbarrier";
-const char* NAME_LABEL           = "@TestLabel";
+unsigned operandId2SymId(unsigned operandId)
+{
+    switch(operandId)
+    {
+    case O_ADDRESS_GLOBAL_VAR:      return SYM_GLOBAL_VAR;
+    case O_ADDRESS_READONLY_VAR:    return SYM_READONLY_VAR;
+    case O_ADDRESS_GROUP_VAR:       return SYM_GROUP_VAR;
+    case O_ADDRESS_PRIVATE_VAR:     return SYM_PRIVATE_VAR;
+
+    case O_ADDRESS_GLOBAL_ROIMG:    return SYM_GLOBAL_ROIMG;
+    case O_ADDRESS_READONLY_ROIMG:  return SYM_READONLY_ROIMG;
+    case O_ADDRESS_GLOBAL_RWIMG:    return SYM_GLOBAL_RWIMG;
+    case O_ADDRESS_READONLY_RWIMG:  return SYM_READONLY_RWIMG;
+    case O_ADDRESS_GLOBAL_WOIMG:    return SYM_GLOBAL_WOIMG;
+
+    case O_ADDRESS_GLOBAL_SAMP:     return SYM_GLOBAL_SAMP;
+    case O_ADDRESS_READONLY_SAMP:   return SYM_READONLY_SAMP;
+
+    case O_ADDRESS_GLOBAL_SIG32:    return SYM_GLOBAL_SIG32;
+    case O_ADDRESS_READONLY_SIG32:  return SYM_READONLY_SIG32;
+    case O_ADDRESS_GLOBAL_SIG64:    return SYM_GLOBAL_SIG64;
+    case O_ADDRESS_READONLY_SIG64:  return SYM_READONLY_SIG64;
+
+    case O_FBARRIERREF:             return SYM_FBARRIER;
+    case O_FUNCTIONREF:             return SYM_FUNC;
+    case O_LABELREF:                return SYM_LABEL;
+
+    default:                        return SYM_NONE;
+    }
+}
+
+bool isSupportedOperand(unsigned oprId)
+{
+    unsigned symId = operandId2SymId(oprId);
+    return symId == SYM_NONE || isSupportedSym(symId);
+}
+
+const SymDesc symDescTab[SYM_MAXID] =
+{
+    {},
+
+    {SYM_FUNC,           "&TestFunc",      Brig::BRIG_TYPE_NONE,  Brig::BRIG_SEGMENT_NONE},
+    {SYM_GLOBAL_VAR,     "&GlobalVar",     Brig::BRIG_TYPE_S32,   Brig::BRIG_SEGMENT_GLOBAL},
+    {SYM_GROUP_VAR,      "&GroupVar",      Brig::BRIG_TYPE_S32,   Brig::BRIG_SEGMENT_GROUP},
+    {SYM_PRIVATE_VAR,    "&PrivateVar",    Brig::BRIG_TYPE_S32,   Brig::BRIG_SEGMENT_PRIVATE},
+    {SYM_READONLY_VAR,   "&ReadonlyVar",   Brig::BRIG_TYPE_S32,   Brig::BRIG_SEGMENT_READONLY},
+    {SYM_GLOBAL_ROIMG,   "&GlobalROImg",   Brig::BRIG_TYPE_ROIMG, Brig::BRIG_SEGMENT_GLOBAL},
+    {SYM_GLOBAL_WOIMG,   "&GlobalWOImg",   Brig::BRIG_TYPE_WOIMG, Brig::BRIG_SEGMENT_GLOBAL},
+    {SYM_GLOBAL_RWIMG,   "&GlobalRWImg",   Brig::BRIG_TYPE_RWIMG, Brig::BRIG_SEGMENT_GLOBAL},
+    {SYM_READONLY_ROIMG, "&ReadonlyROImg", Brig::BRIG_TYPE_ROIMG, Brig::BRIG_SEGMENT_READONLY},
+    {SYM_READONLY_RWIMG, "&ReadonlyRWImg", Brig::BRIG_TYPE_RWIMG, Brig::BRIG_SEGMENT_READONLY},
+    {SYM_GLOBAL_SAMP,    "&GlobalSamp",    Brig::BRIG_TYPE_SAMP,  Brig::BRIG_SEGMENT_GLOBAL},
+    {SYM_READONLY_SAMP,  "&ReadonlySamp",  Brig::BRIG_TYPE_SAMP,  Brig::BRIG_SEGMENT_READONLY},
+    {SYM_GLOBAL_SIG32,   "&GlobalSig32",   Brig::BRIG_TYPE_SIG32, Brig::BRIG_SEGMENT_GLOBAL},
+    {SYM_READONLY_SIG32, "&ReadonlySig32", Brig::BRIG_TYPE_SIG32, Brig::BRIG_SEGMENT_READONLY},
+    {SYM_GLOBAL_SIG64,   "&GlobalSig64",   Brig::BRIG_TYPE_SIG64, Brig::BRIG_SEGMENT_GLOBAL},
+    {SYM_READONLY_SIG64, "&ReadonlySig64", Brig::BRIG_TYPE_SIG64, Brig::BRIG_SEGMENT_READONLY},
+    {SYM_FBARRIER,       "&Fbarrier",      Brig::BRIG_TYPE_NONE,  Brig::BRIG_SEGMENT_NONE},
+    {SYM_LABEL,          "@TestLabel",     Brig::BRIG_TYPE_NONE,  Brig::BRIG_SEGMENT_NONE},
+
+};
+
+const char* getSymName(unsigned symId)    { assert(SYM_MINID < symId && symId < SYM_MAXID && symDescTab[symId].id == symId); return symDescTab[symId].name;    }
+unsigned    getSymType(unsigned symId)    { assert(SYM_MINID < symId && symId < SYM_MAXID && symDescTab[symId].id == symId); return symDescTab[symId].type;    }
+unsigned    getSymSegment(unsigned symId) { assert(SYM_MINID < symId && symId < SYM_MAXID && symDescTab[symId].id == symId); return symDescTab[symId].segment; }
+
+bool isSupportedSym(unsigned symId)
+{
+    assert(SYM_MINID < symId && symId < SYM_MAXID);
+    return validateProp(PROP_TYPE, getSymType(symId), machineModel, profile, instSubset.isSet(SUBSET_IMAGE)) == 0;
+}
 
 //=============================================================================
 //=============================================================================
@@ -105,9 +160,9 @@ string prop2str(unsigned id)
     return PropValidator::prop2str(id);
 }
 
-string operand2str(unsigned id)
+string operand2str(unsigned operandId)
 {
-    switch(id)
+    switch(operandId)
     {
     case O_NULL:          return "none";
     
@@ -166,29 +221,30 @@ string operand2str(unsigned id)
     case O_IMM32_3:       return "3";
 
     case O_WAVESIZE:      return "WAVESIZE";
-    case O_LABELREF:      return NAME_LABEL;
-    case O_FUNCTIONREF:   return NAME_FUNC;
-    case O_FBARRIERREF:   return NAME_FBARRIER;
+
+    case O_LABELREF:      
+    case O_FUNCTIONREF:   
+    case O_FBARRIERREF:   return getSymName(operandId2SymId(operandId));
+
 
     case O_ADDRESS_FLAT_REG:            return (machineModel == BRIG_MACHINE_LARGE)? "[$d0]" : "[$s0]";
     case O_ADDRESS_FLAT_OFF:            return "[0]";
 
-    case O_ADDRESS_GLOBAL_VAR:          return string("[") + NAME_GLOBAL_VAR     + "]";
-    case O_ADDRESS_READONLY_VAR:        return string("[") + NAME_READONLY_VAR   + "]";
-    case O_ADDRESS_GROUP_VAR:           return string("[") + NAME_GROUP_VAR      + "]";
-    case O_ADDRESS_PRIVATE_VAR:         return string("[") + NAME_PRIVATE_VAR    + "]";
-
-    case O_ADDRESS_GLOBAL_ROIMG:        return string("[") + NAME_GLOBAL_ROIMG   + "]";
-    case O_ADDRESS_GLOBAL_RWIMG:        return string("[") + NAME_GLOBAL_RWIMG   + "]";
-    case O_ADDRESS_GLOBAL_SAMP:         return string("[") + NAME_GLOBAL_SAMP    + "]";
-    case O_ADDRESS_GLOBAL_SIG32:        return string("[") + NAME_GLOBAL_SIG32   + "]";
-    case O_ADDRESS_GLOBAL_SIG64:        return string("[") + NAME_GLOBAL_SIG64   + "]";
-
-    case O_ADDRESS_READONLY_ROIMG:      return string("[") + NAME_READONLY_ROIMG + "]";
-    case O_ADDRESS_READONLY_RWIMG:      return string("[") + NAME_READONLY_RWIMG + "]";
-    case O_ADDRESS_READONLY_SAMP:       return string("[") + NAME_READONLY_SAMP  + "]";
-    case O_ADDRESS_READONLY_SIG32:      return string("[") + NAME_READONLY_SIG32 + "]";
-    case O_ADDRESS_READONLY_SIG64:      return string("[") + NAME_READONLY_SIG64 + "]";
+    case O_ADDRESS_GLOBAL_VAR:          
+    case O_ADDRESS_READONLY_VAR:        
+    case O_ADDRESS_GROUP_VAR:           
+    case O_ADDRESS_PRIVATE_VAR:        
+    case O_ADDRESS_GLOBAL_ROIMG:        
+    case O_ADDRESS_GLOBAL_RWIMG:        
+    case O_ADDRESS_GLOBAL_WOIMG:        
+    case O_ADDRESS_GLOBAL_SAMP:         
+    case O_ADDRESS_GLOBAL_SIG32:        
+    case O_ADDRESS_GLOBAL_SIG64:        
+    case O_ADDRESS_READONLY_ROIMG:      
+    case O_ADDRESS_READONLY_RWIMG:      
+    case O_ADDRESS_READONLY_SAMP:       
+    case O_ADDRESS_READONLY_SIG32:      
+    case O_ADDRESS_READONLY_SIG64:      return string("[") + getSymName(operandId2SymId(operandId)) + "]";
     
     case O_JUMPTAB:                     return "[Jumptab]"; // currently unused
     case O_CALLTAB:                     return "[Calltab]"; // currently unused
@@ -223,51 +279,6 @@ string val2str(unsigned id, unsigned val)
     else
     {
         return PropValidator::val2str(id, val);
-    }
-}
-
-//=============================================================================
-//=============================================================================
-//=============================================================================
-
-static bool isOperandProp(unsigned propId)
-{
-    switch(propId)
-    {
-    case PROP_D0:
-    case PROP_D1:                 
-    case PROP_S0:
-    case PROP_S1:
-    case PROP_S2:
-    case PROP_S3:
-    case PROP_S4:
-        return true;
-    default: 
-        return false;
-    }
-}
-
-static bool isImmOperandId(unsigned val)
-{
-    switch(val)
-    {
-    case O_IMM1_X:
-    case O_IMM8_X:
-    case O_IMM16_X:
-    case O_IMM32_X:
-    case O_IMM64_X:
-    case O_IMM128_X:
-        return true;
-    case O_IMM32_0:
-    case O_IMM32_1:
-    case O_IMM32_2:
-    case O_IMM32_3:
-        return true;
-    case O_WAVESIZE:
-        return true;
-
-    default: 
-        return false;
     }
 }
 

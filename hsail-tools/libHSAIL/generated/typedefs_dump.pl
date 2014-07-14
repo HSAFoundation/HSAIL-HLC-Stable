@@ -39,171 +39,175 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS WITH THE
 // SOFTWARE.
 $typedefs = {
-              'BrigWidth8_t' => {
-                                  'name' => 'BrigWidth8_t',
-                                  'type' => 'uint8_t'
-                                },
-              'BrigImageOrder8_t' => {
-                                       'name' => 'BrigImageOrder8_t',
-                                       'type' => 'uint8_t',
-                                       'defValue' => 'Brig::BRIG_ORDER_UNKNOWN'
-                                     },
+              'BrigStringOffset32_t' => {
+                                          'name' => 'BrigStringOffset32_t',
+                                          'type' => 'uint32_t',
+                                          'defValue' => '0',
+                                          'wtype' => 'StrRef'
+                                        },
+              'BrigDirectiveKinds16_t' => {
+                                            'name' => 'BrigDirectiveKinds16_t',
+                                            'type' => 'uint16_t'
+                                          },
               'BrigControlDirective16_t' => {
                                               'name' => 'BrigControlDirective16_t',
                                               'type' => 'uint16_t'
                                             },
-              'BrigOperandKinds16_t' => {
-                                          'name' => 'BrigOperandKinds16_t',
-                                          'type' => 'uint16_t'
+              'BrigMemoryScope8_t' => {
+                                        'name' => 'BrigMemoryScope8_t',
+                                        'defValue' => 'Brig::BRIG_MEMORY_SCOPE_SYSTEM',
+                                        'type' => 'uint8_t'
+                                      },
+              'BrigWidth8_t' => {
+                                  'name' => 'BrigWidth8_t',
+                                  'type' => 'uint8_t'
+                                },
+              'BrigImageQuery8_t' => {
+                                       'name' => 'BrigImageQuery8_t',
+                                       'type' => 'uint8_t'
+                                     },
+              'BrigMemoryFenceSegments8_t' => {
+                                                'type' => 'uint8_t',
+                                                'name' => 'BrigMemoryFenceSegments8_t'
+                                              },
+              'BrigSamplerFilter8_t' => {
+                                          'name' => 'BrigSamplerFilter8_t',
+                                          'type' => 'uint8_t'
                                         },
+              'BrigAluModifier16_t' => {
+                                         'name' => 'BrigAluModifier16_t',
+                                         'type' => 'uint16_t'
+                                       },
+              'BrigDataOffset32_t' => {
+                                        'name' => 'BrigDataOffset32_t',
+                                        'type' => 'uint32_t'
+                                      },
               'BrigImageGeometry8_t' => {
-                                          'name' => 'BrigImageGeometry8_t',
+                                          'defValue' => 'Brig::BRIG_GEOMETRY_UNKNOWN',
                                           'type' => 'uint8_t',
-                                          'defValue' => 'Brig::BRIG_GEOMETRY_UNKNOWN'
+                                          'name' => 'BrigImageGeometry8_t'
                                         },
-              'BrigSegCvtModifier8_t' => {
-                                           'name' => 'BrigSegCvtModifier8_t',
+              'BrigSamplerAddressing8_t' => {
+                                              'name' => 'BrigSamplerAddressing8_t',
+                                              'type' => 'uint8_t',
+                                              'defValue' => 'Brig::BRIG_ADDRESSING_CLAMP_TO_EDGE'
+                                            },
+              'BrigLinkage8_t' => {
+                                    'name' => 'BrigLinkage8_t',
+                                    'defValue' => 'Brig::BRIG_LINKAGE_NONE',
+                                    'type' => 'uint8_t'
+                                  },
+              'BrigExecutableModifier8_t' => {
+                                               'type' => 'uint8_t',
+                                               'name' => 'BrigExecutableModifier8_t'
+                                             },
+              'BrigSymbolModifier8_t' => {
+                                           'name' => 'BrigSymbolModifier8_t',
                                            'type' => 'uint8_t'
+                                         },
+              'BrigMemoryModifier8_t' => {
+                                           'name' => 'BrigMemoryModifier8_t',
+                                           'type' => 'uint8_t'
+                                         },
+              'BrigAtomicOperation8_t' => {
+                                            'name' => 'BrigAtomicOperation8_t',
+                                            'type' => 'uint8_t'
+                                          },
+              'BrigVersion32_t' => {
+                                     'type' => 'uint32_t',
+                                     'name' => 'BrigVersion32_t'
+                                   },
+              'BrigOperandOffset32_t' => {
+                                           'defValue' => '0',
+                                           'type' => 'uint32_t',
+                                           'name' => 'BrigOperandOffset32_t',
+                                           'wtype' => 'ItemRef<Operand>'
+                                         },
+              'BrigRound8_t' => {
+                                  'type' => 'uint8_t',
+                                  'name' => 'BrigRound8_t'
+                                },
+              'BrigSamplerCoordNormalization8_t' => {
+                                                      'name' => 'BrigSamplerCoordNormalization8_t',
+                                                      'type' => 'uint8_t'
+                                                    },
+              'BrigProfile8_t' => {
+                                    'name' => 'BrigProfile8_t',
+                                    'defValue' => 'Brig::BRIG_PROFILE_FULL',
+                                    'type' => 'uint8_t'
+                                  },
+              'BrigSegCvtModifier8_t' => {
+                                           'type' => 'uint8_t',
+                                           'name' => 'BrigSegCvtModifier8_t'
                                          },
               'BrigMachineModel8_t' => {
                                          'name' => 'BrigMachineModel8_t',
                                          'type' => 'uint8_t',
                                          'defValue' => 'Brig::BRIG_MACHINE_LARGE'
                                        },
-              'BrigSegment8_t' => {
-                                    'name' => 'BrigSegment8_t',
-                                    'type' => 'uint8_t',
-                                    'defValue' => '0'
-                                  },
               'BrigType16_t' => {
-                                  'name' => 'BrigType16_t',
-                                  'type' => 'uint16_t'
+                                  'type' => 'uint16_t',
+                                  'name' => 'BrigType16_t'
                                 },
-              'BrigPack8_t' => {
-                                 'name' => 'BrigPack8_t',
-                                 'type' => 'uint8_t',
-                                 'defValue' => 'Brig::BRIG_PACK_NONE'
-                               },
-              'BrigOpcode16_t' => {
-                                    'name' => 'BrigOpcode16_t',
-                                    'type' => 'uint16_t'
-                                  },
-              'BrigSymbolModifier8_t' => {
-                                           'name' => 'BrigSymbolModifier8_t',
-                                           'type' => 'uint8_t'
-                                         },
-              'BrigStringOffset32_t' => {
-                                          'name' => 'BrigStringOffset32_t',
-                                          'wtype' => 'StrRef',
-                                          'type' => 'uint32_t',
-                                          'defValue' => '0'
-                                        },
-              'BrigExecutableModifier8_t' => {
-                                               'name' => 'BrigExecutableModifier8_t',
-                                               'type' => 'uint8_t'
-                                             },
-              'BrigRound8_t' => {
-                                  'name' => 'BrigRound8_t',
-                                  'type' => 'uint8_t'
-                                },
-              'BrigDataOffset32_t' => {
-                                        'name' => 'BrigDataOffset32_t',
-                                        'type' => 'uint32_t'
-                                      },
+              'BrigImageChannelType8_t' => {
+                                             'name' => 'BrigImageChannelType8_t',
+                                             'type' => 'uint8_t',
+                                             'defValue' => 'Brig::BRIG_CHANNEL_TYPE_UNKNOWN'
+                                           },
               'BrigInstKinds16_t' => {
                                        'name' => 'BrigInstKinds16_t',
                                        'type' => 'uint16_t'
                                      },
-              'BrigCompareOperation8_t' => {
-                                             'name' => 'BrigCompareOperation8_t',
-                                             'type' => 'uint8_t'
-                                           },
-              'BrigSamplerBoundaryMode8_t' => {
-                                                'name' => 'BrigSamplerBoundaryMode8_t',
-                                                'type' => 'uint8_t',
-                                                'defValue' => 'Brig::BRIG_BOUNDARY_CLAMP'
-                                              },
-              'BrigAtomicOperation8_t' => {
-                                            'name' => 'BrigAtomicOperation8_t',
-                                            'type' => 'uint8_t'
-                                          },
-              'BrigDirectiveKinds16_t' => {
-                                            'name' => 'BrigDirectiveKinds16_t',
-                                            'type' => 'uint16_t'
-                                          },
-              'BrigLinkage8_t' => {
-                                    'name' => 'BrigLinkage8_t',
-                                    'type' => 'uint8_t',
-                                    'defValue' => 'Brig::BRIG_LINKAGE_NONE'
-                                  },
-              'BrigMemoryScope8_t' => {
-                                        'name' => 'BrigMemoryScope8_t',
-                                        'type' => 'uint8_t',
-                                        'defValue' => 'Brig::BRIG_MEMORY_SCOPE_SYSTEM'
-                                      },
-              'BrigOperandOffset32_t' => {
-                                           'name' => 'BrigOperandOffset32_t',
-                                           'wtype' => 'ItemRef<Operand>',
-                                           'type' => 'uint32_t',
-                                           'defValue' => '0'
-                                         },
-              'BrigImageFormat8_t' => {
-                                        'name' => 'BrigImageFormat8_t',
-                                        'type' => 'uint8_t',
-                                        'defValue' => 'Brig::BRIG_FORMAT_UNKNOWN'
-                                      },
-              'BrigSamplerModifier8_t' => {
-                                            'name' => 'BrigSamplerModifier8_t',
-                                            'type' => 'uint8_t'
-                                          },
+              'BrigOperandKinds16_t' => {
+                                          'name' => 'BrigOperandKinds16_t',
+                                          'type' => 'uint16_t'
+                                        },
+              'BrigSamplerQuery8_t' => {
+                                         'name' => 'BrigSamplerQuery8_t',
+                                         'type' => 'uint8_t'
+                                       },
+              'BrigImageChannelOrder8_t' => {
+                                              'name' => 'BrigImageChannelOrder8_t',
+                                              'type' => 'uint8_t',
+                                              'defValue' => 'Brig::BRIG_CHANNEL_ORDER_UNKNOWN'
+                                            },
               'BrigCodeOffset32_t' => {
-                                        'name' => 'BrigCodeOffset32_t',
-                                        'wtype' => 'ItemRef<Inst>',
                                         'type' => 'uint32_t',
-                                        'defValue' => '0'
+                                        'defValue' => '0',
+                                        'name' => 'BrigCodeOffset32_t',
+                                        'wtype' => 'ItemRef<Inst>'
                                       },
               'BrigAlignment8_t' => {
-                                      'name' => 'BrigAlignment8_t',
-                                      'type' => 'uint8_t'
+                                      'type' => 'uint8_t',
+                                      'name' => 'BrigAlignment8_t'
                                     },
-              'BrigMemoryFenceSegments8_t' => {
-                                                'name' => 'BrigMemoryFenceSegments8_t',
-                                                'type' => 'uint8_t'
-                                              },
-              'BrigSamplerAddressing8_t' => {
-                                              'name' => 'BrigSamplerAddressing8_t',
-                                              'type' => 'uint8_t'
-                                            },
-              'BrigAluModifier16_t' => {
-                                         'name' => 'BrigAluModifier16_t',
-                                         'type' => 'uint16_t'
-                                       },
-              'BrigMemoryModifier8_t' => {
-                                           'name' => 'BrigMemoryModifier8_t',
-                                           'type' => 'uint8_t'
-                                         },
-              'BrigDirectiveOffset32_t' => {
-                                             'name' => 'BrigDirectiveOffset32_t',
-                                             'wtype' => 'ItemRef<Directive>',
-                                             'type' => 'uint32_t',
-                                             'defValue' => '0'
-                                           },
+              'BrigOpcode16_t' => {
+                                    'type' => 'uint16_t',
+                                    'name' => 'BrigOpcode16_t'
+                                  },
+              'BrigPack8_t' => {
+                                 'name' => 'BrigPack8_t',
+                                 'defValue' => 'Brig::BRIG_PACK_NONE',
+                                 'type' => 'uint8_t'
+                               },
+              'BrigSegment8_t' => {
+                                    'name' => 'BrigSegment8_t',
+                                    'defValue' => '0',
+                                    'type' => 'uint8_t'
+                                  },
               'BrigMemoryOrder8_t' => {
                                         'name' => 'BrigMemoryOrder8_t',
                                         'type' => 'uint8_t',
                                         'defValue' => 'Brig::BRIG_MEMORY_ORDER_RELAXED'
                                       },
-              'BrigProfile8_t' => {
-                                    'name' => 'BrigProfile8_t',
-                                    'type' => 'uint8_t',
-                                    'defValue' => 'Brig::BRIG_PROFILE_FULL'
-                                  },
-              'BrigSamplerFilter8_t' => {
-                                          'name' => 'BrigSamplerFilter8_t',
-                                          'type' => 'uint8_t'
-                                        },
-              'BrigVersion32_t' => {
-                                     'name' => 'BrigVersion32_t',
-                                     'type' => 'uint32_t'
-                                   }
+              'BrigCompareOperation8_t' => {
+                                             'type' => 'uint8_t',
+                                             'name' => 'BrigCompareOperation8_t'
+                                           },
+              'BrigDirectiveOffset32_t' => {
+                                             'defValue' => '0',
+                                             'type' => 'uint32_t',
+                                             'name' => 'BrigDirectiveOffset32_t',
+                                             'wtype' => 'ItemRef<Directive>'
+                                           }
             };

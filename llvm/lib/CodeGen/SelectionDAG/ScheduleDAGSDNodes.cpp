@@ -34,10 +34,6 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
-#if defined(AMD_OPENCL) || 1
-#include "llvm/AMDLLVMContextHook.h"
-#endif
-
 using namespace llvm;
 
 STATISTIC(LoadsClustered, "Number of loads clustered together");
@@ -264,8 +260,7 @@ void ScheduleDAGSDNodes::ClusterNeighboringLoads(SDNode *Node) {
     {
       // We still could have a chance to group some loads
       // starting with another base
-      if (AMDOptions::isTargetHSAIL(DAG->getTarget().getTargetTriple())
-          && NumLoads == 0 && i < e - 1) {
+      if (NumLoads == 0 && i < e - 1) {
         BaseOff = Offset;
         Loads[0] = BaseLoad = Load;
       }
@@ -328,18 +323,13 @@ void ScheduleDAGSDNodes::ClusterNodes() {
     unsigned Opc = Node->getMachineOpcode();
     const MCInstrDesc &MCID = TII->get(Opc);
 #if defined(AMD_OPENCL) || 1
-    // Cluster both loads and stores for HSA
-    // TODO_HSA: Check that improvements to load/store clustering
-    //           is profitable for ORCA and remove target check.
-    //           Bug 9478
-    if (AMDOptions::isTargetHSAIL(DAG->getTarget().getTargetTriple()) &&
-        (MCID.mayLoad() || MCID.mayStore()))
+    if (MCID.mayLoad() || MCID.mayStore())
       ClusterNeighboringLdSt(Node);
-    else
-#endif
+#else
     if (MCID.mayLoad())
       // Cluster loads from "near" addresses into combined SUnits.
       ClusterNeighboringLoads(Node);
+#endif
   }
 }
 

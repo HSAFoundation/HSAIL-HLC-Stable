@@ -509,6 +509,9 @@ multiclass LDSLSInst<RegisterClass reg> {
       def STOREv2i32r : ILFormat<IL_OP_LDS_STORE_VEC, (outs GPR_32:$mem),
           (ins reg:$addy, GPRV4I32:$src, i32imm:$id),
           !strconcat(IL_OP_LDS_STORE_VEC.Text, "_id($id) $mem, $addy, $src, $src"), []>;
+      def STOREi64r : ILFormat<IL_OP_LDS_STORE64, (outs),
+          (ins reg:$addy, GPR_32:$src, i32imm:$id),
+          !strconcat(IL_OP_LDS_STORE64.Text, "_id($id) $addy, $src"), []>;
       def STOREv4i32r : ILFormat<IL_OP_LDS_STORE_VEC, (outs GPR_32:$mem),
           (ins reg:$addy, GPRV4I32:$src, i32imm:$id),
           !strconcat(IL_OP_LDS_STORE_VEC.Text, "_id($id) $mem, $addy, $src, $src"), []>;
@@ -532,6 +535,9 @@ multiclass LDSLSInst<RegisterClass reg> {
       def LOADv2i32r: ILFormat<IL_OP_LDS_LOAD_VEC, (outs GPRV2I32:$dst),
           (ins reg:$addy, i32imm:$id),
           !strconcat(IL_OP_LDS_LOAD_VEC.Text, "_id($id) $dst, $addy, $addy"), []>;
+      def LOADi64r: ILFormat<IL_OP_LDS_LOAD64, (outs GPRV2I32:$dst),
+          (ins reg:$addy, i32imm:$id),
+          !strconcat(IL_OP_LDS_LOAD64.Text, "_id($id) $dst, $addy"), []>;
       def LOADv4i32r: ILFormat<IL_OP_LDS_LOAD_VEC, (outs GPRV4I32:$dst),
           (ins reg:$addy, i32imm:$id),
           !strconcat(IL_OP_LDS_LOAD_VEC.Text, "_id($id) $dst, $addy, $addy"), []>;
@@ -988,9 +994,9 @@ multiclass ConvertIntMC<ILOpCode opcode, Intrinsic intr,
 }
 
 multiclass IntrConvertF32TOF16<ILOpCode opcode, Intrinsic intr> {
-  defm i16   : ConvertIntMC<opcode, intr, i16,   GPRI16,   f32,   GPR_32, f32imm, fpimm>;
-  defm v2i16 : ConvertIntMC<opcode, intr, v2i16, GPRV2I16, v2f32, GPRV2I32, v2f32imm, fpimm>;
-  defm v4i16 : ConvertIntMC<opcode, intr, v4i16, GPRV4I16, v4f32, GPRV4I32, v4f32imm, fpimm>;
+  defm i16   : ConvertIntMC<opcode, intr, i32,   GPR_32,   f32,   GPR_32, f32imm, fpimm>;
+  defm v2i16 : ConvertIntMC<opcode, intr, v2i32, GPRV2I32, v2f32, GPRV2I32, v2f32imm, fpimm>;
+  defm v4i16 : ConvertIntMC<opcode, intr, v4i32, GPRV4I32, v4f32, GPRV4I32, v4f32imm, fpimm>;
 }
 
 multiclass IntrConvertF32TOI32<ILOpCode opcode, Intrinsic intr> {

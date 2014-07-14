@@ -46,6 +46,7 @@
 #include <limits>
 #include <utility>
 #include <strstream>
+#include <cctype>
 
 StreamScannerBase::StreamScannerBase(std::istream& is)
     : m_is(is)
@@ -193,6 +194,8 @@ EScanContext Scanner::getTokenContext(ETokens token)
     if (token >= EModifiers) {
         switch(token) {
         case EMAtomicOp: return EInstModifierInstAtomicContext;
+        case EMImageQuery: return EInstModifierInstQueryContext;
+        case EMMemoryFenceSegments: return EInstModifierInstFenceContext;
         default: return EInstModifierContext;
         }
     } else {
@@ -208,7 +211,11 @@ Scanner::CToken& Scanner::peek(EScanContext ctx)
 {
     // we assume by the nature of hsail that peeks has the same context
     // thus rescan is not needed
-    assert(m_peekToken==NULL || getTokenContext(m_peekToken->kind())==ctx);
+    // dp: currently if m_peekToken token is EEmpty, this means that previous 
+    // scan failed because the token was found in an unexpected context. 
+    // This will cause syntax error on next step.
+    // TBD: Is there a better solution for handling of context-sensitive scan failures?
+    assert(m_peekToken==NULL || m_peekToken->kind()==EEmpty || getTokenContext(m_peekToken->kind())==ctx);
 
     if (m_peekToken==NULL) {
         m_peekToken = &scanNext(ctx);
@@ -223,7 +230,11 @@ Scanner::CToken& Scanner::scan(EScanContext ctx)
     } else {   
         // we assume by the nature of hsail that scan that follows peek 
         // has the same context thus rescan is not needed
-        assert(getTokenContext(m_peekToken->kind())==ctx);
+        // dp: currently if m_peekToken token is EEmpty, this means that previous 
+        // scan failed because the token was found in an unexpected context. 
+        // This will cause syntax error on next step.
+        // TBD: Is there a better solution for handling of context-sensitive scan failures?
+        assert(m_peekToken->kind()==EEmpty || getTokenContext(m_peekToken->kind())==ctx);
         m_curToken  = m_peekToken;
         m_peekToken = NULL;
     }
@@ -334,19 +345,20 @@ Scanner::Variant Scanner::readValueVariant()
         case EHlfNumber:
             {
                 float v;
-                istringstreamalert(m_curToken->text()) >> v;
+                istringstreamalert(m_curToken->text().drop_back(1)) >> v;
                 return Variant(f16_t(f32_t(&v)));
             }
         case ESglNumber:
             {
                 float v;
-                istringstreamalert(m_curToken->text()) >> v;
+                istringstreamalert(m_curToken->text().drop_back(1)) >> v;
                 return Variant(&v);
             }
         case EDblNumber:
             {
                 double v;
-                istringstreamalert(m_curToken->text()) >> v;
+                SRef s = m_curToken->text();
+                istringstreamalert(isdigit(s.back()) ? s : s.drop_back(1)) >> v;
                 return Variant(f64_t(&v));
             }
         case EHlfHexNumber:
@@ -369,17 +381,18 @@ Scanner::Variant Scanner::readValueVariant()
             }
         case EHlfC99Number:
             {
-                f16_t const v = readC99<f16_t>(m_curToken->text());
+                f16_t const v = readC99<f16_t>(m_curToken->text().drop_back(1));
                 return Variant(v);
             }
         case ESglC99Number:
             {
-                f32_t v = readC99<f32_t>(m_curToken->text());
+                f32_t v = readC99<f32_t>(m_curToken->text().drop_back(1));
                 return Variant(v);
             }
         case EDblC99Number:
             {
-                f64_t const v = readC99<f64_t>(m_curToken->text());
+                SRef s = m_curToken->text();
+                f64_t const v = readC99<f64_t>(isdigit(s.back()) ? s : s.drop_back(1));
                 return Variant(v);
             }
         default:
@@ -418,7 +431,6 @@ void Scanner::throwTokenExpected(ETokens token, const char* message, const SrcLo
         case EMPacking:       message = "packing control"; break;
         case EMCompare:       message = "compare modifier"; break;
         case EMGeom:          message = "geometry modifier"; break;
-        case EMImageModifier: message = "image modifier"; break;
         case EMVector:        message = "vector size specifier"; break;
         case EMNone:          message = "no more modifiers"; break;
         case EQuot:           message = "\""; break;
@@ -429,14 +441,17 @@ void Scanner::throwTokenExpected(ETokens token, const char* message, const SrcLo
         case EMMemoryScope:   message = "memory scope value"; break;
         case ETargetMachine:  message = "machine model"; break;
         case ETargetProfile:  message = "target profile"; break;
-        case ESamplerBoundaryMode: message = "sampler boundary mode value"; break;
-        case EImageFormat:    message = "image format"; break;
-        case EImageOrder:     message = "image order"; break;
+        case ESamplerAddressingMode: message = "sampler addressing mode value"; break;
+        case EImageFormat:    message = "image channel type"; break;
+        case EImageOrder:     message = "image channel order"; break;
         case EImageGeometry:  message = "image geometry"; break;
         case EKWRWImg:        message = "read-write image initializer"; break;
         case EKWROImg:        message = "read-only image initializer"; break;
         case EKWWOImg:        message = "write-only image initializer"; break;
         case EKWSamp:         message = "sampler initializer"; break;
+        case EMImageQuery:    message = "image query"; break;
+        case EMSamplerQuery:  message = "sampler query"; break;
+        case EMMemoryFenceSegments: message = "memory fence segment"; break;
         default:  {
             assert(0);
             std::stringstream ss;

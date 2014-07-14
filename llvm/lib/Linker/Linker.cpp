@@ -20,8 +20,6 @@
 #include "llvm/Support/system_error.h"
 using namespace llvm;
 
-std::map<const Value*, bool> Linker::ReferenceMap;
-
 Linker::Linker(StringRef progname, StringRef modname,
                LLVMContext& C, unsigned flags):
   Context(C),

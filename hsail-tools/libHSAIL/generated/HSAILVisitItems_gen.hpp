@@ -143,7 +143,6 @@ RetType dispatchByItemKind_gen(Inst item,Visitor& vis) {
 	switch(item.brig()->kind) {
 	case BRIG_INST_ADDR: return vis(InstAddr(item));
 	case BRIG_INST_ATOMIC: return vis(InstAtomic(item));
-	case BRIG_INST_ATOMIC_IMAGE: return vis(InstAtomicImage(item));
 	case BRIG_INST_BASIC: return vis(InstBasic(item));
 	case BRIG_INST_BR: return vis(InstBr(item));
 	case BRIG_INST_CMP: return vis(InstCmp(item));
@@ -153,6 +152,8 @@ RetType dispatchByItemKind_gen(Inst item,Visitor& vis) {
 	case BRIG_INST_MEM: return vis(InstMem(item));
 	case BRIG_INST_MEM_FENCE: return vis(InstMemFence(item));
 	case BRIG_INST_MOD: return vis(InstMod(item));
+	case BRIG_INST_QUERY_IMAGE: return vis(InstQueryImage(item));
+	case BRIG_INST_QUERY_SAMPLER: return vis(InstQuerySampler(item));
 	case BRIG_INST_QUEUE: return vis(InstQueue(item));
 	case BRIG_INST_SEG: return vis(InstSeg(item));
 	case BRIG_INST_SEG_CVT: return vis(InstSegCvt(item));
@@ -304,8 +305,8 @@ template <typename Visitor> void enumerateFields_gen(DirectiveImageProperties ob
   vis(obj.depth(),"depth");
   vis(obj.array(),"array");
   vis(obj.geometry(),"geometry");
-  vis(obj.order(),"order");
-  vis(obj.format(),"format");
+  vis(obj.channelOrder(),"channelOrder");
+  vis(obj.channelType(),"channelType");
 }
 
 template <typename Visitor> void enumerateFields_gen(DirectiveLabel obj,  Visitor & vis) {
@@ -354,10 +355,9 @@ template <typename Visitor> void enumerateFields_gen(DirectivePragma obj,  Visit
 
 template <typename Visitor> void enumerateFields_gen(DirectiveSamplerProperties obj,  Visitor & vis) {
   vis(obj.code(),"code");
-  enumerateFields(obj.modifier(), vis);
-  vis(obj.boundaryU(),"boundaryU");
-  vis(obj.boundaryV(),"boundaryV");
-  vis(obj.boundaryW(),"boundaryW");
+  vis(obj.coord(),"coord");
+  vis(obj.filter(),"filter");
+  vis(obj.addressing(),"addressing");
 }
 
 template <typename Visitor> void enumerateFields_gen(DirectiveVariable obj,  Visitor & vis) {
@@ -418,19 +418,6 @@ template <typename Visitor> void enumerateFields_gen(InstAtomic obj,  Visitor & 
   vis(obj.segment(),"segment");
   vis(obj.memoryOrder(),"memoryOrder");
   vis(obj.memoryScope(),"memoryScope");
-  vis(obj.atomicOperation(),"atomicOperation");
-  vis(obj.equivClass(),"equivClass");
-}
-
-template <typename Visitor> void enumerateFields_gen(InstAtomicImage obj,  Visitor & vis) {
-  vis(obj.opcode(),"opcode");
-  vis(obj.type(),"type");
-  for (unsigned i=0;i<5;i++) {
-    vis(obj.operand(i),"operands", i);
-  }
-  vis(obj.imageType(),"imageType");
-  vis(obj.coordType(),"coordType");
-  vis(obj.geometry(),"geometry");
   vis(obj.atomicOperation(),"atomicOperation");
   vis(obj.equivClass(),"equivClass");
 }
@@ -528,6 +515,26 @@ template <typename Visitor> void enumerateFields_gen(InstMod obj,  Visitor & vis
   }
   enumerateFields(obj.modifier(), vis);
   vis(obj.pack(),"pack");
+}
+
+template <typename Visitor> void enumerateFields_gen(InstQueryImage obj,  Visitor & vis) {
+  vis(obj.opcode(),"opcode");
+  vis(obj.type(),"type");
+  for (unsigned i=0;i<5;i++) {
+    vis(obj.operands(i),"operands", i);
+  }
+  vis(obj.imageType(),"imageType");
+  vis(obj.geometry(),"geometry");
+  vis(obj.imageQuery(),"imageQuery");
+}
+
+template <typename Visitor> void enumerateFields_gen(InstQuerySampler obj,  Visitor & vis) {
+  vis(obj.opcode(),"opcode");
+  vis(obj.type(),"type");
+  for (unsigned i=0;i<5;i++) {
+    vis(obj.operands(i),"operands", i);
+  }
+  vis(obj.samplerQuery(),"samplerQuery");
 }
 
 template <typename Visitor> void enumerateFields_gen(InstQueue obj,  Visitor & vis) {
@@ -645,12 +652,6 @@ template <typename Visitor> void enumerateFields_gen(OperandVector obj,  Visitor
 }
 
 template <typename Visitor> void enumerateFields_gen(OperandWavesize obj,  Visitor & vis) {
-}
-
-template <typename Visitor> void enumerateFields_gen(SamplerModifier obj,  Visitor & vis) {
-  vis(obj.allBits(),"allBits");
-  vis(obj.filter(),"filter");
-  vis(obj.isUnnormalized(),"isUnnormalized");
 }
 
 template <typename Visitor> void enumerateFields_gen(SegCvtModifier obj,  Visitor & vis) {

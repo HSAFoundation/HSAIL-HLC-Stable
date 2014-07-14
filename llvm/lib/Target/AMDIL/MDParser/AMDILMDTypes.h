@@ -448,6 +448,7 @@ namespace llvm
     std::string AccessType_;
     unsigned Volatile_;
     unsigned Restrict_;
+    unsigned Pipe_;
     private:
     MDPointer();
   }; // MDPointer

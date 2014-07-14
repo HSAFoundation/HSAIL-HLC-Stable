@@ -32,7 +32,6 @@ using std::ofstream;
 using HSAIL_ASM::Inst;
 using HSAIL_ASM::InstBasic;
 using HSAIL_ASM::InstAtomic;
-using HSAIL_ASM::InstAtomicImage;
 using HSAIL_ASM::InstLane;
 using HSAIL_ASM::InstCmp;
 using HSAIL_ASM::InstCvt;
@@ -47,6 +46,8 @@ using HSAIL_ASM::InstMemFence;
 using HSAIL_ASM::InstSegCvt;
 using HSAIL_ASM::InstSignal;
 using HSAIL_ASM::InstQueue;
+using HSAIL_ASM::InstQueryImage;
+using HSAIL_ASM::InstQuerySampler;
 
 using HSAIL_ASM::OperandReg;
 using HSAIL_ASM::OperandImmed;
@@ -75,7 +76,6 @@ enum Category
     C_MOVE,
     C_ATOMIC_MEMORY,
     C_MEMORY,
-    C_ATOMIC_IMAGE,
     C_IMAGE,
     C_SYNC,
     C_MISC,
@@ -320,7 +320,7 @@ private:
         else if (propId == PROP_WIDTH)
         {
             addProp(makeProp(propId, propVal));
-            addProp(makeDefaultProp(propId, propVal == getDefWidth(inst, machineModel)));
+            addProp(makeDefaultProp(propId, propVal == getDefWidth(inst, machineModel, profile)));
         }
         else
         {
@@ -515,7 +515,6 @@ private:
         case C_BRANCH:          // direct, indirect
             res += getBranchCategory(inst);
             break;
-        case C_ATOMIC_IMAGE:
         case C_IMAGE:
         case C_SYNC:
         case C_MISC:
@@ -587,8 +586,6 @@ private:
         case BRIG_OPCODE_RDIMAGE:
         case BRIG_OPCODE_STIMAGE:
         case BRIG_OPCODE_LDIMAGE:
-        case BRIG_OPCODE_ATOMICIMAGE:
-        case BRIG_OPCODE_ATOMICIMAGENORET:
         case BRIG_OPCODE_GCNLD:
         case BRIG_OPCODE_GCNST:
         case BRIG_OPCODE_GCNATOMIC:

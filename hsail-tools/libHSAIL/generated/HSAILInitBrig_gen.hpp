@@ -164,8 +164,8 @@ void DirectiveImageProperties::initBrig() {
   brig()->depth = 0;
   brig()->array = 0;
   brig()->geometry = Brig::BRIG_GEOMETRY_UNKNOWN;
-  brig()->order = Brig::BRIG_ORDER_UNKNOWN;
-  brig()->format = Brig::BRIG_FORMAT_UNKNOWN;
+  brig()->channelOrder = Brig::BRIG_CHANNEL_ORDER_UNKNOWN;
+  brig()->channelType = Brig::BRIG_CHANNEL_TYPE_UNKNOWN;
   brig()->reserved = 0;
 }
 
@@ -240,10 +240,8 @@ void DirectiveSamplerProperties::initBrig() {
   brig()->size = sizeof(Brig::BrigDirectiveSamplerProperties);
   brig()->kind = Brig::BRIG_DIRECTIVE_SAMPLER_PROPERTIES;
   brig()->code = 0;
-  modifier().initBrig();
-  brig()->boundaryU = Brig::BRIG_BOUNDARY_CLAMP;
-  brig()->boundaryV = Brig::BRIG_BOUNDARY_CLAMP;
-  brig()->boundaryW = Brig::BRIG_BOUNDARY_CLAMP;
+  brig()->addressing = Brig::BRIG_ADDRESSING_CLAMP_TO_EDGE;
+  brig()->reserved = 0;
 }
 
 void DirectiveVariable::initBrig() {
@@ -311,16 +309,6 @@ void InstAtomic::initBrig() {
   for (int i=0;i<3;i++) {
     brig()->reserved[i] = 0;
   }
-}
-
-void InstAtomicImage::initBrig() {
-  brig()->size = sizeof(Brig::BrigInstAtomicImage);
-  brig()->kind = Brig::BRIG_INST_ATOMIC_IMAGE;
-  for (int i=0;i<5;i++) {
-    brig()->operands[i] = 0;
-  }
-  brig()->geometry = Brig::BRIG_GEOMETRY_UNKNOWN;
-  brig()->reserved = 0;
 }
 
 void InstBasic::initBrig() {
@@ -415,6 +403,26 @@ void InstMod::initBrig() {
   modifier().initBrig();
   brig()->pack = Brig::BRIG_PACK_NONE;
   brig()->reserved = 0;
+}
+
+void InstQueryImage::initBrig() {
+  brig()->size = sizeof(Brig::BrigInstQueryImage);
+  brig()->kind = Brig::BRIG_INST_QUERY_IMAGE;
+  for (int i=0;i<5;i++) {
+    brig()->operands[i] = 0;
+  }
+  brig()->geometry = Brig::BRIG_GEOMETRY_UNKNOWN;
+}
+
+void InstQuerySampler::initBrig() {
+  brig()->size = sizeof(Brig::BrigInstQuerySampler);
+  brig()->kind = Brig::BRIG_INST_QUERY_SAMPLER;
+  for (int i=0;i<5;i++) {
+    brig()->operands[i] = 0;
+  }
+  for (int i=0;i<3;i++) {
+    brig()->reserved[i] = 0;
+  }
 }
 
 void InstQueue::initBrig() {
@@ -565,10 +573,6 @@ void OperandVector::initBrig() {
 void OperandWavesize::initBrig() {
   brig()->size = sizeof(Brig::BrigOperandWavesize);
   brig()->kind = Brig::BRIG_OPERAND_WAVESIZE;
-}
-
-void SamplerModifier::initBrig() {
-  brig()->allBits = 0;
 }
 
 void SegCvtModifier::initBrig() {

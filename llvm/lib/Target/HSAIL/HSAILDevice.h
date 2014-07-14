@@ -64,7 +64,6 @@
 #include "llvm/ADT/BitVector.h"
 namespace llvm {
   class HSAILSubtarget;
-  class HSAILAsmPrinter;
   class HSAILIOExpansion;
   class HSAILPointerManager;
 //===----------------------------------------------------------------------===//

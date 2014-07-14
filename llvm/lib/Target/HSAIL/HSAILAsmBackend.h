@@ -13,13 +13,8 @@
 #include "llvm/MC/MCAssembler.h"
 #include "llvm/MC/MCELFObjectWriter.h"
 #include "llvm/MC/MCFixupKindInfo.h"
-#include "llvm/MC/MCMachObjectWriter.h"
-#include "llvm/MC/MCSectionCOFF.h"
 #include "llvm/MC/MCSectionELF.h"
-#include "llvm/MC/MCSectionMachO.h"
-#include "llvm/Object/MachOFormat.h"
 #include "llvm/Support/ELF.h"
-#include "HSAILWinCOFFObjectWriter.h"
 //#if LLVM_VERSION >= 3316
 #include "llvm/MC/MCAsmBackend.h"
 #define ASM_BACKEND_CLASS MCAsmBackend
@@ -145,84 +140,6 @@ public:
     return createELFObjectWriter(new HSAILELFObjectWriter(true, OSType,
                                                         ELF::EM_HSAIL_64, false),
                                  OS, /*IsLittleEndian*/ true);
-  }
-};
-
-class WindowsHSAILAsmBackend : public HSAILAsmBackend {
-  bool Is64Bit;
-
-public:
-  WindowsHSAILAsmBackend(const ASM_BACKEND_CLASS &T, bool is64Bit)
-    : HSAILAsmBackend(T)
-    , Is64Bit(is64Bit) {
-  }
-
-  MCObjectWriter *createObjectWriter(raw_ostream &OS) const {
-    return createHSAILWinCOFFObjectWriter(OS, Is64Bit);
-  }
-};
-
-class DarwinHSAILAsmBackend : public HSAILAsmBackend {
-public:
-  DarwinHSAILAsmBackend(const ASM_BACKEND_CLASS &T)
-    : HSAILAsmBackend(T) { }
-};
-
-class DarwinHSAIL_32AsmBackend : public DarwinHSAILAsmBackend {
-public:
-  DarwinHSAIL_32AsmBackend(const ASM_BACKEND_CLASS &T)
-    : DarwinHSAILAsmBackend(T) {}
-
-  MCObjectWriter *createObjectWriter(raw_ostream &OS) const {
-    return createHSAILMachObjectWriter(OS, /*Is64Bit=*/false,
-                                     object::mach::CTM_HSAIL,
-                                     object::mach::CSHSAIL_ALL);
-  }
-};
-
-class DarwinHSAIL_64AsmBackend : public DarwinHSAILAsmBackend {
-public:
-  DarwinHSAIL_64AsmBackend(const ASM_BACKEND_CLASS &T)
-    : DarwinHSAILAsmBackend(T) {
-    HasReliableSymbolDifference = true;
-  }
-
-  MCObjectWriter *createObjectWriter(raw_ostream &OS) const {
-    return createHSAILMachObjectWriter(OS, /*Is64Bit=*/true,
-                                     object::mach::CTM_HSAIL_64,
-                                     object::mach::CSHSAIL_ALL);
-  }
-
-  virtual bool doesSectionRequireSymbols(const MCSection &Section) const {
-    // Temporary labels in the string literals sections require symbols. The
-    // issue is that the x86_64 relocation format does not allow symbol +
-    // offset, and so the linker does not have enough information to resolve the
-    // access to the appropriate atom unless an external relocation is used. For
-    // non-cstring sections, we expect the compiler to use a non-temporary label
-    // for anything that could have an addend pointing outside the symbol.
-    //
-    // See <rdar://problem/4765733>.
-    const MCSectionMachO &SMO = static_cast<const MCSectionMachO&>(Section);
-    return SMO.getType() == MCSectionMachO::S_CSTRING_LITERALS;
-  }
-
-  virtual bool isSectionAtomizable(const MCSection &Section) const {
-    const MCSectionMachO &SMO = static_cast<const MCSectionMachO&>(Section);
-    // Fixed sized data sections are uniqued, they cannot be diced into atoms.
-    switch (SMO.getType()) {
-    default:
-      return true;
-    case MCSectionMachO::S_4BYTE_LITERALS:
-    case MCSectionMachO::S_8BYTE_LITERALS:
-    case MCSectionMachO::S_16BYTE_LITERALS:
-    case MCSectionMachO::S_LITERAL_POINTERS:
-    case MCSectionMachO::S_NON_LAZY_SYMBOL_POINTERS:
-    case MCSectionMachO::S_LAZY_SYMBOL_POINTERS:
-    case MCSectionMachO::S_MOD_INIT_FUNC_POINTERS:
-    case MCSectionMachO::S_MOD_TERM_FUNC_POINTERS:
-    case MCSectionMachO::S_INTERPOSING:
-      return false;
-    }
   }
 };
 } // end anonymous namespace

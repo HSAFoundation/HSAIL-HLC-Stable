@@ -10,7 +10,6 @@
 #define _HSAIL_ELF_OBJECT_WRITER_H_
 
 #include "llvm/MC/MCELFObjectWriter.h"
-#include "llvm/MC/MCWinCOFFObjectWriter.h"
 
 namespace llvm {
 class HSAILELFObjectWriter : public MCELFObjectTargetWriter {

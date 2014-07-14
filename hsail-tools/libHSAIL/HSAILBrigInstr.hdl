@@ -28,7 +28,7 @@ BrigProp type =
     fx.64  = f(16x4, 32x2),
     fx.128 = f(16x8, 32x4, 64x2),
 
-    roimg, rwimg, samp, sig32, sig64;
+    roimg, rwimg, woimg, samp, sig32, sig64;
 
 Alias sx = sx.(32, 64, 128);
 Alias ux = ux.(32, 64, 128);
@@ -52,7 +52,7 @@ Alias f16x = f(16x2, 16x4, 16x8);
 Alias f32x = f(32x2, 32x4);
 Alias f64x = f(64x2);
 
-Alias opaque = roimg, rwimg, samp, sig32, sig64;
+Alias opaque = roimg, rwimg, woimg, samp, sig32, sig64;
 
 Clone stype;   ExtPropName sourceType;  // src type
 Clone itype;   ExtPropName imageType;   // image type
@@ -207,9 +207,10 @@ BrigProp memscp =
     wv  = wavefront,
     wg  = workgroup,
     cmp = component,
-    sys = system;
+    sys = system,
+    wi  = workitem;
 
-Alias any = * / none;
+Alias std = wv, wg, cmp, sys;
 
 BrigPrefix  MEMORY_SCOPE;
 ExtPropName memoryScope;
@@ -221,7 +222,8 @@ BrigProp memseg =
     none,
     group,
     global,
-    both;
+    both,
+    image;
 
 Alias any = * / none;
 
@@ -240,7 +242,7 @@ BrigProp atmop =
     wait        = (wait_eq, wait_ne, wait_lt, wait_gte),
     waittimeout = (waittimeout_eq, waittimeout_ne, waittimeout_lt, waittimeout_gte);
 
-Alias any         = *;
+Alias any = *;
 
 BrigPrefix   ATOMIC;
 ExtPropName  atomicOperation;
@@ -254,6 +256,28 @@ BrigProp geometry =
     1d,  2d,  3d, 
     1db, 1da, 2da,
     2ddepth, 2dadepth;
+
+Alias any = *;
+
+// ============================================================================
+// Image Query
+
+BrigProp iprop = width, height, depth, array, channeltype, channelorder;
+
+Alias any = *;
+
+BrigPrefix IMAGE_QUERY;
+ExtPropName imageQuery;
+
+// ============================================================================
+// Sampler Query
+
+BrigProp sprop = addressing, coord, filter;
+
+Alias any = *;
+
+BrigPrefix SAMPLER_QUERY;
+ExtPropName samplerQuery;
 
 // ============================================================================
 // Width
@@ -319,8 +343,8 @@ OperandProp operand =
           tseg),            // 1+2+3+4
                             // 4) opaque symbols used in address must match instruction type
     
-    (roimage, rwimage).(itype, stype),  //F: should be removed as soon as image support is implemented
-    sampler.samp,                       //F: should be removed as soon as image support is implemented
+    (roimage, rwimage, woimage).(itype, stype),  //F: should be removed as soon as image support is implemented
+    sampler.samp,                                //F: should be removed as soon as image support is implemented
 
     (imm0T2, imm0T3).u32,
     (reg, vec.2, vec.3, vec.4, imm).(b1, b32, b64, u32, u64, s32, s64, p2u, dtype, stype, ctype),
@@ -334,8 +358,8 @@ Alias imm    = imm.dtype;
 
 Alias vector = vec.(2, 3, 4);
 
-Alias image.itype = (roimage, rwimage).itype; //F: should be removed as soon as image support is implemented
-Alias image.stype = (roimage, rwimage).stype; //F: should be removed as soon as image support is implemented
+Alias image.itype = (roimage, rwimage, woimage).itype; //F: should be removed as soon as image support is implemented
+Alias image.stype = (roimage, rwimage, woimage).stype; //F: should be removed as soon as image support is implemented
 
 Clone  d0, d1, s0, s1, s2, s3, s4;
 
@@ -426,7 +450,7 @@ Inst min(Mod, arithmetic, max)
 Req mul
 {
     type = (s, u)(32, 64), f, x;
-    ftz  = any;
+    ftz   = any;
 
     { type = (s, u)(32, 64); ? pack = none;      round = none;  ftz = none }
     { type = f               ? pack = none;      round = float; ftz = any  }
@@ -1341,8 +1365,8 @@ Req atomic
     { atmop = ld                 ? type = (b   )(32, 64); memord = ld;  s2 = null;     s3 = null     }
     ;
 
-    { segment = global, flat ? memscp = any    }
-    { segment = group        ? memscp = wv, wg }
+    { segment = global, flat ? memscp = wv, wg, cmp, sys }
+    { segment = group        ? memscp = wv, wg           }
     ;
 
     d0 = reg;
@@ -1371,8 +1395,8 @@ Req atomic.noret
     { atmop = st                 ? type = (b   )(32, 64); memord  = st;  s2 = null     }
     ;
 
-    { segment = global, flat ? memscp = any    }
-    { segment = group        ? memscp = wv, wg }
+    { segment = global, flat ? memscp = wv, wg, cmp, sys }
+    { segment = group        ? memscp = wv, wg           }
     ;
 
     s0 = addr.seg;
@@ -1471,7 +1495,7 @@ Req ld.st.image
 { 
     type     = (s, u, f)32;
     ctype    = u32;
-    geometry = 1d, 2d, 3d, 1db, 1da, 2da, 2ddepth, 2dadepth;
+    geometry = any;
     eqclass  = any;
 }
 
@@ -1495,7 +1519,7 @@ Req ld.image
 Req st.image
 { 
     ld.st.image;
-    itype = rwimg;
+    itype = woimg, rwimg;
 
     { geometry = 1d, 1db  ? s0 = vec.4; s2 = reg.ctype   }
     { geometry = 2d, 1da  ? s0 = vec.4; s2 = vec.2.ctype }
@@ -1513,79 +1537,23 @@ Inst ldimage(Image, image, ld.image)
 Inst stimage(Image, image, st.image)
 
 // ============================================================================
-// ATOMICIMAGE
-
-Req atomic.image
-{ 
-    type     = (b, s, u)(32, 64);
-    itype    = rwimg;
-    ctype    = u32;
-    geometry = 1d, 2d, 3d, 1db, 1da, 2da;
-    atmop    = generic, exch;
-    eqclass  = any;
-
-    typesize = atomic;
-
-    { atmop = cas                ? type = b(32, 64);      s4 = reg, imm }
-    { atmop = and, or, xor, exch ? type = b(32, 64);      s4 = null     }
-    { atmop = inc, dec           ? type = u(32, 64);      s4 = null     }
-    { atmop = add, sub, min, max ? type = (s, u)(32, 64); s4 = null     }
-    ;
-
-    d0 = reg;
-    s1 = (reg, image).itype;
-    s3 = reg, imm;
-
-    { geometry = 1d, 1db ? s2 = reg.ctype    }
-    { geometry = 2d, 1da ? s2 = vec.2.ctype }
-    { geometry = 3d, 2da ? s2 = vec.3.ctype }
-    ;
-}
-
-Inst atomicimage(Atomic.Image, atomic.image, atomic.image)
-
-// ============================================================================
-// ATOMIC_NO_RET_IMAGE
-
-Req atomic.noret.image
-{ 
-    type     = (b, s, u)(32, 64);
-    itype    = rwimg;
-    ctype    = u32;
-    geometry = 1d, 2d, 3d, 1db, 1da, 2da;
-    atmop    = generic;
-    eqclass  = any;
-
-    typesize = atomic;
-
-    { atmop = cas                ? type = b(32, 64);      s3 = reg, imm }
-    { atmop = and, or, xor       ? type = b(32, 64);      s3 = null     }
-    { atmop = inc, dec           ? type = u(32, 64);      s3 = null     }
-    { atmop = add, sub, min, max ? type = (s, u)(32, 64); s3 = null     }
-    ;
-
-    s0 = (reg, image).itype;
-    s2 = reg, imm;
-    s4 = null;
-
-    { geometry = 1d, 1db ? s1 = reg.ctype    }
-    { geometry = 2d, 1da ? s1 = vec.2.ctype }
-    { geometry = 3d, 2da ? s1 = vec.3.ctype }
-    ;
-}
-
-Inst atomicimagenoret(Atomic.Image, atomic.image, atomic.noret.image)
-
-// ============================================================================
 // QUERY
 
 Req queryimage
 { 
-    type = u32;
-    stype = roimg, rwimg;
+    type     = u32;
+    itype    = roimg, rwimg, woimg;
+    geometry = any;
+    iprop    = any;
+
+    { iprop = width, channeltype, channelorder ? geometry = any                            }
+    { iprop = depth                            ? geometry = 3d                             }
+    { iprop = array                            ? geometry = 1da, 2da, 2dadepth             }
+    { iprop = height                           ? geometry = 2d, 3d, 2da, 2ddepth, 2dadepth }
+    ;
        
     d0 = reg;
-    s1 = (reg, image).stype;
+    s1 = (reg, image).itype;
     s2 = null;
     s3 = null;    
     s4 = null;
@@ -1593,8 +1561,8 @@ Req queryimage
 
 Req querysampler
 { 
-    type = u32;
-    stype = samp;
+    type  = u32;
+    sprop = any;
        
     d0 = reg;
     s1 = (reg, sampler).samp;
@@ -1603,27 +1571,8 @@ Req querysampler
     s4 = null;
 }
 
-Req querysamplerboundary
-{ 
-    type = u32;
-    stype = samp;
-       
-    d0 = reg;
-    s1 = (reg, sampler).samp;
-    s2 = imm.u32;
-    s3 = null;    
-    s4 = null;
-}
-
-Inst queryimagewidth     (Source.Type, image, queryimage)
-Inst queryimageheight    (Source.Type, image, queryimage)
-Inst queryimagedepth     (Source.Type, image, queryimage)
-Inst queryimagearray     (Source.Type, image, queryimage)
-Inst queryimageorder     (Source.Type, image, queryimage)
-Inst queryimageformat    (Source.Type, image, queryimage)
-Inst querysamplercoord   (Source.Type, image, querysampler)
-Inst querysamplerfilter  (Source.Type, image, querysampler) 
-Inst querysamplerboundary(Source.Type, image, querysamplerboundary) 
+Inst queryimage  (Query.Image,   image, queryimage)
+Inst querysampler(Query.Sampler, image, querysampler)
 
 // ============================================================================
 // CBR
@@ -1760,11 +1709,12 @@ Req memfence
 { 
     type   = none;
     memord = acq, rel, ar;
-    memscp = any;
+    memscp = wv, wg, cmp, sys, wi;
     memseg = any;
 
-    { memseg = global, both ? memscp = any    }
-    { memseg = group        ? memscp = wv, wg }
+    { memseg = global, both ? memord = ar, acq, rel; memscp = wv, wg, cmp, sys }
+    { memseg = group        ? memord = ar, acq, rel; memscp = wv, wg           }
+    { memseg = image        ? memord = ar;           memscp = wv, wg, wi       }
     ;
 
     s0 = null;
@@ -2332,7 +2282,7 @@ Req gcn_atomic
     type    = (b, s, u)(32, 64);
     atmop   = generic, exch, ld;
     segment = gcn;
-    memscp  = any;
+    memscp  = wv, wg, cmp, sys;
     eqclass = any;
 
     typesize = atomic;
@@ -2359,7 +2309,7 @@ Req gcn_atomic_noret
     type    = (b, s, u)(32, 64);
     atmop   = generic, st;
     segment = gcn;
-    memscp  = any;
+    memscp  = wv, wg, cmp, sys;
     eqclass = any;
 
     typesize = atomic;

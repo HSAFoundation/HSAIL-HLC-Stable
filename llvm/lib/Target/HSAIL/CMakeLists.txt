@@ -31,13 +31,9 @@ set(sources
   BRIGDwarfCompileUnit.cpp
   BRIGDwarfDebug.cpp
   HSAILAsmBackend.cpp
-  HSAILAsmPrinter.cpp
   BRIGDwarfCompileUnit.cpp
   BRIGDwarfDebug.cpp
   BRIGDwarfStreamer.cpp 
-  HSAILCOFF.cpp
-  HSAILCOFFMachineModuleInfo.cpp
-  HSAILCOFFObjectFile.cpp
   HSAILDevice.cpp
   HSAILDeviceInfo.cpp
   HSAILEarlyCFGOpts.cpp
@@ -49,18 +45,13 @@ set(sources
   HSAILIntrinsicInfo.cpp
   HSAILISelDAGToDAG.cpp
   HSAILISelLowering.cpp
-  HSAILJITInfo.cpp
   HSAILKernelManager.cpp
   HSAILMachineFunctionInfo.cpp
-  HSAILMachObjectWriter.cpp
-  HSAILMachoTargetObjectFile.cpp
   HSAILMCAsmInfo.cpp
   HSAILMCCodeEmitter.cpp
-  HSAILMCInstLower.cpp
   HSAILModuleInfo.cpp
   HSAILOptimizeMemoryOps.cpp
   HSAILParamManager.cpp
-  HSAILPrintfConvert.cpp
   HSAILPropImageOps.cpp
   HSAILRegisterInfo.cpp
   HSAILSelectionDAGInfo.cpp
@@ -70,7 +61,6 @@ set(sources
   HSAILUtilityFunctions.cpp
   RawVectorOstream.cpp
   HSAILGlobalOffsetInsertionPass.cpp
-  HSAILMetadataUtils.cpp
   HSAILControlDependencyAnalysis.cpp
   HSAILResizePointer.cpp
   HSAILOpaqueTypes.cpp
@@ -79,6 +69,11 @@ set(sources
   HSAILLowerSPIRSamplers.cpp
   HSAILFastISel.cpp
   HSAILMergeLoadStores.cpp
+  HSAILAddrSpaceCast.cpp
+  HSAILKernelArgInsertion.cpp
+  HSAILInsertKernelIndexMetadata.cpp
+  HSAILPrintfRuntimeBindingMetadata.cpp
+  HSAILNullPtrInsertion.cpp
   )
 
 if( CMAKE_CL_64 )
@@ -111,5 +106,5 @@ add_dependencies(LLVMHSAILCodeGen
   )
 #add_subdirectory(AsmParser)
 #add_subdirectory(Disassembler)
-add_subdirectory(InstPrinter)
+#add_subdirectory(InstPrinter)
 add_subdirectory(TargetInfo)

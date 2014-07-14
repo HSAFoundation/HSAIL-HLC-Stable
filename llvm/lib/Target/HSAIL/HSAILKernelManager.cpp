@@ -48,7 +48,6 @@
 //==-----------------------------------------------------------------------===//
 #include "HSAILKernelManager.h"
 #include "HSAILAlgorithms.tpp"
-#include "HSAILAsmPrinter.h"
 #include "HSAILDeviceInfo.h"
 #include "HSAILDevices.h"
 #include "HSAILCompilerErrors.h"
@@ -78,6 +77,31 @@
 #include <utility>
 using namespace llvm;
 #define NUM_EXTRA_SLOTS_PER_IMAGE 1
+
+// This header file is required for generating global variables for kernel
+// argument info.
+namespace clk {
+typedef unsigned int uint;
+typedef uint32_t cl_mem_fence_flags;
+//kernel arg access qualifier and type qualifier
+typedef enum clk_arg_qualifier_t
+{
+    Q_NONE = 0,
+
+    //for image type only, access qualifier
+    Q_READ = 1,
+    Q_WRITE = 2,
+
+    //for pointer type only
+    Q_CONST = 4, // pointee
+    Q_RESTRICT = 8,
+    Q_VOLATILE = 16,  // pointee
+    Q_PIPE = 32  // pipe
+
+} clk_arg_qualifier_t;
+
+//#include <amdocl/cl_kernel.h>
+} // end of namespace clk
 
 static bool errorPrint(const char *ptr, OSTREAM_TYPE &O) {
   if (ptr[0] == 'E') {
@@ -115,9 +139,9 @@ printfPrint(std::pair<const std::string, HSAILPrintfInfo *> &data, OSTREAM_TYPE 
 }
 
 void HSAILKernelManager::updatePtrArg(Function::const_arg_iterator Ip,
-                                      int numWriteImages, int raw_uav_buffer,
+                                      int raw_uav_buffer,
                                       int counter, bool isKernel,
-                                      const Function *F) {
+                                      const Function *F, int pointerCount) {
   assert(F && "Cannot pass a NULL Pointer to F!");
   assert(Ip->getType()->isPointerTy() &&
          "Argument must be a pointer to be passed into this function!\n");
@@ -208,8 +232,25 @@ void HSAILKernelManager::updatePtrArg(Function::const_arg_iterator Ip,
   } else {
     ptrArg += "RW";
   }
-  ptrArg += (mMFI->isVolatilePointer(Ip)) ? ":1" : ":0";
-  ptrArg += (mMFI->isRestrictPointer(Ip)) ? ":1" : ":0";
+
+  const Module* M = mMF->getMMI().getModule();
+  bool isSPIR = isSPIRModule(*M);
+  if (isSPIR) {
+    if (pointerCount == 0)
+      ptrArg += ":0:0:0"; //skip the print_buffer pointer
+    // No need update the kernel info for block kernels (child kernel).
+    else if (!F->getName().startswith("__OpenCL___amd_blocks_func__"))
+    {
+      int typeQual = mAMI->getKernel(F->getName())->
+         accessTypeQualifer[pointerCount-1];
+      ptrArg += (typeQual & clk::Q_VOLATILE) ? ":1" : ":0";
+      ptrArg += (typeQual & clk::Q_RESTRICT) ? ":1" : ":0";
+      ptrArg += (typeQual & clk::Q_PIPE)     ? ":1" : ":0";
+    }
+  } else {
+    ptrArg += (mMFI->isVolatilePointer(Ip)) ? ":1" : ":0";
+    ptrArg += (mMFI->isRestrictPointer(Ip)) ? ":1" : ":0";
+  }
   mMFI->addMetadata(ptrArg, true);
 }
 
@@ -250,7 +291,8 @@ void HSAILKernelManager::processArgMetadata(OSTREAM_TYPE &ignored,
   const char * symTab = "NoSymTab";
   Function::const_arg_iterator Ip = F->arg_begin();
   Function::const_arg_iterator Ep = F->arg_end();
-  
+  int pointerCount = 0;
+
   if (F->hasStructRetAttr()) {
     assert(Ip != Ep && "Invalid struct return fucntion!");
     mMFI->addErrorMsg(hsa::CompilerErrorMessage[INTERNAL_ERROR]);
@@ -261,8 +303,7 @@ void HSAILKernelManager::processArgMetadata(OSTREAM_TYPE &ignored,
   bool MultiUAV = mSTM->device()->isSupported(HSAILDeviceInfo::MultiUAV);
   bool ArenaSegment =
     mSTM->device()->isSupported(HSAILDeviceInfo::ArenaSegment);
-  int numWriteImages = mMFI->get_num_write_images();
-  if (numWriteImages == OPENCL_MAX_WRITE_IMAGES || MultiUAV || ArenaSegment) {
+  if (MultiUAV || ArenaSegment) {
     if (mSTM->device()->getGeneration() <= HSAILDeviceInfo::HD6XXX) {
       raw_uav_buffer = mSTM->device()->getResourceID(HSAILDevice::ARENA_UAV_ID);
     }
@@ -271,6 +312,7 @@ void HSAILKernelManager::processArgMetadata(OSTREAM_TYPE &ignored,
   uint32_t SemaNum = 0;
   uint32_t ROArg = 0;
   uint32_t WOArg = 0;
+  uint32_t RWArg = 0;
   uint32_t NumArg = 0;
   uint32_t SamplerNum = 0;
   while (Ip != Ep) {
@@ -323,17 +365,17 @@ void HSAILKernelManager::processArgMetadata(OSTREAM_TYPE &ignored,
           }
           if (isKernel) {
             if (mAMI->isReadOnlyImage (mMF->getFunction()->getName(),
-                                       (ROArg + WOArg))) {
+                                       (ROArg + WOArg + RWArg))) {
               imageArg += "RO:" + itostr(ROArg);
               ++ROArg;
             } else if (mAMI->isWriteOnlyImage(mMF->getFunction()->getName(),
-                                              (ROArg + WOArg))) {
-              uint32_t offset = 0;
-              offset += WOArg;
-              imageArg += "WO:" + itostr(offset & 0x7);
+                                              (ROArg + WOArg + RWArg))) {
+              imageArg += "WO:" + itostr(WOArg);
               ++WOArg;
-            } else {
-              imageArg += "RW:" + itostr(ROArg + WOArg);
+            } else if (mAMI->isReadWriteImage(mMF->getFunction()->getName(),
+                                              (ROArg + WOArg + RWArg))) {
+              imageArg += "RW:" + itostr(RWArg);
+              ++RWArg;
             }
           }
           imageArg += ":1:" + itostr(mCBSize * 16);
@@ -360,8 +402,8 @@ void HSAILKernelManager::processArgMetadata(OSTREAM_TYPE &ignored,
           mMFI->addMetadata(samplerArg, true);
           ++mCBSize;
         } else {
-          updatePtrArg(Ip, numWriteImages, raw_uav_buffer, mCBSize, isKernel,
-                       F);
+          updatePtrArg(Ip, raw_uav_buffer, mCBSize, isKernel,
+                       F, pointerCount++);
           ++mCBSize;
         }
       } else if (CT->getTypeID() == Type::StructTyID 
@@ -388,7 +430,7 @@ void HSAILKernelManager::processArgMetadata(OSTREAM_TYPE &ignored,
                  || CT->getTypeID() == Type::ArrayTyID
                  || CT->getTypeID() == Type::PointerTyID
                  || PT->getAddressSpace() != HSAILAS::PRIVATE_ADDRESS) {
-        updatePtrArg(Ip, numWriteImages, raw_uav_buffer, mCBSize, isKernel, F);
+        updatePtrArg(Ip, raw_uav_buffer, mCBSize, isKernel, F, pointerCount++);
         ++mCBSize;
       } else {
         assert(0 && "Cannot process current pointer argument");
@@ -621,7 +663,7 @@ void HSAILKernelManager::brigEmitMetaData(HSAIL_ASM::BrigContainer& bc, uint32_t
         } else {
           BlockString(bc) << "uavid:" << mSTM->device()->getResourceID(HSAILDevice::ARENA_UAV_ID);
         }
-      } else if ((mMFI->get_num_write_images()) != OPENCL_MAX_WRITE_IMAGES && !mSTM->device()->isSupported(HSAILDeviceInfo::ArenaSegment)
+      } else if (!mSTM->device()->isSupported(HSAILDeviceInfo::ArenaSegment)
                  && mMFI->uav_count(mSTM->device()-> getResourceID(HSAILDevice::RAW_UAV_ID))) {
         BlockString(bc) << "uavid:" << mSTM->device()->getResourceID(HSAILDevice::RAW_UAV_ID);
       } else if (mMFI->uav_size() == 1) {
@@ -637,6 +679,12 @@ void HSAILKernelManager::brigEmitMetaData(HSAIL_ASM::BrigContainer& bc, uint32_t
     if (isKernel) {
       BlockString(bc) << "privateid:" << mSTM->device()->getResourceID(HSAILDevice::SCRATCH_ID);
     }
+    // Metadata for the device enqueue.
+    if (isKernel) {
+      BlockString(bc) << "enqueue_kernel:" << kernel->EnqueuesKernel;
+      BlockString(bc) << "kernel_index:" << kernel->KernelIndex;
+    }
+
     if (kernel) {
       for (unsigned I = 0, E = kernel->ArgTypeNames.size(); I != E; ++I) {
         BlockString(bc) << "reflection:" << I << ":" << kernel->ArgTypeNames[I];
@@ -644,7 +692,6 @@ void HSAILKernelManager::brigEmitMetaData(HSAIL_ASM::BrigContainer& bc, uint32_t
     }
 
     BlockString(bc) << "ARGEND:" << mName;
-
     // we're done - gen end_of_block
     HSAIL_ASM::BlockEnd eBlock = bc.append<HSAIL_ASM::BlockEnd>();
   }
@@ -815,9 +862,7 @@ void HSAILKernelManager::printKernelArgs(OSTREAM_TYPE &O) {
           O << mSTM->device()->getResourceID(HSAILDevice::ARENA_UAV_ID);
           O << "\"" << ";" << "\n";
         }
-      } else if ((mMFI->get_num_write_images()) !=
-                 OPENCL_MAX_WRITE_IMAGES
-                 && !mSTM->device()->isSupported(HSAILDeviceInfo::ArenaSegment)
+      } else if (!mSTM->device()->isSupported(HSAILDeviceInfo::ArenaSegment)
                  && mMFI->uav_count(mSTM->device()->
                                     getResourceID(HSAILDevice::RAW_UAV_ID))) {
         O << "\tblockstring " << "\"";

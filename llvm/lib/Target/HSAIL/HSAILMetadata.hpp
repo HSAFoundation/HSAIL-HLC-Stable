@@ -145,6 +145,7 @@ typedef struct _md_arg_type_0_7 {
       AccessType type;
       bool isVolatile;
       bool isRestrict;
+      bool isPipe;
     } pointer;
   } arg;
   ArgType type;
@@ -188,6 +189,8 @@ typedef struct _cl_metadata_0_7 {
   printfFmt *printf;
   const char *kernelName;
   const char *deviceName;
+  bool enqueue_kernel;
+  uint32_t kernel_index;
 } CLMetadata_0_7;
 
 #endif // _HSAIL_METADATA_HPP

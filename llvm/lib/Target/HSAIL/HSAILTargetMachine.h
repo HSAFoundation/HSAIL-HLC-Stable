@@ -19,7 +19,6 @@
 #include "HSAILInstrInfo.h"
 #include "HSAILIntrinsicInfo.h"
 #include "HSAILISelLowering.h"
-#include "HSAILJITInfo.h"
 #include "HSAILSelectionDAGInfo.h"
 #include "HSAILSubtarget.h"
 #include "llvm/CodeGen/Passes.h"
@@ -63,9 +62,6 @@ public:
   virtual const HSAILFrameLowering*
   getFrameLowering() const { return &FrameLowering; }
 
-  virtual HSAILJITInfo*
-  getJITInfo() { llvm_unreachable("getJITInfo not implemented"); }
-
   virtual const HSAILSubtarget*
   getSubtargetImpl() const { return &Subtarget; }
 
@@ -83,6 +79,19 @@ public:
   getRegisterInfo() const { return &getInstrInfo()->getRegisterInfo(); }
 
   virtual TargetPassConfig *createPassConfig(PassManagerBase &PM);
+
+  CodeGenFileType HSAILFileType;
+
+public:
+  /// addPassesToEmitFile - Add passes to the specified pass manager to get the
+  /// specified file emitted.  Typically this will involve several steps of code
+  /// generation.
+  virtual bool addPassesToEmitFile(PassManagerBase &PM,
+                                   formatted_raw_ostream &Out,
+                                   CodeGenFileType FT,
+                                   bool DisableVerify = true,
+                                   AnalysisID StartAfter = 0,
+                                   AnalysisID StopAfter = 0);
 };
 
 /// HSAIL_32TargetMachine - HSAIL 32-bit target machine.
@@ -91,7 +100,6 @@ class HSAIL_32TargetMachine : public HSAILTargetMachine {
   HSAILInstrInfo      InstrInfo;
   HSAILSelectionDAGInfo TSInfo;
   HSAILTargetLowering TLInfo;
-  HSAILJITInfo        JITInfo;
 public:
   HSAIL_32TargetMachine(const Target &T,
 			StringRef TT, StringRef CPU, 
@@ -118,9 +126,6 @@ public:
   virtual const HSAILInstrInfo*
   getInstrInfo() const { return &InstrInfo; }
 
-  virtual HSAILJITInfo*
-  getJITInfo() { return &JITInfo; }
-
   void dump(OSTREAM_TYPE &O);
   void setDebug(bool debugMode);
   bool getDebug() const;
@@ -133,7 +138,6 @@ class HSAIL_64TargetMachine : public HSAILTargetMachine {
   HSAILInstrInfo      InstrInfo;
   HSAILSelectionDAGInfo TSInfo;
   HSAILTargetLowering TLInfo;
-  HSAILJITInfo        JITInfo;
 public:
   HSAIL_64TargetMachine(const Target &T,
 			StringRef TT, StringRef CPU, 
@@ -170,12 +174,6 @@ public:
     return &InstrInfo;
   }
 
-  virtual HSAILJITInfo*
-  getJITInfo()
-  {
-    return &JITInfo;
-  }
-
 };
 
 } // End llvm namespace
@@ -202,6 +200,7 @@ public:
   }
 
   // Pass Pipeline Configuration
+  virtual void addIRPasses() LLVM_OVERRIDE;
   virtual bool addPreEmitPass();
   virtual bool addPreISel();
   virtual bool addInstSelector();

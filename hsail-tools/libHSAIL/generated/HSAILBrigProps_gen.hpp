@@ -52,6 +52,7 @@ enum
     PROP_EQUIVCLASS,          // type = uint8_t,                        acc = equivClass()
     PROP_FTZ,                 // type = bool,                           acc = modifier().ftz()
     PROP_GEOMETRY,            // type = BrigImageGeometry8_t,           acc = geometry()
+    PROP_IMAGEQUERY,          // type = BrigImageQuery8_t,              acc = imageQuery()
     PROP_IMAGETYPE,           // type = BrigType16_t,                   acc = imageType()
     PROP_ISCONST,             // type = bool,                           acc = modifier().isConst()
     PROP_ISNONULL,            // type = bool,                           acc = modifier().isNoNull()
@@ -60,6 +61,7 @@ enum
     PROP_OPCODE,              // type = BrigOpcode16_t,                 acc = opcode()
     PROP_PACK,                // type = BrigPack8_t,                    acc = pack()
     PROP_ROUND,               // type = BrigRound8_t,                   acc = modifier().round()
+    PROP_SAMPLERQUERY,        // type = BrigSamplerQuery8_t,            acc = samplerQuery()
     PROP_SEGMENT,             // type = BrigSegment8_t,                 acc = segment()
     PROP_SEGMENTS,            // type = BrigMemoryFenceSegments8_t,     acc = segments()
     PROP_SIGNALOPERATION,     // type = BrigAtomicOperation8_t,         acc = signalOperation()
@@ -86,18 +88,6 @@ enum
 //    PROP_SEGMENT,
 //    PROP_MEMORYORDER,
 //    PROP_MEMORYSCOPE,
-//    PROP_ATOMICOPERATION,
-//    PROP_EQUIVCLASS,
-//};
-
-
-//enum BrigInstAtomicImageProps // BRIG_INST_ATOMIC_IMAGE
-//{
-//    PROP_OPCODE,
-//    PROP_TYPE,
-//    PROP_IMAGETYPE,
-//    PROP_COORDTYPE,
-//    PROP_GEOMETRY,
 //    PROP_ATOMICOPERATION,
 //    PROP_EQUIVCLASS,
 //};
@@ -189,6 +179,24 @@ enum
 //    PROP_ROUND,
 //    PROP_FTZ,
 //    PROP_PACK,
+//};
+
+
+//enum BrigInstQueryImageProps // BRIG_INST_QUERY_IMAGE
+//{
+//    PROP_OPCODE,
+//    PROP_TYPE,
+//    PROP_IMAGETYPE,
+//    PROP_GEOMETRY,
+//    PROP_IMAGEQUERY,
+//};
+
+
+//enum BrigInstQuerySamplerProps // BRIG_INST_QUERY_SAMPLER
+//{
+//    PROP_OPCODE,
+//    PROP_TYPE,
+//    PROP_SAMPLERQUERY,
 //};
 
 

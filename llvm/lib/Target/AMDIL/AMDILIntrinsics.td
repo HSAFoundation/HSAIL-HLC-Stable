@@ -1320,13 +1320,17 @@ let TargetPrefix = "AMDIL", isTarget = 1 in {
     TernaryIntFloat;
 
 
-  def int_AMDIL_mad_u64_u32 : GCCBuiltin<"__amdil_umadu64u32">,
-    TernaryIntLong;
-  def int_AMDIL_mad_i64_i32 : GCCBuiltin<"__amdil_imadi64i32">,
-    TernaryIntLong;
+    // FIXME: These don't quite follow the normal intrinsic naming
+    // convention because AMDILIntrinsicInfo stupidly tries to strip
+    // off anything that looks like a type suffix after the last
+    // underscore.
+  def int_AMDIL_mad_u64_u32 : GCCBuiltin<"__amdil_umad64_32">,
+    Intrinsic<[llvm_i64_ty], [llvm_i32_ty, llvm_i32_ty, llvm_i64_ty], [IntrNoMem]>;
+  def int_AMDIL_mad_i64_i32 : GCCBuiltin<"__amdil_imad64_32">,
+    Intrinsic<[llvm_i64_ty], [llvm_i32_ty, llvm_i32_ty, llvm_i64_ty], [IntrNoMem]>;
 
-  def int_AMDIL_media_mqsad_u32_u8 : GCCBuiltin<"__amdil_mqsadu32u8">,
-    Intrinsic<[llvm_v4i32_ty], [llvm_v2i32_ty, llvm_i32_ty, llvm_v4i8_ty], [IntrNoMem]>;
+  def int_AMDIL_media_mqsad_u32_u8 : GCCBuiltin<"__amdil_mqsad_32_8">,
+    Intrinsic<[llvm_v4i32_ty], [llvm_v2i32_ty, llvm_i32_ty, llvm_v4i32_ty], [IntrNoMem]>;
 
     // @TODO, add atomics and real machine instructions.
   def int_AMDIL_atomic_add_fi32 : GCCBuiltin<"__atomic_add_fi32">,

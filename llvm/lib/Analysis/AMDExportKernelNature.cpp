@@ -30,8 +30,7 @@ namespace {
   class AMDExportKernelNature : public ModulePass {
   public:
     static char ID;
-    AMDExportKernelNature(bool WorkGroupLevel = false) : ModulePass(ID),
-                                                         WGLevel(WorkGroupLevel) {
+    AMDExportKernelNature() : ModulePass(ID) {
       initializeAMDExportKernelNaturePass(*PassRegistry::getPassRegistry());
     }
 
@@ -43,7 +42,6 @@ namespace {
     }
 
   private:
-    bool WGLevel;
     StructType *NatureTy;
 
     void initializeNatureStructure(Module& M) {
@@ -61,48 +59,12 @@ namespace {
 
       IntegerType *Int32Ty = Type::getInt32Ty(FStub->getContext());
       Constant *CElems[] = {
-        ConstantInt::get(Int32Ty, KN_HAS_BARRIER |
-                                 (WGLevel ? KN_WG_LEVEL : 0)),
+        ConstantInt::get(Int32Ty, KN_HAS_BARRIER),
         ConstantInt::get(Int32Ty, 0)
       };
       GV->setInitializer(ConstantStruct::get(NatureTy, CElems));
     }
 
-    void exportWGLevelStub(Function *FStub) const {
-      GlobalVariable *GV = cast<GlobalVariable>(
-        FStub->getParent()->getOrInsertGlobal(
-          AMDSymbolNames::decorateNatureName(
-            AMDSymbolNames::undecorateStubFunctionName(FStub->getName())), NatureTy));
-
-      IntegerType *Int32Ty = Type::getInt32Ty(FStub->getContext());
-      Constant *CElems[] = {
-        ConstantInt::get(Int32Ty, KN_WG_LEVEL),
-        ConstantInt::get(Int32Ty, 0)
-      };
-      GV->setInitializer(ConstantStruct::get(NatureTy, CElems));
-    }
-
-    void setNoInline(Function *F) const {
-      if (WGLevel && !F->getFnAttributes().hasAttribute(Attributes::NoInline)) {
-        LLVMContext &C = F->getParent()->getContext();
-
-        AttrBuilder B;
-        B.addAttribute(Attributes::AlwaysInline);
-        F->removeFnAttr(Attributes::get(C, B));
-        F->addFnAttr(Attributes::NoInline);
-      }
-    }
-
-    void setAlwaysInline(Function *F) const {
-      if (WGLevel && !F->getFnAttributes().hasAttribute(Attributes::AlwaysInline)) {
-        LLVMContext &C = F->getParent()->getContext();
-
-        AttrBuilder B;
-        B.addAttribute(Attributes::NoInline);
-        F->removeFnAttr(Attributes::get(C, B));
-        F->addFnAttr(Attributes::AlwaysInline);
-      }
-    }
   };
 
 } // end anonymous namespace
@@ -117,17 +79,12 @@ bool AMDExportKernelNature::runOnModule(Module& M)
   initializeNatureStructure(M);
 
   const OpenCLSymbols &OCLS = getAnalysis<OpenCLSymbols>();
-  if (WGLevel) {
-    for (OpenCLSymbols::stubs_iterator I = OCLS.stubs_begin(),
-         E = OCLS.stubs_end(); I != E; ++I)
-      exportWGLevelStub(const_cast<Function *>(*I));
-  }
 
   Function *Caller = NULL;
   // TODO: The following macro should be removed when Clang becomes the
-  // default compiler for building x86 built-ins. Only the check for the
-  // mangled names should be retained.
-#ifdef BUILD_X86_WITH_CLANG
+  // default compiler for building x86 built-ins for OpenCL 1.2 builds.
+  // Only the check for the mangled names should be retained.
+#if OPENCL_MAJOR >= 2
   Caller = M.getFunction("_Z7barrierj");
 #else
   Caller = M.getFunction("barrier");
@@ -137,8 +94,6 @@ bool AMDExportKernelNature::runOnModule(Module& M)
     DEBUG(dbgs() << "No use of barrier in module.\n");
     return true;
   }
-
-  setNoInline(Caller);
 
   SmallPtrSet<User *, 16> Users;
   SmallVector<User *, 64> Pending;
@@ -170,7 +125,6 @@ bool AMDExportKernelNature::runOnModule(Module& M)
       }
       else if (Users.insert(Caller)) {
         Pending.push_back(Caller);
-        setAlwaysInline(Caller);
       }
     }
   }
@@ -178,6 +132,6 @@ bool AMDExportKernelNature::runOnModule(Module& M)
   return true;
 }
 
-ModulePass *llvm::createAMDExportKernelNaturePass(bool WorkGroupLevel) {
-  return new AMDExportKernelNature(WorkGroupLevel);
+ModulePass *llvm::createAMDExportKernelNaturePass() {
+  return new AMDExportKernelNature();
 }

@@ -13,9 +13,6 @@
 #include "llvm/MC/MCSymbol.h"
 #include "llvm/Support/ELF.h"
 #include "llvm/Support/raw_ostream.h"
-#if defined(AMD_OPENCL) || 1
-#include "llvm/Support/CommandLine.h" // to get disableBrigLowering
-#endif
 
 using namespace llvm;
 
@@ -34,21 +31,8 @@ bool MCSectionELF::ShouldOmitSectionDirective(StringRef Name,
   return false;
 }
 
-#if defined(AMD_OPENCL) || 1
-cl::opt<bool> disableBrigLowering("disable-brig-lowering",
-  cl::desc("Disable BRIG output for HSAIL target (do HSAIL text printing instead)"),
-  cl::init(false), cl::Hidden);
-bool loweringWithDisasm=false;
-#endif
-
 void MCSectionELF::PrintSwitchToSection(const MCAsmInfo &MAI,
                                         raw_ostream &OS) const {
-
-#if defined(AMD_OPENCL) || 1
-  if (disableBrigLowering) {
-    return;
-  }
-#endif
 
   if (ShouldOmitSectionDirective(SectionName, MAI)) {
     OS << '\t' << getSectionName() << '\n';

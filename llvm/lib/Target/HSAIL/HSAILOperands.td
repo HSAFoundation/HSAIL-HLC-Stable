@@ -7,24 +7,19 @@
 def PtrRC: Operand<iPTR>, PointerLikeRegClass<0>;
 
 def MEMOP  : Operand<iPTR> {
-    let PrintMethod = "printMemOperand";
     let MIOperandInfo = (ops PtrRC, PtrRC, PtrRC);
 }
 
 def WIDTH_OPND  : OptionalDefOperand<i32, (ops i32), (ops (i32 1))> {
-  let PrintMethod = "printOperand";
 }
 
 def ALIGN_OPND  : OptionalDefOperand<i8, (ops i8), (ops (i8 1))> {
-  let PrintMethod = "printOperand";
 }
 
 def CONST_OPERAND  : OptionalDefOperand<i1, (ops i1), (ops (i1 0))> {
-  let PrintMethod = "printOperand";
 }
 
 def IMAGEMEM32  : Operand<i32> {
-    let PrintMethod = "printImageMemOperand";
 }
 
 def calltarget : Operand<i32>;

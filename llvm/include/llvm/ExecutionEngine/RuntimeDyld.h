@@ -59,6 +59,14 @@ public:
   /// message to stderr and aborts.
   virtual void *getPointerToNamedFunction(const std::string &Name,
                                           bool AbortOnFailure = true) = 0;
+
+#if defined(AMD_OPENCL) || 1
+  /// reserveMemory - This method can be used as a hint for the memory manager
+  /// to pre-allocate a larger block of memory which can be used for many small
+  /// subsequent allocations. The default implementation does nothing
+
+  virtual void reserveMemory(uint64_t size) { }
+#endif
 };
 
 class RuntimeDyld {

@@ -27,6 +27,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="hsail_c.cpp" />
     <ClCompile Include="HSAILBrigantine.cpp" />
     <ClCompile Include="HSAILBrigContainer.cpp" />
     <ClCompile Include="HSAILBrigObjectFile.cpp" />
@@ -42,6 +43,7 @@
     <ClCompile Include="HSAILValidatorBase.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="hsail_c.h" />
     <ClInclude Include="Brig_new.hpp" />
     <ClInclude Include="$(ProjectDir)\generated\HSAILBrigStaticChecks_gen.hpp" />
     <ClInclude Include="$(ProjectDir)\generated\HSAILBrigValidation_gen.hpp" />

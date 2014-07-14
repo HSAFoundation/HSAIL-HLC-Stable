@@ -138,6 +138,10 @@ struct BrigIO {
                     size_t                      size,
                     std::ostream&               errs = defaultErrs());
 
+    static std::auto_ptr<ReadAdapter>  istreamReadingAdapter(
+                    std::istream&               is, 
+                    std::ostream&               errs = defaultErrs());
+
     // normal API using adapter references
 
     static int save(BrigContainer&              src,
@@ -195,6 +199,10 @@ public: // Elf reading
 
     static int load(BrigContainer &c, const char *fileName) {
         return BrigIO::load(c, FORMAT, BrigIO::fileReadingAdapter(fileName));
+    }
+
+    static int load(BrigContainer &c, std::istream& is) {
+        return BrigIO::load(c, FORMAT, BrigIO::istreamReadingAdapter(is));
     }
 };
 

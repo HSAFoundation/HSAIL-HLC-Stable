@@ -51,10 +51,10 @@ public:
   /// emitProlog/emitEpilog - These methods insert prolog and epilog code into
   /// the function.
   virtual void
-  emitPrologue(MachineFunction &MF) const;
+  emitPrologue(MachineFunction &MF) const {};
 
   virtual void
-  emitEpilogue(MachineFunction &MF, MachineBasicBlock &MBB) const;
+  emitEpilogue(MachineFunction &MF, MachineBasicBlock &MBB) const {};
 #if 0
   /// spillCalleeSavedRegisters - Issues instruction(s) to spill all callee
   /// saved registers and returns true if it isn't possible / profitable to do

@@ -133,6 +133,294 @@ bool AMDILEGIOExpansionImpl::isArenaOp(MachineInstr *MI) {
     CurRes.bits.ResourceID >= ARENA_SEGMENT_RESERVED_UAVS;
 }
 
+void AMDILEGIOExpansionImpl::expandLongExtend(MachineInstr *MI,
+                                              uint32_t NumComps,
+                                              uint32_t Size,
+                                              bool SignedShift,
+                                              uint32_t SrcReg,
+                                              uint32_t &DstReg) {
+  DebugLoc DL = MI->getDebugLoc();
+  switch (Size) {
+    default:
+      llvm_unreachable("Found a case we don't handle!");
+      break;
+    case 8:
+      if (NumComps == 1) {
+        expandLongExtendSub32(MI, AMDIL::SHLi8i32rr, AMDIL::SHRv2i32i32rr,
+            AMDIL::USHRi8i32rr,
+            24, (24ULL | (31ULL << 32)), 24, AMDIL::LCREATEi64rr, SignedShift,
+            false, SrcReg, DstReg);
+      } else if (NumComps == 2) {
+        expandLongExtendSub32(MI, AMDIL::SHLv2i8i32rr, AMDIL::SHRv4i32i32rr,
+            AMDIL::USHRv2i8i32rr,
+            24, (24ULL | (31ULL << 32)), 24, AMDIL::LCREATEv2i64rr, SignedShift,
+            true, SrcReg, DstReg);
+      } else {
+        llvm_unreachable( "Found a case we don't handle!");
+      }
+      break;
+    case 16:
+      if (NumComps == 1) {
+        expandLongExtendSub32(MI, AMDIL::SHLi16i32rr, AMDIL::SHRv2i32i32rr,
+            AMDIL::USHRi16i32rr,
+            16, (16ULL | (31ULL << 32)), 16, AMDIL::LCREATEi64rr, SignedShift,
+            false, SrcReg, DstReg);
+      } else if (NumComps == 2) {
+        expandLongExtendSub32(MI, AMDIL::SHLv2i16i32rr, AMDIL::SHRv4i32i32rr,
+            AMDIL::USHRv2i16i32rr,
+            16, (16ULL | (31ULL << 32)), 16, AMDIL::LCREATEv2i64rr, SignedShift,
+            true, SrcReg, DstReg);
+      } else {
+        llvm_unreachable( "Found a case we don't handle!");
+      }
+      break;
+    case 32:
+      if (NumComps == 1) {
+        assert(is32BitRegister(SrcReg) && "bad SrcReg");
+        if (SignedShift) {
+          BuildMI(*mBB, MI, DL, mTII->get(AMDIL::SHRi32i32rr), DstReg)
+            .addReg(SrcReg)
+            .addImm(mMFI->addi64Literal((0ULL | (31ULL << 32))));
+        } else {
+          BuildMI(*mBB, MI, DL, mTII->get(AMDIL::LCREATEi64rr), DstReg)
+            .addReg(SrcReg)
+            .addImm(mMFI->addi32Literal(0));
+        }
+      } else if (NumComps == 2) {
+        assert(is64BitRegister(SrcReg) && "bad SrcReg");
+        if (SignedShift) {
+          BuildMI(*mBB, MI, DL, mTII->get(AMDIL::SHRv2i32i32rr), AMDIL::Rxy1012)
+            .addReg(SrcReg)
+            .addImm(mMFI->addi64Literal(31));
+          BuildMI(*mBB, MI, DL, mTII->get(AMDIL::LCREATEv2i64rr), DstReg)
+            .addReg(SrcReg)
+            .addReg(AMDIL::Rxy1012);
+        } else {
+          BuildMI(*mBB, MI, DL, mTII->get(AMDIL::LCREATEv2i64rr), DstReg)
+            .addReg(SrcReg)
+            .addImm(mMFI->addi32Literal(0));
+        }
+      } else {
+        llvm_unreachable( "Found a case we don't handle!");
+      }
+  }
+}
+
+void AMDILEGIOExpansionImpl::expandLongExtendSub32(MachineInstr *MI,
+                                                   unsigned SHLop,
+                                                   unsigned SHRop,
+                                                   unsigned USHRop,
+                                                   unsigned SHLimm,
+                                                   uint64_t SHRimm,
+                                                   unsigned USHRimm,
+                                                   unsigned LCRop,
+                                                   bool SignedShift,
+                                                   bool Vec2,
+                                                   uint32_t SrcReg,
+                                                   uint32_t &DstReg) {
+  DebugLoc DL = MI->getDebugLoc();
+  unsigned OrigReg = DstReg;
+  DstReg = Vec2 ? AMDIL::Rxy1011 : AMDIL::Rx1011;
+  BuildMI(*mBB, MI, DL, mTII->get(SHLop), DstReg)
+    .addReg(SrcReg)
+    .addImm(mMFI->addi32Literal(SHLimm));
+  if (SignedShift) {
+    BuildMI(*mBB, MI, DL, mTII->get(LCRop),
+        Vec2 ? AMDIL::R1011 : AMDIL::Rxy1011)
+      .addReg(DstReg).addReg(DstReg);
+    DstReg = Vec2 ? AMDIL::R1011 : AMDIL::Rxy1011;
+    BuildMI(*mBB, MI, DL, mTII->get(SHRop),
+        OrigReg).addReg(DstReg)
+      .addImm(mMFI->addi64Literal(SHRimm));
+  } else {
+    BuildMI(*mBB, MI, DL, mTII->get(USHRop),
+        DstReg).addReg(DstReg)
+      .addImm(mMFI->addi32Literal(USHRimm));
+    BuildMI(*mBB, MI, MI->getDebugLoc(), mTII->get(LCRop),
+        OrigReg)
+      .addReg(DstReg)
+      .addImm(mMFI->addi32Literal(0));
+  }
+}
+
+void AMDILEGIOExpansionImpl::expandIntegerExtend(MachineInstr *MI,
+                                                 unsigned SHLop,
+                                                 unsigned SHRop,
+                                                 unsigned Offset,
+                                                 unsigned SrcReg,
+                                                 unsigned DstReg) {
+  DebugLoc DL = MI->getDebugLoc();
+  Offset = mMFI->addi32Literal(Offset);
+  BuildMI(*mBB, MI, DL, mTII->get(SHLop), DstReg)
+    .addReg(SrcReg).addImm(Offset);
+  BuildMI(*mBB, MI, DL, mTII->get(SHRop), DstReg)
+    .addReg(DstReg).addImm(Offset);
+}
+
+void AMDILEGIOExpansionImpl::expandExtendLoad(MachineInstr *MI,
+                                              uint32_t SrcReg,
+                                              uint32_t &DstReg) {
+  if (!isExtendLoad(MI)) {
+    return;
+  }
+  Type *AType = NULL;
+  if (!MI->memoperands_empty()) {
+    MachineMemOperand *MemOp = *MI->memoperands_begin();
+    const Value *MOVal = MemOp ? MemOp->getValue() : NULL;
+    AType = MOVal ? MOVal->getType() : NULL;
+  }
+
+  bool IsFloat = false;
+
+  unsigned OpCode = 0;
+  DebugLoc DL = MI->getDebugLoc();
+  if (isExtLoadInst(MI)) {
+    switch(MI->getDesc().OpInfo[0].RegClass) {
+    default:
+      llvm_unreachable( "Found an extending load that we don't handle!");
+      break;
+    case AMDIL::GPRI16RegClassID:
+      if (!isHardwareLocal(MI)
+          || mSTM->usesSoftware(AMDIL::Caps::ByteLDSOps)) {
+        OpCode = isSExtLoadInst(MI) ? AMDIL::SHRi16i32rr : AMDIL::USHRi16i32rr;
+        expandIntegerExtend(MI, AMDIL::SHLi16i32rr, OpCode, 24, SrcReg, DstReg);
+      }
+      break;
+    case AMDIL::GPRV2I16RegClassID:
+      OpCode = isSExtLoadInst(MI) ? AMDIL::SHRv2i16i32rr : AMDIL::USHRv2i16i32rr;
+      expandIntegerExtend(MI, AMDIL::SHLv2i16i32rr, OpCode, 24, SrcReg, DstReg);
+      break;
+    case AMDIL::GPRV4I8RegClassID:
+      OpCode = isSExtLoadInst(MI) ? AMDIL::SHRv4i8i32rr : AMDIL::USHRv4i8i32rr;
+      expandIntegerExtend(MI, AMDIL::SHLv4i8i32rr, OpCode, 24, SrcReg, DstReg);
+      break;
+    case AMDIL::GPRV4I16RegClassID:
+      OpCode = isSExtLoadInst(MI) ? AMDIL::SHRv4i16i32rr : AMDIL::USHRv4i16i32rr;
+      expandIntegerExtend(MI, AMDIL::SHLv4i16i32rr, OpCode, 24, SrcReg, DstReg);
+      break;
+
+    case AMDIL::GPR_32RegClassID:
+      if (IsFloat) {
+        BuildMI(*mBB, MI, DL,
+                mTII->get(AMDIL::HTOFf32r), DstReg)
+          .addReg(SrcReg);
+        break;
+      }
+
+      // We can be a i8 or i16 bit sign extended value
+      if (getMemorySize(MI) == 1) {
+        OpCode = isSExtLoadInst(MI) ? AMDIL::SHRi32i32rr : AMDIL::USHRi32i32rr;
+        expandIntegerExtend(MI, AMDIL::SHLi32i32rr, OpCode, 24, SrcReg, DstReg);
+      } else if (getMemorySize(MI) == 2) {
+        OpCode = isSExtLoadInst(MI) ? AMDIL::SHRi32i32rr : AMDIL::USHRi32i32rr;
+        expandIntegerExtend(MI, AMDIL::SHLi32i32rr, OpCode, 16, SrcReg, DstReg);
+      } else {
+        llvm_unreachable( "Found an extending load that we don't handle!");
+      }
+      break;
+    case AMDIL::GPRV2I32RegClassID:
+      if (IsFloat) {
+        BuildMI(*mBB, MI, DL,
+                mTII->get(AMDIL::HTOFv2f32r), DstReg)
+          .addReg(SrcReg);
+        break;
+      }
+
+      // We can be a v2i8 or v2i16 bit sign extended value
+      if (getMemorySize(MI) == 2) {
+        OpCode = isSExtLoadInst(MI) ?
+                 AMDIL::SHRv2i32i32rr : AMDIL::USHRv2i32i32rr;
+        expandIntegerExtend(MI, AMDIL::SHLv2i32i32rr, OpCode, 24, SrcReg,
+                            DstReg);
+      } else if (getMemorySize(MI) == 4) {
+        OpCode = isSExtLoadInst(MI) ?
+                 AMDIL::SHRv2i32i32rr : AMDIL::USHRv2i32i32rr;
+        expandIntegerExtend(MI, AMDIL::SHLv2i32i32rr, OpCode, 16, SrcReg,
+                            DstReg);
+      } else {
+        llvm_unreachable( "Found an extending load that we don't handle!");
+      }
+      break;
+    case AMDIL::GPRV4I32RegClassID:
+      if (IsFloat) {
+        BuildMI(*mBB, MI, DL,
+                mTII->get(AMDIL::HTOFv4f32r), DstReg)
+          .addReg(SrcReg);
+        break;
+      }
+
+      // We can be a v4i8 or v4i16 bit sign extended value
+      if (getMemorySize(MI) == 4) {
+        OpCode = isSExtLoadInst(MI) ?
+                 AMDIL::SHRv4i32i32rr : AMDIL::USHRv4i32i32rr;
+        expandIntegerExtend(MI, AMDIL::SHLv4i32i32rr, OpCode, 24, SrcReg,
+                            DstReg);
+      } else if (getMemorySize(MI) == 8) {
+        OpCode = isSExtLoadInst(MI) ?
+                 AMDIL::SHRv4i32i32rr : AMDIL::USHRv4i32i32rr;
+        expandIntegerExtend(MI, AMDIL::SHLv4i32i32rr, OpCode, 16, SrcReg,
+                            DstReg);
+      } else {
+        llvm_unreachable( "Found an extending load that we don't handle!");
+      }
+      break;
+    case AMDIL::GPR_64RegClassID:
+      if (IsFloat) {
+        BuildMI(*mBB, MI, DL,
+                mTII->get(AMDIL::FTODr), DstReg)
+          .addReg(SrcReg);
+        break;
+      }
+
+      // We can be a i8, i16 or i32 bit sign extended value
+      if (getMemorySize(MI) == 1) {
+        expandLongExtend(MI, 1, 8, isSExtLoadInst(MI), SrcReg, DstReg);
+      } else if (getMemorySize(MI) == 2) {
+        expandLongExtend(MI, 1, 16, isSExtLoadInst(MI), SrcReg, DstReg);
+      } else if (getMemorySize(MI) == 4) {
+        expandLongExtend(MI, 1, 32, isSExtLoadInst(MI), SrcReg, DstReg);
+      } else {
+        llvm_unreachable( "Found an extending load that we don't handle!");
+      }
+      break;
+    case AMDIL::GPRV2I64RegClassID:
+      if (IsFloat) {
+        assert((isXYComponentReg(SrcReg) || isZWComponentReg(SrcReg)) &&
+               "bad SrcReg");
+        assert(is128BitRegister(DstReg) && "bad DstReg");
+        if (isXYComponentReg(SrcReg)) {
+          BuildMI(*mBB, MI, DL,
+                  mTII->get(AMDIL::FTODr), getCompReg(DstReg, AMDIL::sub_zw))
+            .addReg(getCompReg(SrcReg, AMDIL::sub_y));
+          BuildMI(*mBB, MI, DL,
+                  mTII->get(AMDIL::FTODr), getCompReg(DstReg, AMDIL::sub_xy))
+            .addReg(getCompReg(SrcReg, AMDIL::sub_x));
+        } else {
+          BuildMI(*mBB, MI, DL,
+                  mTII->get(AMDIL::FTODr), getCompReg(DstReg, AMDIL::sub_xy))
+            .addReg(getCompReg(SrcReg, AMDIL::sub_z));
+          BuildMI(*mBB, MI, DL,
+                  mTII->get(AMDIL::FTODr), getCompReg(DstReg, AMDIL::sub_zw))
+            .addReg(getCompReg(SrcReg, AMDIL::sub_w));
+        }
+        break;
+      }
+
+      // We can be a v2i8, v2i16 or v2i32 bit sign extended value
+      if (getMemorySize(MI) == 2) {
+        expandLongExtend(MI, 2, 8, isSExtLoadInst(MI), SrcReg, DstReg);
+      } else if (getMemorySize(MI) == 4) {
+        expandLongExtend(MI, 2, 16, isSExtLoadInst(MI), SrcReg, DstReg);
+      } else if (getMemorySize(MI) == 8) {
+        expandLongExtend(MI, 2, 32, isSExtLoadInst(MI), SrcReg, DstReg);
+      } else {
+        llvm_unreachable( "Found an extending load that we don't handle!");
+      }
+      break;
+    }
+  }
+}
+
 void AMDILEGIOExpansionImpl::expandPackedData(MachineInstr *MI,
                                               uint32_t SrcReg,
                                               uint32_t &DstReg) {
@@ -423,6 +711,78 @@ void AMDILEGIOExpansionImpl::expandGlobalLoad(MachineInstr *MI) {
   }
 }
 
+void AMDILEGIOExpansionImpl::expandConstantLoad(MachineInstr *MI) {
+  if (!isHardwareInst(MI) || MI->memoperands_empty()) {
+    return expandGlobalLoad(MI);
+  }
+  uint32_t cID = getPointerID(MI);
+  if (cID < 2) {
+    return expandGlobalLoad(MI);
+  }
+  if (!mMFI->usesConstant() && mMFI->isKernel()) {
+    mMFI->addErrorMsg(amd::CompilerErrorMessage[MEMOP_NO_ALLOCATION]);
+  }
+
+  assert(mSTM->getGeneration() <= AMDIL::NORTHERN_ISLANDS &&
+         "This should not be used on SI");
+
+  DebugLoc DL = MI->getDebugLoc();
+  uint32_t OrigReg = MI->getOperand(1).getReg();
+  uint32_t AddyReg = MI->getOperand(1).getReg();
+  uint32_t DataReg = MI->getOperand(0).getReg();
+  uint32_t Reg = getPackedReg(DataReg, getPackedID(MI));
+  // These instructions go before the current MI.
+  expandLoadStartCode(MI, AddyReg);
+  switch (getMemorySize(MI)) {
+    default:
+      BuildMI(*mBB, MI, DL,
+          mTII->get(AMDIL::SHRi32i32rr), AMDIL::Rx1010)
+        .addReg(AddyReg)
+        .addImm(mMFI->addi32Literal(4));
+      BuildMI(*mBB, MI, DL,
+          mTII->get(AMDIL::CB32LOAD), Reg)
+        .addReg(AMDIL::Rx1010)
+        .addImm(cID);
+      break;
+    case 1:
+    case 2:
+    case 4:
+      emitVectorAddressCalc(MI, true, true, AddyReg);
+      BuildMI(*mBB, MI, DL,
+          mTII->get(AMDIL::CB32LOAD), AMDIL::R1011)
+        .addReg(AddyReg)
+        .addImm(cID);
+      Reg = get1stI32SubReg(Reg);
+      emitDataLoadSelect(MI, Reg, OrigReg);
+      break;
+    case 8:
+      emitVectorAddressCalc(MI, false, true, AddyReg);
+      Reg = get1stI64SubReg(Reg);
+      BuildMI(*mBB, MI, DL,
+          mTII->get(AMDIL::CB32LOAD), AMDIL::R1011)
+        .addReg(AddyReg)
+        .addImm(cID);
+      BuildMI(*mBB, MI, DL,
+          mTII->get(AMDIL::CMOV_LOGICALi64rrr), Reg)
+        .addReg(AMDIL::Rxy1008)
+        .addReg(AMDIL::Rxy1011)
+        .addReg(AMDIL::Rzw1011);
+      break;
+  }
+
+  if (isPackedInst(MI)) {
+    expandPackedData(MI, Reg, DataReg);
+    Reg = DataReg;
+  }
+
+  if (isExtendLoad(MI)) {
+    expandExtendLoad(MI, Reg, DataReg);
+    MI->getOperand(0).setReg(DataReg);
+  } else {
+    assert(Reg == DataReg && "inconsistent register");
+  }
+}
+
 void AMDILEGIOExpansionImpl::expandRegionLoad(MachineInstr *MI) {
   bool HWRegion = mSTM->usesHardware(AMDIL::Caps::RegionMem);
   if (!mSTM->isSupported(AMDIL::Caps::RegionMem)) {
@@ -491,7 +851,7 @@ void AMDILEGIOExpansionImpl::expandRegionLoad(MachineInstr *MI) {
           .addReg(AMDIL::Rx1008)
           .addReg(Reg);
       } else {
-        if (isSWSExtLoadInst(MI)) {
+        if (isSExtLoadInst(MI)) {
           BuildMI(*mBB, MI, DL, mTII->get(AMDIL::GDS32LOADi8r), Reg)
             .addReg(AddyReg)
             .addImm(gID);
@@ -524,7 +884,7 @@ void AMDILEGIOExpansionImpl::expandRegionLoad(MachineInstr *MI) {
           .addReg(AMDIL::Rx1008)
           .addReg(Reg);
       } else {
-        if (isSWSExtLoadInst(MI)) {
+        if (isSExtLoadInst(MI)) {
           BuildMI(*mBB, MI, DL, mTII->get(AMDIL::GDS32LOADi16r), Reg)
             .addReg(AddyReg)
             .addImm(gID);
@@ -600,7 +960,12 @@ void AMDILEGIOExpansionImpl::expandLocalLoad(MachineInstr *MI) {
         Reg = get1stI64SubReg(Reg);
         if (!isXYComponentReg(Reg))
           Reg = AMDIL::Rxy1011;
-        BuildMI(*mBB, MI, DL, mTII->get(AMDIL::LDS32LOADv2i32r), Reg)
+
+	unsigned Opcode = (mSTM->getGeneration() >= AMDIL::SOUTHERN_ISLANDS &&
+	  (*MI->memoperands_begin())->getAlignment() >= 8) ?
+	  AMDIL::LDS32LOADi64r : AMDIL::LDS32LOADv2i32r;
+
+        BuildMI(*mBB, MI, DL, mTII->get(Opcode), Reg)
           .addReg(AddyReg)
           .addImm(lID);
       }
@@ -668,7 +1033,7 @@ void AMDILEGIOExpansionImpl::expandLocalLoad(MachineInstr *MI) {
           .addReg(AMDIL::Rx1008)
           .addReg(Reg);
       } else {
-        if (isSWSExtLoadInst(MI)) {
+        if (isSExtLoadInst(MI)) {
           BuildMI(*mBB, MI, DL, mTII->get(AMDIL::LDS32LOADi16r), Reg)
             .addReg(AddyReg)
             .addImm(lID);
@@ -1001,10 +1366,17 @@ void AMDILEGIOExpansionImpl::expandLocalStore(MachineInstr *MI) {
         .addImm(lID);
       break;
     case 8:
-      BuildMI(*mBB, MI, DL, mTII->get(AMDIL::LDS32STOREv2i32r), AMDIL::MEMxy)
-        .addReg(AddyReg)
-        .addReg(DataReg)
-        .addImm(lID);
+      if (mSTM->getGeneration() >= AMDIL::SOUTHERN_ISLANDS &&
+        (*MI->memoperands_begin())->getAlignment() >= 8) {
+	BuildMI(*mBB, MI, DL, mTII->get(AMDIL::LDS32STOREi64r), AddyReg)
+	  .addReg(DataReg)
+	  .addImm(lID);
+      } else {
+	BuildMI(*mBB, MI, DL, mTII->get(AMDIL::LDS32STOREv2i32r), AMDIL::MEMxy)
+	  .addReg(AddyReg)
+	  .addReg(DataReg)
+	  .addImm(lID);
+      }
       break;
     case 4:
       BuildMI(*mBB, MI, DL, mTII->get(AMDIL::LDS32STOREi32r), AddyReg)
@@ -1088,6 +1460,235 @@ void AMDILEGIOExpansionImpl::expandLocalStore(MachineInstr *MI) {
       }
       break;
   }
+}
+
+void AMDILEGIOExpansionImpl::expandPrivateLoad(MachineInstr *MI) {
+  if (!mMFI->usesScratch() && mMFI->isKernel()) {
+    mMFI->addErrorMsg(amd::CompilerErrorMessage[MEMOP_NO_ALLOCATION]);
+  }
+  uint32_t xID = getPointerID(MI);
+  assert(xID &&
+      "Found a scratch load that was incorrectly marked as zero ID!\n");
+  if (!xID) {
+    xID = mSTM->getResourceID(AMDIL::SCRATCH_ID);
+    mMFI->addErrorMsg(amd::CompilerWarningMessage[RECOVERABLE_ERROR]);
+  }
+  DebugLoc DL = MI->getDebugLoc();
+  uint32_t origReg = MI->getOperand(1).getReg();
+  uint32_t AddyReg = MI->getOperand(1).getReg();
+  uint32_t DataReg = MI->getOperand(0).getReg();
+  uint32_t Reg = getPackedReg(DataReg, getPackedID(MI));
+  // These instructions go before the current MI.
+  expandLoadStartCode(MI, AddyReg);
+  switch (getMemorySize(MI)) {
+    default:
+      // Since the private register is a 128 bit aligned, we have to align
+      // the address first, since our source address is 32bit aligned and then
+      // load the data. This produces the following pseudo-IL:
+      // ishr r1010.x___, r1010.xxxx, 4
+	    // mov r1011, x1[r1010.x]
+      BuildMI(*mBB, MI, DL,
+          mTII->get(AMDIL::SHRi32i32rr), AMDIL::Rx1010)
+        .addReg(AddyReg)
+        .addImm(mMFI->addi32Literal(4));
+      BuildMI(*mBB, MI, DL,
+          mTII->get(AMDIL::SCRATCH32LOAD), Reg)
+        .addReg(AMDIL::Rx1010)
+        .addImm(xID);
+      break;
+    case 1:
+    case 2:
+    case 4:
+      emitVectorAddressCalc(MI, true, true, AddyReg);
+      // This produces the following pseudo-IL:
+      // mov r1011, x1[r1007.x]
+      BuildMI(*mBB, MI, DL,
+          mTII->get(AMDIL::SCRATCH32LOAD), AMDIL::R1011)
+        .addReg(AddyReg)
+        .addImm(xID);
+      // These instructions go after the current MI.
+      Reg = get1stI32SubReg(Reg);
+      emitDataLoadSelect(MI, Reg, origReg);
+     break;
+    case 8:
+      emitVectorAddressCalc(MI, false, true, AddyReg);
+      Reg = get1stI64SubReg(Reg);
+      // This produces the following pseudo-IL:
+      // mov r1011, x1[r1007.x]
+      // cmov_logical r1011.xy__, r1008.xxxx, r1011.xy, r1011.zw
+      BuildMI(*mBB, MI, DL,
+          mTII->get(AMDIL::SCRATCH32LOAD), AMDIL::R1011)
+        .addReg(AddyReg)
+        .addImm(xID);
+      BuildMI(*mBB, MI, DL,
+          mTII->get(AMDIL::CMOV_LOGICALi64rrr), Reg)
+        .addReg(AMDIL::Rxy1008)
+        .addReg(AMDIL::Rxy1011)
+        .addReg(AMDIL::Rzw1011);
+     break;
+  }
+
+  if (isPackedInst(MI)) {
+    expandPackedData(MI, Reg, DataReg);
+    Reg = DataReg;
+  }
+
+  if (isExtendLoad(MI)) {
+    expandExtendLoad(MI, Reg, DataReg);
+    MI->getOperand(0).setReg(DataReg);
+  } else {
+    assert(Reg == DataReg && "inconsistent register");
+  }
+}
+void AMDILEGIOExpansionImpl::expandPrivateStore(MachineInstr *MI) {
+  if (!mMFI->usesScratch() && mMFI->isKernel()) {
+    mMFI->addErrorMsg(amd::CompilerErrorMessage[MEMOP_NO_ALLOCATION]);
+  }
+  uint32_t xID = getPointerID(MI);
+  assert(xID &&
+      "Found a scratch store that was incorrectly marked as zero ID!\n");
+  if (!xID) {
+    xID = mSTM->getResourceID(AMDIL::SCRATCH_ID);
+    mMFI->addErrorMsg(amd::CompilerWarningMessage[RECOVERABLE_ERROR]);
+  }
+  DebugLoc DL = MI->getDebugLoc();
+  uint32_t DataReg = MI->getOperand(0).getReg();
+  uint32_t AddyReg = MI->getOperand(1).getReg();
+  if (AddyReg == AMDIL::DFP) {
+    BuildMI(*mBB, MI, DL, mTII->get(TargetOpcode::COPY), AMDIL::Rx1010)
+            .addReg(AddyReg);
+    AddyReg = AMDIL::Rx1010;
+  }
+   // These instructions go before the current MI.
+  expandStoreSetupCode(MI, AddyReg, DataReg);
+  uint32_t OrigReg = AddyReg;
+  switch (getMemorySize(MI)) {
+    default:
+      // This section generates the following pseudo-IL:
+      // ishr r1010.x___, r1010.xxxx, 4
+	    // mov x1[r1010.x], r1011
+      BuildMI(*mBB, MI, DL,
+          mTII->get(AMDIL::SHRi32i32rr), AMDIL::Rx1010)
+        .addReg(AddyReg)
+        .addImm(mMFI->addi32Literal(4));
+      BuildMI(*mBB, MI, DL,
+          mTII->get(AMDIL::SCRATCH32STORE), AMDIL::Rx1010)
+        .addReg(DataReg)
+        .addImm(xID);
+      break;
+    case 1:
+      emitVectorAddressCalc(MI, true, true, AddyReg);
+      // This section generates the following pseudo-IL:
+      // mov r1002, x1[r1007.x]
+      BuildMI(*mBB, MI, DL,
+          mTII->get(AMDIL::SCRATCH32LOAD), AMDIL::R1002)
+        .addReg(AddyReg)
+        .addImm(xID);
+      emitComponentExtract(MI, AMDIL::R1002, AMDIL::Rx1002, true);
+      // This section generates the following pseudo-IL:
+      // iand r1003.x, r1010.x, 3
+      // iadd r1001, r1003.x, {0, -1, -2, -3}
+      // ieq r1001, r1001, 0
+      // ishr r1002, r1002.x, {0, 8, 16, 24}
+      // cmov_logical r1002, r1001, r1011.x, r1002
+      BuildMI(*mBB, MI, DL, mTII->get(AMDIL::ANDi32rr), AMDIL::Rx1003)
+        .addReg(OrigReg)
+        .addImm(mMFI->addi32Literal(3));
+      BuildMI(*mBB, MI, DL, mTII->get(AMDIL::ADDv4i32rr), AMDIL::R1001)
+        .addReg(AMDIL::Rx1003)
+        .addImm(mMFI->addi128Literal(0xFFFFFFFFULL << 32,
+              (0xFFFFFFFEULL | (0xFFFFFFFDULL << 32))));
+      BuildMI(*mBB, MI, DL, mTII->get(AMDIL::IEQv4i32rr), AMDIL::R1001)
+        .addReg(AMDIL::R1001)
+        .addImm(mMFI->addi32Literal(0));
+     BuildMI(*mBB, MI, DL, mTII->get(AMDIL::SHRv4i32i32rr), AMDIL::R1002)
+      .addReg(AMDIL::Rx1002)
+      .addImm(mMFI->addi128Literal(8ULL << 32, 16ULL | (24ULL << 32)));
+     BuildMI(*mBB, MI, DL, mTII->get(AMDIL::CMOV_LOGICALv4i32rrr), AMDIL::R1002)
+        .addReg(AMDIL::R1001)
+        .addReg(DataReg)
+        .addReg(AMDIL::R1002);
+
+     // This section generates the following pseudo-IL:
+     // mov r1001.xy, r1002.yw
+     // mov r1002.xy, r1002.xz
+     // ubit_insert r1002.xy, 8, 8, r1001.xy, r1002.xy
+     // ubit_insert r1011.x, 16, 16, r1002.y, r1002.x
+     BuildMI(*mBB, MI, DL, mTII->get(AMDIL::LHIv2i64r), AMDIL::Rxy1001)
+       .addReg(AMDIL::R1002);
+     BuildMI(*mBB, MI, DL, mTII->get(AMDIL::LLOv2i64r), AMDIL::Rxy1002)
+       .addReg(AMDIL::R1002);
+     BuildMI(*mBB, MI, DL, mTII->get(AMDIL::UBIT_INSERTv2i32rrrr),
+             AMDIL::Rxy1002)
+       .addImm(mMFI->addi32Literal(8))
+       .addImm(mMFI->addi32Literal(8))
+       .addReg(AMDIL::Rxy1001)
+       .addReg(AMDIL::Rxy1002);
+     BuildMI(*mBB, MI, DL, mTII->get(AMDIL::UBIT_INSERTi32rrrr),
+             AMDIL::Rx1011)
+       .addImm(mMFI->addi32Literal(16))
+       .addImm(mMFI->addi32Literal(16))
+       .addReg(AMDIL::Ry1002)
+       .addReg(AMDIL::Rx1002);
+
+      DataReg = AMDIL::Rx1011;
+      emitVectorAddressCalc(MI, true, false, OrigReg);
+      emitVectorSwitchWrite(MI, true, OrigReg, DataReg);
+      break;
+    case 2:
+      emitVectorAddressCalc(MI, true, true, AddyReg);
+      // This section generates the following pseudo-IL:
+      // mov r1002, x1[r1007.x]
+      BuildMI(*mBB, MI, DL,
+          mTII->get(AMDIL::SCRATCH32LOAD), AMDIL::R1002)
+        .addReg(AddyReg)
+        .addImm(xID);
+      emitComponentExtract(MI, AMDIL::R1002, AMDIL::Rx1002, true);
+      // This section generates the following pseudo-IL:
+      // ishr r1003.x, $OrigReg, 1
+      // iand r1003.x, r1003.x, 1
+      // ishr r1001.x, r1002.x, 16
+      // cmov_logical r1002.x, r1003.x, r1002.x, $OrigReg
+      // cmov_logical r1001.x, r1003.x, $OrigReg, r1001.x
+      BuildMI(*mBB, MI, DL, mTII->get(AMDIL::SHRi32i32rr), AMDIL::Rx1003)
+        .addReg(OrigReg)
+        .addImm(mMFI->addi32Literal(1));
+      BuildMI(*mBB, MI, DL, mTII->get(AMDIL::ANDi32rr), AMDIL::Rx1003)
+        .addReg(AMDIL::Rx1003)
+        .addImm(mMFI->addi32Literal(1));
+      BuildMI(*mBB, MI, DL, mTII->get(AMDIL::SHRi32i32rr), AMDIL::Rx1001)
+        .addReg(AMDIL::Rx1002)
+        .addImm(mMFI->addi32Literal(16));
+      BuildMI(*mBB, MI, DL, mTII->get(AMDIL::CMOV_LOGICALi32rrr), AMDIL::Rx1002)
+        .addReg(AMDIL::Rx1003)
+        .addReg(AMDIL::Rx1002)
+        .addReg(DataReg);
+      BuildMI(*mBB, MI, DL, mTII->get(AMDIL::CMOV_LOGICALi32rrr), AMDIL::Rx1001)
+        .addReg(AMDIL::Rx1003)
+        .addReg(DataReg)
+        .addReg(AMDIL::Rx1001);
+      // This section generates the following pseudo-IL:
+      // ubit_insert r1011.x, 16, 16, r1001.x, r1002.x
+      BuildMI(*mBB, MI, DL, mTII->get(AMDIL::UBIT_INSERTi32rrrr),
+              AMDIL::Rx1011)
+        .addImm(mMFI->addi32Literal(16))
+        .addImm(mMFI->addi32Literal(16))
+        .addReg(AMDIL::Rx1001)
+        .addReg(AMDIL::Rx1002);
+      DataReg = AMDIL::Rx1011;
+
+      emitVectorAddressCalc(MI, true, false, OrigReg);
+      emitVectorSwitchWrite(MI, true, OrigReg, DataReg);
+      break;
+    case 4:
+      emitVectorAddressCalc(MI, true, false, AddyReg);
+      emitVectorSwitchWrite(MI, true, AddyReg, DataReg);
+      break;
+    case 8:
+      emitVectorAddressCalc(MI, false, false, AddyReg);
+      emitVectorSwitchWrite(MI, false, AddyReg, DataReg);
+      break;
+  };
 }
 
 void AMDILEGIOExpansionImpl::expandArenaSetup(MachineInstr *MI,

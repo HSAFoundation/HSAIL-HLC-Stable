@@ -8183,12 +8183,12 @@ SDValue X86TargetLowering::LowerUINT_TO_FP(SDValue Op,
 
   assert(SrcVT == MVT::i64 && "Unexpected type in UINT_TO_FP");
 
+#if defined(AMD_OPENCL) || 1
   // If target is 32-bit windows, we need to use a different algorithm because
   // the x87 control register is not the same as for Linux. This algorithm is
   // a bit slower and uses integer arithmetic only, but will give the correct result
   // We should fix this and manage the FPCW, see bug 9282
-  if (Subtarget->isTargetAMDOpenCL() &&
-      (Subtarget->isTargetWindows() || Subtarget->isTargetMingw()) &&
+  if ((Subtarget->isTargetWindows() || Subtarget->isTargetMingw()) &&
       !Subtarget->isTargetWin64()) {
     SDValue u = N0;
     SDValue hi_shift = DAG.getNode(ISD::SRL, dl, MVT::i64, u, DAG.getConstant(32, MVT::i64));
@@ -8224,7 +8224,7 @@ SDValue X86TargetLowering::LowerUINT_TO_FP(SDValue Op,
     SDValue floatresult = DAG.getNode(ISD::BITCAST, dl, MVT::f32, intresult);
     return floatresult;
   }
-
+#endif
   SDValue Store = DAG.getStore(DAG.getEntryNode(), dl, Op.getOperand(0),
                                StackSlot, MachinePointerInfo(),
                                false, false, 0);

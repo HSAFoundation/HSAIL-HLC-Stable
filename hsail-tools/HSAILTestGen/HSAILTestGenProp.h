@@ -109,6 +109,7 @@ enum BrigOperandId
     O_ADDRESS_PRIVATE_VAR,      // 32-bit segment
 
     O_ADDRESS_GLOBAL_ROIMG,
+    O_ADDRESS_GLOBAL_WOIMG,
     O_ADDRESS_GLOBAL_RWIMG,
 
     O_ADDRESS_READONLY_ROIMG,
@@ -134,6 +135,38 @@ enum BrigOperandId
     O_MAXID
 };
 
+inline bool isImmOperandId(unsigned val)
+{
+    switch(val)
+    {
+    case O_IMM1_X:
+    case O_IMM8_X:
+    case O_IMM16_X:
+    case O_IMM32_X:
+    case O_IMM64_X:
+    case O_IMM128_X:
+        return true;
+    case O_IMM32_0:
+    case O_IMM32_1:
+    case O_IMM32_2:
+    case O_IMM32_3:
+        return true;
+    case O_WAVESIZE:
+        return true;
+
+    default: 
+        return false;
+    }
+}
+
+unsigned operandId2SymId(unsigned oprId);
+bool     isSupportedOperand(unsigned oprId);
+
+//=============================================================================
+//=============================================================================
+//=============================================================================
+// Equivalence class values
+
 enum BrigEqClassId
 {
     EQCLASS_MINID = 0,
@@ -149,25 +182,47 @@ enum BrigEqClassId
 //=============================================================================
 //=============================================================================
 //=============================================================================
-// Names of symbols used by operands
+// Symbols
 
-extern const char* NAME_FUNC;
-extern const char* NAME_GLOBAL_VAR;
-extern const char* NAME_GROUP_VAR;
-extern const char* NAME_PRIVATE_VAR;
-extern const char* NAME_READONLY_VAR;
-extern const char* NAME_GLOBAL_ROIMG;
-extern const char* NAME_GLOBAL_RWIMG;
-extern const char* NAME_READONLY_ROIMG;
-extern const char* NAME_READONLY_RWIMG;
-extern const char* NAME_GLOBAL_SAMP; 
-extern const char* NAME_READONLY_SAMP;
-extern const char* NAME_GLOBAL_SIG32; 
-extern const char* NAME_READONLY_SIG32;
-extern const char* NAME_GLOBAL_SIG64; 
-extern const char* NAME_READONLY_SIG64;
-extern const char* NAME_FBARRIER;
-extern const char* NAME_LABEL;
+enum SymId
+{
+    SYM_NONE = 0,
+    SYM_MINID = 0,
+
+    SYM_FUNC,
+    SYM_GLOBAL_VAR,
+    SYM_GROUP_VAR,
+    SYM_PRIVATE_VAR,
+    SYM_READONLY_VAR,
+    SYM_GLOBAL_ROIMG,
+    SYM_GLOBAL_WOIMG,
+    SYM_GLOBAL_RWIMG,
+    SYM_READONLY_ROIMG,
+    SYM_READONLY_RWIMG,
+    SYM_GLOBAL_SAMP, 
+    SYM_READONLY_SAMP,
+    SYM_GLOBAL_SIG32, 
+    SYM_READONLY_SIG32,
+    SYM_GLOBAL_SIG64, 
+    SYM_READONLY_SIG64,
+    SYM_FBARRIER,
+    SYM_LABEL,
+
+    SYM_MAXID
+};
+
+struct SymDesc
+{
+    unsigned    id;
+    const char* name;
+    unsigned    type;
+    unsigned    segment;
+};
+
+const char* getSymName(unsigned symId);
+unsigned    getSymType(unsigned symId);
+unsigned    getSymSegment(unsigned symId);
+bool        isSupportedSym(unsigned symId);
 
 //=============================================================================
 //=============================================================================
@@ -286,7 +341,12 @@ protected:
     virtual void appendPositive(unsigned val)
     {
         assert(VAL_MINID < val && val < VAL_MAXID);
-        for (const unsigned* vals = translateVal(val); *vals != 0; ++vals) Prop::appendPositive(*vals);
+        for (const unsigned* vals = translateVal(val); *vals != 0; ++vals)
+        {
+            if (isOperandProp(propId) && !isSupportedOperand(*vals)) continue;
+
+            Prop::appendPositive(*vals);
+        }
     }
 
     virtual void appendNegative(unsigned val)
@@ -294,6 +354,8 @@ protected:
         assert(VAL_MINID < val && val < VAL_MAXID);
         for (const unsigned* vals = translateVal(val); *vals != 0; ++vals) 
         {
+            if (isOperandProp(propId) && !isSupportedOperand(*vals)) continue;
+
             //F: This is to avoid problems with disassembler (it fails with assert if some operands are 0)
             if (PROP_D0 <= propId && propId <= PROP_S4 && *vals == O_NULL && !isPositive(*vals)) continue; 
             Prop::appendNegative(*vals); // replace "0" with INVALID_VAL_XXX

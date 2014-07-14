@@ -16,6 +16,7 @@
 #include "llvm/Function.h"
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Analysis/Loads.h"
+#include "llvm/AMDIntrinsicInfo.h"
 #include <map>
 #include <string>
 #include <cstdarg>
@@ -87,9 +88,6 @@ typedef  StringMap<int> Str2IntMap;
   
 class AMDLibCalls {
 public:
-  enum BLTIN_FUNC_KIND { FK_NORMAL, FK_NATIVE, FK_HALF , FK_HSAIL };
-  enum ELEMENT_TYPE    { ET_F32, ET_F64 };   // argument element type
-
   /*
     IDs will start from 1-arg functions, then 2-arg functions,
     etc. in order.
@@ -188,12 +186,8 @@ public:
     unsigned flags;
   };
 
-  struct FuncInfo {
-    char GFName[MAX_FNAME_SIZE+1];
+  struct FuncInfo : AMDIntrinsicInfo {
     BLTIN_FUNC_ID FID;
-    BLTIN_FUNC_KIND FKind;
-    ELEMENT_TYPE EType;
-    int VectorSize;
   };
    
 
@@ -238,11 +232,11 @@ private:
   // "FuncName" exists. It may creates a new function prototype based on return
   // type "RetTy" and parameter types given in va arg list. The va arg list ends
   // with a '0' (NULL) arg.
-  Constant* getFunction(Module *M, StringRef FuncName, Type *RetTy, ...);
-  Constant* getFunction(Module *M, FunctionType *FuncTy, StringRef FuncName);
+  Constant* getFunction(Module *M, StringRef FuncName, const AMDIntrinsicInfo& fInfo, Type *RetTy, ...);
+  Constant* getFunction(Module *M, FunctionType *FuncTy, StringRef FuncName, const AMDIntrinsicInfo& fInfo);
 
-  void getFunctionName(std::string& FuncName, const char* GFName, 
-                       BLTIN_FUNC_KIND FKind, ELEMENT_TYPE EType, int VSize);
+  std::string getFunctionName(const char* GFName, 
+                       AMDIntrinsicInfo::EKind kind, Type::TypeID type, int VSize);
 
   unsigned int getNumOfArgs(BLTIN_FUNC_ID FID) {
     return (FID < BFID_2IN_START)
@@ -250,11 +244,9 @@ private:
   }
 
   // Replace a normal function with its native version.
-  bool replaceWithNative(CallInst *CI, FuncInfo &FInfo);
+  bool replaceWithNative(CallInst *CI, const StringRef& bareName, const FuncInfo &FInfo);
 
-  bool parseFunctionName(StringRef FMangledName, FuncInfo &FInfo);
-
-  bool isPtrEncode(char c) { return (c == 'g' || c == 'l' || c == 'p'); }
+  StringRef parseFunctionName(const StringRef& FMangledName, FuncInfo *FInfo=NULL /*out*/);
 
   bool TDOFold(CallInst *CI, const DataLayout *DL, FuncInfo &FInfo);
 
@@ -276,7 +268,7 @@ private:
   bool fold_fma_mad(CallInst *CI, IRBuilder<> &B, FuncInfo &FInfo);
 
   // -fuse-native for sincos
-  bool sincosUseNative(CallInst *aCI, FuncInfo &FInfo, const char* Suffix);
+  bool sincosUseNative(CallInst *aCI, const FuncInfo &FInfo);
 
   // evaluate calls if calls' arguments are constants.
   bool evaluateScalarMathFunc(FuncInfo &FInfo, double& Res0,
@@ -308,24 +300,16 @@ private:
   bool fold_sincos(CallInst * CI, IRBuilder<> &B, AliasAnalysis * AA);
 
 private:
-  // prefix of sin/cos/sincos library calls.
-  const std::string getSinCosPrefix() { return "__sincos_"; }
-  const std::string getSinPrefix() { return "__sin_"; }
-  const std::string getCosPrefix() { return "__cos_"; }
   // Get a sincos function.
-  Function * getSinCosFunc(CallInst * UI, std::string Name);
-  // Get name of a sincos function.
-  std::string genSinCosName(StringRef Name);
-  // Get name of a sin or a cos function.
-  std::string genSinOrCosName(StringRef Name);
+  Function * getSinCosFunc(CallInst * UI, const AMDIntrinsicInfo& fInfo, unsigned AS);
   // Get insertion point at entry.
   BasicBlock::iterator getEntryIns(CallInst * UI);
   // Maximum instruction to scan.
   int getMaxInstsToScan() { return 30; }
   // Insert an Alloc instruction.
-  AllocaInst * insertAlloca(CallInst * UI, IRBuilder<> &B);
+  AllocaInst * insertAlloca(CallInst * UI, IRBuilder<> &B, const char *prefix);
   // Get a scalar native or HSAIL builtin signle argument FP function
-  Constant* getNativeOrHsailFunction(Module* M, StringRef Name, ELEMENT_TYPE EType);
+  Constant* getNativeOrHsailFunction(Module* M, StringRef Name, Type::TypeID EType);
 
 protected:
   CallInst *CI;

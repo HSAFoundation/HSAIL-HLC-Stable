@@ -14,6 +14,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "machineinstcount"
+#include <stdio.h>
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/StringExtras.h"
@@ -32,9 +33,6 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Target/TargetInstrInfo.h"
-
-//- dd
-#include <cstdio>
 
 #include <map>
 using namespace llvm;
@@ -115,9 +113,7 @@ namespace {
     }
     virtual ~MachineInstrCount() {
       if (RunOpt) {
-        //FILE *fp = ::fopen(DataFile.c_str(), "w");
-	//- dd
-        FILE *fp = fopen(DataFile.c_str(), "w");
+        FILE *fp = ::fopen(DataFile.c_str(), "w");
         if (fp) {
           char buffer[2048];
           for (StringMap<unsigned>::iterator opb = Opcodes.begin(),
@@ -125,17 +121,11 @@ namespace {
             // Only emit the instructions that have more hits than the cutoff count.
             if (opb->getValue() > CutoffCount) {
               memset(buffer, 0, sizeof(buffer));
-              //::sprintf(buffer,"%s:%d\n", opb->getKey().data(), opb->getValue());
-	      //- dd
-              sprintf(buffer,"%s:%d\n", opb->getKey().data(), opb->getValue());
-              //::fwrite(buffer, strlen(buffer), 1, fp);
-	      //- dd
-              fwrite(buffer, strlen(buffer), 1, fp);
+              ::sprintf(buffer,"%s:%d\n", opb->getKey().data(), opb->getValue());
+              ::fwrite(buffer, strlen(buffer), 1, fp);
             }
           }
-          //::fclose(fp);
-	  //- dd
-          fclose(fp);
+          ::fclose(fp);
         }
       }
     }

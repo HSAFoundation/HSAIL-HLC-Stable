@@ -23,7 +23,7 @@ namespace TESTGEN {
 class PropDesc
 {
 public:
-    static void init(unsigned machineModel);
+    static void init(unsigned machineModel, unsigned profile);
     static void clean();
 
 public:

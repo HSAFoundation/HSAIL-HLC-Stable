@@ -47,8 +47,6 @@ private:
   const HSAILSubtarget *Subtarget;
   const HSAILRegisterInfo *RegInfo;
   const DataLayout *DL;
-  bool HandleIncomingArgumentConversion(MachineInstr *MI, MachineBasicBlock *MBB) const;
-  bool HandleLDAConversion(MachineInstr *MI, MachineBasicBlock *MBB) const;
 public:
   /// NOTE: The constructor takes ownership of TLOF.
   explicit HSAILTargetLowering(HSAILTargetMachine &TM);
@@ -306,6 +304,15 @@ public:
   bool
     isLoadBitCastBeneficial(EVT load, EVT bitcast) const;
 
+  /// isVectorToScalarLoadStoreWidenBeneficial() - Return true if the vector
+  /// load or store packing into a larger scalar type is beneficial.
+  /// Width:     Width to load/store.
+  /// WidenVT:   The widen vector type to load to/store from.
+  /// N:         Load or store SDNode.
+  virtual bool
+  isVectorToScalarLoadStoreWidenBeneficial(unsigned Width, EVT WidenVT,
+                                           const MemSDNode *N) const;
+
 protected:
 
   /// findRepresentativeClass - Return the largest legal super-reg register class
@@ -313,6 +320,24 @@ protected:
   virtual std::pair<const TargetRegisterClass*, uint8_t>
   findRepresentativeClass(EVT VT) const;
 
+  /// Create kernel or function parameter scalar load and return its value.
+  /// If isLoad = false create an argument value store.
+  /// AddressSpace used to determine if that is a kernel or function argument.
+  /// ArgVT specifies expected value type where 'Ty' refers to the real
+  /// argument type from function's signature.
+  /// We have to use machine nodes here because loads and stores must be glued
+  /// together with the whole call sequence, while ISD::LOAD/STORE do not have
+  /// a glue operand. That also skips instruction selection, so faster.
+  /// If the call sequence is not glued we may have unrelated to call
+  /// instructions scheduled into the argscope if intent was argscope use.
+  /// This function inserts a load or store argument instruction with glue.
+  /// If InFlag contains glue it is used for inbound glue. Glue is produced as a
+  /// last result and can be consumed at will of the caller.
+  SDValue getArgLoadOrStore(SelectionDAG &DAG, EVT ArgVT, Type *Ty, bool isLoad,
+                            bool isSExt, unsigned AddressSpace,
+                            SDValue Ptr, SDValue ParamValue,
+                            unsigned index, DebugLoc dl, SDValue Chain,
+                            SDValue InFlag) const;
 
 public:
   //===--------------------------------------------------------------------===//
@@ -357,6 +382,19 @@ public:
   LowerCall(CallLoweringInfo &CLI,
                 SmallVectorImpl<SDValue> &InVals) const LLVM_OVERRIDE;
 
+  /// LowerCallResult - Lower the result values of an ISD::CALL into the
+  /// appropriate copies out of appropriate physical registers.  This assumes that
+  /// Chain/InFlag are the input chain/flag to use, and that TheCall is the call
+  /// being lowered.  The returns a SDNode with the same number of values as the
+  /// ISD::CALL.
+  SDValue LowerCallResult(SDValue Chain,
+                          SDValue& InFlag,
+                          const SmallVectorImpl<ISD::InputArg> &Ins,
+                          Type *type,
+                          DebugLoc dl,
+                          SelectionDAG &DAG,
+                          SmallVectorImpl<SDValue> &InVals,
+                          SDValue RetValue) const;
   /*
   /// CanLowerReturn - This hook should be implemented to check whether the
   /// return values described by the Outs array can fit into the return
@@ -449,14 +487,17 @@ public:
   SDValue 
   LowerROTL(SDValue Op, SelectionDAG &DAG) const;
 
-  SDValue 
+  SDValue
   LowerROTR(SDValue Op, SelectionDAG &DAG) const;
 
-  SDValue 
+  SDValue
   LowerBSWAP(SDValue Op, SelectionDAG &DAG) const;
 
   SDValue
   LowerLOAD(SDValue Op, SelectionDAG &DAG) const;
+
+  SDValue
+  LowerSTORE(SDValue Op, SelectionDAG &DAG) const;
 
   SDValue
   LowerATOMIC_LOAD(SDValue Op, SelectionDAG &DAG) const;
@@ -552,15 +593,6 @@ public:
   //===--------------------------------------------------------------------===//
   // Instruction Emitting Hooks
   //
-
-  // EmitInstrWithCustomInserter - This method should be implemented by targets
-  // that mark instructions with the 'usesCustomInserter' flag.  These
-  // instructions are special in various ways, which require special support to
-  // insert.  The specified MachineInstr is created but not inserted into any
-  // basic blocks, and this method is called to expand it into a sequence of
-  // instructions, potentially also creating new basic blocks and control flow.
-  virtual MachineBasicBlock*
-  EmitInstrWithCustomInserter(MachineInstr *MI, MachineBasicBlock *MBB) const;
 
   //===--------------------------------------------------------------------===//
   // Addressing mode description hooks (used by LSR etc).

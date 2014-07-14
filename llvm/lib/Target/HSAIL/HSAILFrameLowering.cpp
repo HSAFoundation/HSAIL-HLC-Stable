@@ -48,47 +48,7 @@ HSAILFrameLowering::targetHandlesStackFrameRounding() const
   return false;
 }
 #endif
-/// emitProlog/emitEpilog - These methods insert prolog and epilog code into
-/// the function.
-void
-HSAILFrameLowering::emitPrologue(MachineFunction &MF) const
-{
-  const TargetMachine &TM = MF.getTarget();
-  const HSAILSubtarget *Subtarget = &TM.getSubtarget<HSAILSubtarget>();
-  MachineFrameInfo *MFI = MF.getFrameInfo();
 
-  // If there are stack objects (usually spills, but could be local vars)
-  // and we're emitting code for flat addressing, emit the address of the
-  // fixed base register here. Emit the stof for flat addressing.
-  if (Subtarget->usesFlatAddr() && MFI->hasStackObjects()) {
-    MachineBasicBlock &MBB = MF.front();
-    MachineBasicBlock::iterator MBBI = MBB.begin();
-    DebugLoc DL = MBBI->getDebugLoc();
-    unsigned int Opc;
-    const HSAILTargetMachine *HTM = reinterpret_cast<const HSAILTargetMachine*>(&TM);
-    const HSAILRegisterInfo *HRI = HTM->getRegisterInfo();
-    const TargetInstrInfo &TII = *MF.getTarget().getInstrInfo();
-    Opc = Subtarget->is64Bit() ?
-        HSAIL::ldas_private_flat_addr64 : HSAIL::ldas_private_flat_addr32;
-    unsigned int reserved_base_reg =  HRI->getReservedLocalBaseReg(MF);
-    // Emit lda reg,[%stack]
-    MachineInstr *MIbase = BuildMI(MBB, MBBI, DL, TII.get(Opc), reserved_base_reg)
-           .addExternalSymbol("stack")
-           .addReg(0)
-           .addImm(0);
-    // Emit  stof_private reg,reg
-    Opc = Subtarget->is64Bit() ?
-        HSAIL::private_stof_u64 : HSAIL::private_stof_u32 ;
-    MachineInstr *MI_stof = BuildMI(MBB, MBBI, DL, TII.get(Opc), reserved_base_reg)
-        .addReg(reserved_base_reg);
-  }
-}
-
-void
-HSAILFrameLowering::emitEpilogue(MachineFunction &MF,
-                                 MachineBasicBlock &MBB) const
-{
-}
 #if 0
 /// spillCalleeSavedRegisters - Issues instruction(s) to spill all callee
 /// saved registers and returns true if it isn't possible / profitable to do

@@ -47,7 +47,6 @@ Inst appendInst(BrigContainer &container, unsigned instFormat)
     {
     case BRIG_INST_ADDR: return container.append<InstAddr>();
     case BRIG_INST_ATOMIC: return container.append<InstAtomic>();
-    case BRIG_INST_ATOMIC_IMAGE: return container.append<InstAtomicImage>();
     case BRIG_INST_BASIC: return container.append<InstBasic>();
     case BRIG_INST_BR: return container.append<InstBr>();
     case BRIG_INST_CMP: return container.append<InstCmp>();
@@ -57,6 +56,8 @@ Inst appendInst(BrigContainer &container, unsigned instFormat)
     case BRIG_INST_MEM: return container.append<InstMem>();
     case BRIG_INST_MEM_FENCE: return container.append<InstMemFence>();
     case BRIG_INST_MOD: return container.append<InstMod>();
+    case BRIG_INST_QUERY_IMAGE: return container.append<InstQueryImage>();
+    case BRIG_INST_QUERY_SAMPLER: return container.append<InstQuerySampler>();
     case BRIG_INST_QUEUE: return container.append<InstQueue>();
     case BRIG_INST_SEG: return container.append<InstSeg>();
     case BRIG_INST_SEG_CVT: return container.append<InstSegCvt>();

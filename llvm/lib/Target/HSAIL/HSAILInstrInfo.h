@@ -995,10 +995,6 @@ public:
   insertNoop(MachineBasicBlock &MBB,
              MachineBasicBlock::iterator MI) const;
 
-  /// getNoopForMachoTarget - Return the noop instruction to use for a noop.
-  virtual void
-  getNoopForMachoTarget(MCInst &NopInst) const;
-
   /// isPredicated - Returns true if the instruction is already predicated.
   ///
   virtual bool

@@ -206,19 +206,7 @@ AMDILPassConfig::AMDILPassConfig(AMDILTargetMachine *TM, PassManagerBase &PM)
 }
 
 bool AMDILPassConfig::addPreISel() {
-  AMDILTargetMachine &AMDTM = getAMDILTargetMachine();
-  if (AMDTM.getSubtargetImpl()->isSupported(AMDIL::Caps::UseMacroForCall)) {
-    addPass(createAMDILCreateKernelStubPass());
-  }
-  // Vector Coarsening as the current implementation does not support
-  // big endian yet.
-#ifdef AMD_LLVM_INTERNAL
-  if (getAMDILTargetMachine().getOptLevel() != CodeGenOpt::None &&
-      getAMDILTargetMachine().getDataLayout()->isLittleEndian()) {
-    addPass(createVectorCoarseningPass());
-    return true;
-  }
-#endif
+  addPass(createAMDILCreateKernelStubPass());
   return false;
 }
 

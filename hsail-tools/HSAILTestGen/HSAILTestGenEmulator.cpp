@@ -38,7 +38,6 @@ using Brig::BRIG_TYPE_U16X2;
 using HSAIL_ASM::InstBasic;
 using HSAIL_ASM::InstSourceType;
 using HSAIL_ASM::InstAtomic;
-using HSAIL_ASM::InstAtomicImage;
 using HSAIL_ASM::InstCmp;
 using HSAIL_ASM::InstCvt;
 using HSAIL_ASM::InstImage;

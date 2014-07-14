@@ -361,7 +361,15 @@ namespace llvm {
 /// @return The allocated memory. Could be NULL.
 inline void *operator new(size_t Bytes, llvm::MCContext &C,
                           size_t Alignment = 16) throw () {
-  return C.Allocate(Bytes, Alignment);
+  return C.Allocate(
+#if defined(AMD_OPENCL) || 1
+                    (unsigned)
+#endif
+                    Bytes,
+#if defined(AMD_OPENCL) || 1
+                    (unsigned)
+#endif
+                    Alignment);
 }
 /// @brief Placement delete companion to the new above.
 ///
@@ -395,7 +403,15 @@ inline void operator delete(void *Ptr, llvm::MCContext &C, size_t)
 /// @return The allocated memory. Could be NULL.
 inline void *operator new[](size_t Bytes, llvm::MCContext& C,
                             size_t Alignment = 16) throw () {
-  return C.Allocate(Bytes, Alignment);
+  return C.Allocate(
+#if defined(AMD_OPENCL) || 1
+                    (unsigned)
+#endif
+                    Bytes,
+#if defined(AMD_OPENCL) || 1
+                    (unsigned)
+#endif
+                    Alignment);
 }
 
 /// @brief Placement delete[] companion to the new[] above.

@@ -24,7 +24,6 @@ using HSAIL_ASM::DirectiveFbarrier;
 
 using HSAIL_ASM::InstBasic;
 using HSAIL_ASM::InstAtomic;
-using HSAIL_ASM::InstAtomicImage;
 using HSAIL_ASM::InstCmp;
 using HSAIL_ASM::InstCvt;
 using HSAIL_ASM::InstImage;
@@ -67,8 +66,8 @@ void BrigContext::emitVersion()
     version.brigMajor()    = BRIG_VERSION_BRIG_MAJOR;
     version.brigMinor()    = BRIG_VERSION_BRIG_MINOR;
 
-    version.machineModel() = isSmallModel? BRIG_MACHINE_SMALL : BRIG_MACHINE_LARGE;
-    version.profile()      = BRIG_PROFILE_FULL;
+    version.machineModel() = getModel();
+    version.profile()      = getProfile();
     version.code()         = container.insts().end();
 }
 
@@ -563,7 +562,7 @@ void BrigContext::emitCall(DirectiveFunction func, unsigned outArgs, unsigned in
         inst.operand(1) = target;
         inst.operand(2) = inList;
 
-        inst.width()    = getDefWidth(inst, isSmallModel? Brig::BRIG_MACHINE_SMALL : Brig::BRIG_MACHINE_LARGE); // Depends on operand 1
+        inst.width()    = getDefWidth(inst, getModel(), getProfile()); // Depends on operand 1
     }
     DirectiveArgScopeEnd e1 = getContainer().append<DirectiveArgScopeEnd>();
     e1.code() = getContainer().insts().end();

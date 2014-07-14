@@ -17,6 +17,8 @@
 
 #include <cassert>
 
+using HSAIL_ASM::validateProp;
+
 namespace TESTGEN {
 
 //==============================================================================
@@ -72,11 +74,6 @@ namespace TESTGEN {
 
 class TestGen : public InstDesc
 {
-private:
-    // Context in which all (temporary) test samples are created.
-    // This context and all generated code are thrown away at the end of test generation.
-    static Context context;
-
 private:    
     // Samples are necessary to check property values because these checks 
     // are performed on instructions (not on properties themselves).
@@ -108,9 +105,11 @@ private:
     TestGen(unsigned format, unsigned opcode, bool isBasicVariant) 
         : InstDesc(format, opcode), prmPropCurrent(0), isBasic(isBasicVariant) 
     {
-        positiveSample = context.createSample(format, opcode);
-        negativeSample = context.createSample(format, opcode);
+        positiveSample = getPlayground()->createSample(format, opcode);
+        negativeSample = getPlayground()->createSample(format, opcode);
     }
+
+    static Context* getPlayground();
 
     //==========================================================================
 public:
@@ -129,6 +128,8 @@ public:
 
     void dump() { dumpTestInst(positiveSample.getInst()); }
 
+    static void init();
+    static void clean();
     //==========================================================================
 public:
     // Generate next valid set of values for all primary properties;
@@ -137,7 +138,9 @@ public:
     {
         bool found = setAllPrimary(start);
         
-        assert(found || !start || isBasicVariant());
+        // Below is a list of conditions when there are no more tests.
+        // An interesting case is a GCN trig_preop instruction which cannot be supported with base profile.
+        assert(found || !start || isBasicVariant() || positiveSample.getOpcode() == Brig::BRIG_OPCODE_GCNTRIG_PREOP);
         if (!found) return false;
 
         setAllSecondary();
@@ -258,7 +261,7 @@ private:
 
         assert(validatePrimaryPosition(idx));
         positiveSample.set(propId, val);
-        return PropDesc::isValidProp(positiveSample.getInst(), propId); 
+        return isValidProp(positiveSample.getInst(), propId); 
     }
 
     bool isValidSecondary(unsigned idx) 
@@ -269,7 +272,7 @@ private:
         unsigned val    = getSecProp(idx)->getCurrentPositive();
 
         positiveSample.set(propId, val);
-        return PropDesc::isValidProp(positiveSample.getInst(), propId); 
+        return isValidProp(positiveSample.getInst(), propId); 
     }
 
     bool isInvalidPrimary(unsigned idx)
@@ -298,7 +301,7 @@ private:
 
         negativeSample.copyFrom(positiveSample);
         negativeSample.set(propId, val);
-        return !PropDesc::isValidProp(negativeSample.getInst(), propId); 
+        return !isValidProp(negativeSample.getInst(), propId); 
     }
 
     //==========================================================================
@@ -429,9 +432,9 @@ private:
     {
         assert(isBasicVariant());
 
-        return PropDesc::isValidProp(positiveSample.getInst(), PROP_FTZ)   &&
-               PropDesc::isValidProp(positiveSample.getInst(), PROP_ROUND) &&
-               PropDesc::isValidProp(positiveSample.getInst(), PROP_PACK);
+        return isValidProp(positiveSample.getInst(), PROP_FTZ)   &&
+               isValidProp(positiveSample.getInst(), PROP_ROUND) &&
+               isValidProp(positiveSample.getInst(), PROP_PACK);
     }
 
     // Remove InstMod-specific properties which are not present in instBasic format.
@@ -451,6 +454,17 @@ private:
         prmPropCurrent = idx;
         return res;
     }
+
+    //==========================================================================
+private:
+
+    static bool isValidProp(Inst inst, unsigned propId)
+    {
+        if (!PropDesc::isValidProp(inst, propId)) return false;
+        return validateProp(inst, propId, machineModel, profile, instSubset.isSet(SUBSET_IMAGE)) == 0;
+    }
+
+    //==========================================================================
 
 }; // class TestGen
 

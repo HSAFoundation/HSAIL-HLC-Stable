@@ -318,13 +318,16 @@ void AMDILAsmPrinter::EmitInstruction(const MachineInstr *II) {
     // when calling another kernel, don't call the wrapper, call the
     // kernel function directly
     StringRef Name = GV->getName();
-    if (AMDSymbolNames::isKernelFunctionName(Name))
+    bool IsKernel = false;
+    if (AMDSymbolNames::isKernelFunctionName(Name)) {
       Name = AMDSymbolNames::undecorateKernelFunctionName(Name);
+      IsKernel = true;
+    }
     uint32_t FuncNum = Name.empty()
                      ? mAMI->getOrCreateFunctionID(GV)
                      : mAMI->getOrCreateFunctionID(Name);
     mMFI->addCalledFunc(FuncNum);
-    if (curTarget->isSupported(AMDIL::Caps::UseMacroForCall)) {
+    if (IsKernel || curTarget->isSupported(AMDIL::Caps::UseMacroForCall)) {
       O << "\tmcall(" << FuncNum << ") (";
 
       // search for the RegMask Op
@@ -783,7 +786,10 @@ void AMDILAsmPrinter::addGlobalConstantArrayLiterals() {
 
 void AMDILAsmPrinter::EmitFunctionBodyStart() {
   const AMDILSubtarget *curTarget = mTM->getSubtargetImpl();
-  bool UseMacroForCall = curTarget->isSupported(AMDIL::Caps::UseMacroForCall);
+  bool IsKernel = mMFI->isKernel();
+  bool UseMacroForCall = IsKernel ||
+    curTarget->isSupported(AMDIL::Caps::UseMacroForCall);
+
   bool Is64Bit = curTarget->is64bit();
   SmallString<1024> Str;
   raw_svector_ostream O(Str);
@@ -791,7 +797,6 @@ void AMDILAsmPrinter::EmitFunctionBodyStart() {
   O << "";
   O << ";DEBUGEND\n";
   ++mBuffer;
-  bool IsKernel = mMFI->isKernel();
   uint32_t id = mName.empty()
     ? mAMI->getOrCreateFunctionID(MF->getFunction())
     : mAMI->getOrCreateFunctionID(mName);
@@ -818,10 +823,11 @@ void AMDILAsmPrinter::EmitFunctionBodyStart() {
     }
     mMeta->printArgCopies(O, this);
     assert(mMFI->getNumRetRegs() == 0 && "kernel return type not void");
-    // make call to stub
-    std::string StubName = UseMacroForCall?std::string(mMeta->getStubName()):mName;
+    // Make call to stub.
+    StringRef StubName
+      = UseMacroForCall ? mMeta->getStubName() : StringRef(mName);
     uint32_t StubID = mAMI->getOrCreateFunctionID(StubName);
-    if (UseMacroForCall) {
+    if (0 && UseMacroForCall) {
       O << "mcall(" << StubID << ") (), () ; " << StubName << "\n";
     } else {
       O << "call " << StubID << " ; " << StubName << "\n";
@@ -831,7 +837,7 @@ void AMDILAsmPrinter::EmitFunctionBodyStart() {
   }
 
   // emit the current function's header IL instruction
-  if (UseMacroForCall) {
+  if (UseMacroForCall && !AMDSymbolNames::isStubFunctionName(mName)) {
     O << "mdef(" << id << ")_out(" << mMFI->getRetNumVecRegs()
       << ")_in(" << mMFI->getArgNumVecRegs() << ")_outline ; " << mName << "\n";
   } else {
@@ -884,15 +890,21 @@ void AMDILAsmPrinter::EmitFunctionBodyEnd() {
   if (mName.empty()) {
     mName = Twine("unknown_").concat(Twine(ID)).str();
   }
-  if (mTM->getSubtargetImpl()->isSupported(AMDIL::Caps::UseMacroForCall)) {
+
+
+  bool IsKernel = mMFI->isKernel();
+  if ((IsKernel ||
+       mTM->getSubtargetImpl()->isSupported(AMDIL::Caps::UseMacroForCall)) &&
+      !AMDSymbolNames::isStubFunctionName(mName)) {
     O << "mend ; " << mName << "\n";
   } else {
     O << "ret\nendfunc ; " << mName << "\n";
   }
-  if (mAMI->isKernel(mKernelName)) {
+
+  if (IsKernel)
     mMeta->setName(mName);
-  }
-    mMeta->printMetaData(O, ID, false);
+
+  mMeta->printMetaData(O, ID, false);
 
   O << ";DEBUGSTART\n";
   O.flush();
@@ -900,10 +912,6 @@ void AMDILAsmPrinter::EmitFunctionBodyEnd() {
 }
 
 void AMDILAsmPrinter::EmitConstantPool() {
-  if (!mAMI->getKernel(mKernelName)) {
-    return;
-  }
-
   AMDILKernel *Tmp = mAMI->getKernel(mKernelName);
   if (!Tmp || !Tmp->mKernel) {
     return;

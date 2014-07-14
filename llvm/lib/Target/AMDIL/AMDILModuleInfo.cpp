@@ -231,10 +231,10 @@ bool AMDILModuleInfo::checkConstPtrsUseHW(llvm::Module::const_iterator *FCI) {
   Function::const_arg_iterator AI, AE;
   const Function *Func = *FCI;
   StringRef Name = Func->getName();
-  AMDILKernel *Kernel = mKernels[Name];
-  if (!Kernel || !Kernel->mKernel) {
+  AMDILKernel *Kernel = getKernel(Name);
+  if (!Kernel || !Kernel->mKernel)
     return false;
-  }
+
   if (mSTM->usesHardware(AMDIL::Caps::ConstantMem)) {
     for (AI = Func->arg_begin(), AE = Func->arg_end();
          AI != AE; ++AI) {

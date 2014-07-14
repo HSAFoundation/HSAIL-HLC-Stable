@@ -24,8 +24,8 @@ namespace TESTGEN {
 
 static PropDescImpl* impl = 0;
 
-void PropDesc::init(unsigned model)  { impl = new PropDescImpl(model); } 
-void PropDesc::clean()               { delete impl; impl = 0; } 
+void PropDesc::init(unsigned model, unsigned profile)  { impl = new PropDescImpl(model, profile); } 
+void PropDesc::clean()                                 { delete impl; impl = 0; } 
 
       bool      PropDesc::isBrigProp(unsigned propId)                                 { return PropDescImpl::isBrigProp(propId); }
 const unsigned* PropDesc::getPropVals(unsigned propId, unsigned& num)                 { return PropDescImpl::getPropVals(propId, num); }

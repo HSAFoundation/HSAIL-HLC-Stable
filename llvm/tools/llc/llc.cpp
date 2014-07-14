@@ -41,12 +41,6 @@
 #include <memory>
 using namespace llvm;
 
-#if defined(AMD_HSAIL)
-extern "C" void LLVMInitializeBRIGAsmPrinter();
-extern "C" void LLVMInitializeHSAILAsmPrinter();
-#endif
-
-
 // General options for llc.  Other pass-specific options are specified
 // within the corresponding llc passes, and target-specific options
 // and back-end code generation options are specified with the target machine.
@@ -71,11 +65,6 @@ TargetTriple("mtriple", cl::desc("Override target triple for module"));
 
 cl::opt<bool> NoVerify("disable-verify", cl::Hidden,
                        cl::desc("Do not verify input module"));
-
-#if defined(AMD_OPENCL) || 1
-extern llvm::cl::opt<bool> disableBrigLowering;
-extern bool loweringWithDisasm;
-#endif
 
 cl::opt<bool>
 DisableSimplifyLibCalls("disable-simplify-libcalls",
@@ -175,10 +164,8 @@ int main(int argc, char **argv) {
   // Initialize targets first, so that --version shows registered targets.
   InitializeAllTargets();
   InitializeAllTargetMCs();
-#if !defined(AMD_OPENCL) && 0
   InitializeAllAsmPrinters();
   InitializeAllAsmParsers();
-#endif
 
   // Initialize codegen and IR passes used by llc so that the -print-after,
   // -print-before, and -stop-after options work.
@@ -194,46 +181,6 @@ int main(int argc, char **argv) {
 
   cl::ParseCommandLineOptions(argc, argv, "llvm system compiler\n");
 
-#if defined(AMD_OPENCL) || 1
-  /* For HSAIL target we use override file type using following rules:
-     - if BRIG lowering was not disabled explicitly from command line:
-       * we always emit an object file using BRIG lowering;
-       * if file type is set to assembly file, special flag is set that forces emission of disassembled BRIG;
-     - if BRIG lowering was explicitly disabled:
-       * we always emit assembly text file (using HSAILAsmPrinter);
-  */
-  // In case filetype was not explicitly set in the command line
-  // or was set to CGFT_Auto
-  // choose filetype based on MArch
-  if ((MArch.compare("hsail") == 0) || (MArch.compare("hsail-64") == 0)) {
-    if (FileType == TargetMachine::CGFT_AssemblyFile) {
-      FileType = TargetMachine::CGFT_ObjectFile;
-      if (FileType.getNumOccurrences() > 0) {
-        // Text output was explicitly requested by the command line switch.
-        // Disasm mode for enabled lowering
-        // We'll still use object filetype but the output shall be the text containg disasm
-        // of a Brig Container obtained with Brig lowering phase
-        loweringWithDisasm = true;
-      }
-    }
-    if (disableBrigLowering) {
-      // For the old HSAIL path we force stream to be of assembly type
-      FileType = TargetMachine::CGFT_AssemblyFile;
-    }
-    // This guarantees that BRIG lowering would not be used without MCObjectStreamer
-    assert( (disableBrigLowering || FileType == TargetMachine::CGFT_ObjectFile) && "Wrong file type for BRIG lowering" );
-  }
-
-  // InitializeAllAsmPrinters moved after cl::ParseCommandLineOptions so that
-  // user can select between multiple asmprinters for a single target (e.g.,
-  // HSAIL target's HSAIL asm printer vs. BRIG lowering asm printer)
-  //
-  //InitializeAllAsmPrinters();
-  InitializeAllAsmParsers();
-  LLVMInitializeHSAILAsmPrinter();
-  LLVMInitializeBRIGAsmPrinter();
-
-#endif
   // Load the module to be compiled...
   SMDiagnostic Err;
   std::auto_ptr<Module> M;

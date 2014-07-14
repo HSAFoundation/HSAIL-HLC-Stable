@@ -108,6 +108,26 @@ static MVT getInt32VT(MVT VT) {
     : MVT::i32;
 }
 
+// Find a larger type to do a load / store of a vector with.
+static EVT getEquivalentMemType(LLVMContext &Ctx, EVT VT) {
+  unsigned StoreSize = VT.getStoreSizeInBits();
+  if (StoreSize <= 32)
+    return EVT::getIntegerVT(Ctx, StoreSize);
+
+  assert(StoreSize % 32 == 0 && "Store size not a multiple of 32");
+
+  return EVT::getVectorVT(Ctx, MVT::i32, StoreSize / 32);
+}
+
+// Type for a vector that will be loaded to.
+static EVT getEquivalentLoadRegType(LLVMContext &Ctx, EVT VT) {
+  unsigned StoreSize = VT.getStoreSizeInBits();
+  if (StoreSize <= 32)
+    return MVT::getIntegerVT(32);
+
+  return MVT::getVectorVT(MVT::i32, StoreSize / 32);
+}
+
 SDValue
 AMDILTargetLowering::LowerMemArgument(
     SDValue Chain,
@@ -195,48 +215,16 @@ void AMDILTargetLowering::setIntCondCodeActions(MVT::SimpleValueType VT) {
 }
 
 AMDILTargetLowering::AMDILTargetLowering(TargetMachine &TM)
-  : TargetLowering(TM, new TargetLoweringObjectFileELF()) {
+  : TargetLowering(TM, new TargetLoweringObjectFileELF()),
+    Subtarget(TM.getSubtarget<AMDILSubtarget>()) {
   setBooleanVectorContents(ZeroOrNegativeOneBooleanContent);
   setBooleanContents(ZeroOrNegativeOneBooleanContent);
 
-  int types[] = {
-    (int)MVT::i8,
-    (int)MVT::i16,
-    (int)MVT::i32,
-    (int)MVT::f32,
-    (int)MVT::f64,
-    (int)MVT::i64,
-    (int)MVT::v2i8,
-    (int)MVT::v4i8,
-    (int)MVT::v2i16,
-    (int)MVT::v4i16,
-    (int)MVT::v4f32,
-    (int)MVT::v4i32,
-    (int)MVT::v2f32,
-    (int)MVT::v2i32,
-    (int)MVT::v2f64,
-    (int)MVT::v2i64
-  };
-
-  int IntTypes[] =
-  {
-    (int)MVT::i8,
-    (int)MVT::i16,
-    (int)MVT::i32,
-    (int)MVT::i64
-  };
-
-  int FloatTypes[] =
-  {
-    (int)MVT::f32,
-    (int)MVT::f64
-  };
-
-  MVT::SimpleValueType VectorTypes[] = {
-    MVT::v2i8,
-    MVT::v4i8,
-    MVT::v2i16,
-    MVT::v4i16,
+  MVT::SimpleValueType Types[] = {
+    MVT::i32,
+    MVT::f32,
+    MVT::f64,
+    MVT::i64,
     MVT::v4f32,
     MVT::v4i32,
     MVT::v2f32,
@@ -244,48 +232,43 @@ AMDILTargetLowering::AMDILTargetLowering(TargetMachine &TM)
     MVT::v2f64,
     MVT::v2i64
   };
-  size_t numTypes = sizeof(types) / sizeof(*types);
-  size_t numFloatTypes = sizeof(FloatTypes) / sizeof(*FloatTypes);
-  size_t numIntTypes = sizeof(IntTypes) / sizeof(*IntTypes);
-  size_t numVectorTypes = sizeof(VectorTypes) / sizeof(*VectorTypes);
 
-  ISD::NodeType promoteOpCodes[] = {
-    ISD::AND, ISD::XOR, ISD::OR, ISD::SETCC,
-    ISD::SDIV, ISD::SREM, ISD::UDIV, ISD::UREM,
-    ISD::SHL, ISD::SRL, ISD::SRA
+  MVT::SimpleValueType IntTypes[] = {
+    MVT::i32,
+    MVT::i64
   };
 
-  // These are the current register classes that are
-  // supported
-  addRegisterClass(MVT::i32, &AMDIL::GPR_32RegClass);
-  addRegisterClass(MVT::f32, &AMDIL::GPR_32RegClass);
+  MVT::SimpleValueType FloatTypes[] = {
+    MVT::f32,
+    MVT::f64
+  };
+
+  MVT::SimpleValueType VectorTypes[] = {
+    MVT::v4f32,
+    MVT::v4i32,
+    MVT::v2f32,
+    MVT::v2i32,
+    MVT::v2f64,
+    MVT::v2i64
+  };
 
   const AMDILSubtarget *stm = &getTargetMachine().getSubtarget<AMDILSubtarget>();
+
+  // These are the current register classes that are
+  // supported.
+  addRegisterClass(MVT::i32, &AMDIL::GPR_32RegClass);
+  addRegisterClass(MVT::f32, &AMDIL::GPR_32RegClass);
 
   if (stm->isSupported(AMDIL::Caps::DoubleOps)) {
     addRegisterClass(MVT::f64, &AMDIL::GPR_64RegClass);
     addRegisterClass(MVT::v2f64, &AMDIL::GPRV2I64RegClass);
   }
 
-  if (stm->isSupported(AMDIL::Caps::ByteOps)) {
-    addRegisterClass(MVT::i8, &AMDIL::GPRI8RegClass);
-    addRegisterClass(MVT::v2i8, &AMDIL::GPRV2I8RegClass);
-    addRegisterClass(MVT::v4i8, &AMDIL::GPRV4I8RegClass);
-    setOperationAction(ISD::Constant          , MVT::i8   , Legal);
-    /*
-    for (unsigned x = 0, y = sizeof(promoteOpCodes)/sizeof(uint32_t); x < y; ++x) {
-      setOperationAction(promoteOpCodes[x], MVT::i8, Promote);
-      setOperationAction(promoteOpCodes[x], MVT::v2i8, Promote);
-      setOperationAction(promoteOpCodes[x], MVT::v4i8, Promote);
-      AddPromotedToType(promoteOpCodes[x], MVT::v2i8, MVT::v2i32);
-      AddPromotedToType(promoteOpCodes[x], MVT::v4i8, MVT::v4i32);
-  }
-    */
-  }
   addRegisterClass(MVT::v2f32, &AMDIL::GPRV2I32RegClass);
   addRegisterClass(MVT::v4f32, &AMDIL::GPRV4I32RegClass);
   addRegisterClass(MVT::v2i32, &AMDIL::GPRV2I32RegClass);
   addRegisterClass(MVT::v4i32, &AMDIL::GPRV4I32RegClass);
+
   if (stm->isSupported(AMDIL::Caps::LongOps)) {
     addRegisterClass(MVT::i64, &AMDIL::GPR_64RegClass);
     addRegisterClass(MVT::v2i64, &AMDIL::GPRV2I64RegClass);
@@ -303,17 +286,21 @@ AMDILTargetLowering::AMDILTargetLowering(TargetMachine &TM)
   setOperationAction(ISD::OR, MVT::v2i32, Custom);
   setOperationAction(ISD::OR, MVT::v4i32, Custom);
 
-
   // Workaround documented in DAGCombiner::visitSELECT
   // Avoid turning the (select setcc ..) back into select_cc
   setOperationAction(ISD::SELECT_CC, MVT::Other, Expand);
 
-  for (unsigned int x  = 0; x < numTypes; ++x) {
-    MVT VT(static_cast<MVT::SimpleValueType>(types[x]));
+  /*
+  setOperationAction(ISD::BITCAST, MVT::i16, Custom);
+  setOperationAction(ISD::BITCAST, MVT::v2i16, Custom);
+  setOperationAction(ISD::BITCAST, MVT::v4i16, Custom);
+  setOperationAction(ISD::BITCAST, MVT::v2i8, Custom);
+  setOperationAction(ISD::BITCAST, MVT::v4i8, Custom);
+  */
 
-    //FIXME: SIGN_EXTEND_INREG is not meaningful for floating point types
-    // We cannot sextinreg, expand to shifts
-    setOperationAction(ISD::SIGN_EXTEND_INREG, VT, Custom);
+  for (unsigned int i = 0; i < array_lengthof(Types); ++i) {
+    MVT VT(Types[i]);
+
     setOperationAction(ISD::EXTRACT_SUBVECTOR, VT, Custom);
     setOperationAction(ISD::FP_ROUND, VT, Expand);
     setOperationAction(ISD::SUBE, VT, Expand);
@@ -345,13 +332,14 @@ AMDILTargetLowering::AMDILTargetLowering(TargetMachine &TM)
 
     // TODO: Can possibly get rid of custom lowering of bitcasts after removing
     // the fake legal integer types.
-    setOperationAction(ISD::BITCAST, VT, Custom);
+    //setOperationAction(ISD::BITCAST, VT, Custom);
     setOperationAction(ISD::GlobalAddress, VT, Custom);
     setOperationAction(ISD::JumpTable, VT, Custom);
     setOperationAction(ISD::ConstantPool, VT, Custom);
     setOperationAction(ISD::SMUL_LOHI, VT, Expand);
     setOperationAction(ISD::UMUL_LOHI, VT, Expand);
     /*
+
     for (unsigned y = 0; y < numTypes; ++y) {
       MVT::SimpleValueType DVT = (MVT::SimpleValueType)types[y];
       setTruncStoreAction(VT, DVT, Expand);
@@ -360,6 +348,7 @@ AMDILTargetLowering::AMDILTargetLowering(TargetMachine &TM)
     setLoadExtAction(ISD::ZEXTLOAD, VT, Expand);
     setLoadExtAction(ISD::EXTLOAD, VT, Expand);
     */
+
     setOperationAction(ISD::INSERT_VECTOR_ELT, VT, Custom);
     setOperationAction(ISD::EXTRACT_VECTOR_ELT, VT, Custom);
   }
@@ -373,13 +362,54 @@ AMDILTargetLowering::AMDILTargetLowering(TargetMachine &TM)
 
   for (int I = MVT::FIRST_FP_VECTOR_VALUETYPE;
        I <= MVT::LAST_FP_VECTOR_VALUETYPE; ++I) {
-    MVT::SimpleValueType VT = static_cast<MVT::SimpleValueType>(I);
+    MVT VT(static_cast<MVT::SimpleValueType>(I));
     setLoadExtAction(ISD::EXTLOAD, VT, Expand);
   }
+
+  // Handling of i1 vectors seem to be broken in lots of places, so expand them.
+  // FIXME: They still seem to be broken even with expand. What is the correct
+  // behavior? Currently it seems to be packing the bits inside an i8, but
+  // should it really be promoted to v2i8?
+
+  setOperationAction(ISD::LOAD, MVT::v2i1, Expand);
+  setOperationAction(ISD::LOAD, MVT::v4i1, Expand);
+
+  setLoadExtAction(ISD::EXTLOAD, MVT::v2i1, Expand);
+  setLoadExtAction(ISD::SEXTLOAD, MVT::v2i1, Expand);
+  setLoadExtAction(ISD::ZEXTLOAD, MVT::v2i1, Expand);
+
+  setLoadExtAction(ISD::EXTLOAD, MVT::v4i1, Expand);
+  setLoadExtAction(ISD::SEXTLOAD, MVT::v4i1, Expand);
+  setLoadExtAction(ISD::ZEXTLOAD, MVT::v4i1, Expand);
+
+  setLoadExtAction(ISD::EXTLOAD, MVT::v2i8, Custom);
+  setLoadExtAction(ISD::SEXTLOAD, MVT::v2i8, Custom);
+  setLoadExtAction(ISD::ZEXTLOAD, MVT::v2i8, Custom);
+
+  setLoadExtAction(ISD::EXTLOAD, MVT::v4i8, Custom);
+  setLoadExtAction(ISD::SEXTLOAD, MVT::v4i8, Custom);
+  setLoadExtAction(ISD::ZEXTLOAD, MVT::v4i8, Custom);
+
+  setLoadExtAction(ISD::EXTLOAD, MVT::v2i16, Custom);
+  setLoadExtAction(ISD::SEXTLOAD, MVT::v2i16, Custom);
+  setLoadExtAction(ISD::ZEXTLOAD, MVT::v2i16, Custom);
+
+  setLoadExtAction(ISD::EXTLOAD, MVT::v4i16, Custom);
+  setLoadExtAction(ISD::SEXTLOAD, MVT::v4i16, Custom);
+  setLoadExtAction(ISD::ZEXTLOAD, MVT::v4i16, Custom);
 
   setTruncStoreAction(MVT::f64, MVT::f32, Expand);
   setTruncStoreAction(MVT::f64, MVT::f16, Expand);
   setTruncStoreAction(MVT::f32, MVT::f16, Expand);
+
+
+  setTruncStoreAction(MVT::v2i32, MVT::v2i1, Expand);
+  setTruncStoreAction(MVT::v4i32, MVT::v4i1, Expand);
+
+  setTruncStoreAction(MVT::v2i32, MVT::v2i16, Custom);
+  setTruncStoreAction(MVT::v2i32, MVT::v2i8, Custom);
+  setTruncStoreAction(MVT::v4i32, MVT::v4i8, Custom);
+  setTruncStoreAction(MVT::v4i32, MVT::v4i16, Custom);
 
   // TODO: Half op instructions provide these.
   //setOperationAction(ISD::FP_ROUND_INREG, MVT::f16, Promote);
@@ -388,6 +418,56 @@ AMDILTargetLowering::AMDILTargetLowering(TargetMachine &TM)
 
   setOperationAction(ISD::FP_EXTEND, MVT::v2f16, Expand);
   setOperationAction(ISD::FP_EXTEND, MVT::v2f32, Expand);
+
+  // We need to handle these cases for constant buffers / kernel arguments.
+  setOperationAction(ISD::LOAD, MVT::f32, Promote);
+  AddPromotedToType(ISD::LOAD, MVT::f32, MVT::i32);
+
+  setOperationAction(ISD::LOAD, MVT::v2f32, Promote);
+  AddPromotedToType(ISD::LOAD, MVT::v2f32, MVT::v2i32);
+
+  setOperationAction(ISD::LOAD, MVT::v4f32, Promote);
+  AddPromotedToType(ISD::LOAD, MVT::v4f32, MVT::v4i32);
+
+  setOperationAction(ISD::LOAD, MVT::v4f64, Custom);
+  setOperationAction(ISD::STORE, MVT::v4f64, Custom);
+  setOperationAction(ISD::LOAD, MVT::v4i64, Custom);
+  setOperationAction(ISD::STORE, MVT::v4i64, Custom);
+
+  setOperationAction(ISD::LOAD, MVT::f64, Promote);
+  AddPromotedToType(ISD::LOAD, MVT::f64, MVT::i64);
+
+  setOperationAction(ISD::LOAD, MVT::v2f64, Promote);
+  AddPromotedToType(ISD::LOAD, MVT::v2f64, MVT::v2i64);
+
+  setOperationAction(ISD::LOAD, MVT::i32, Custom);
+  setOperationAction(ISD::LOAD, MVT::v2i32, Custom);
+  setOperationAction(ISD::LOAD, MVT::v4i32, Custom);
+  setOperationAction(ISD::LOAD, MVT::v8i32, Custom);
+  setOperationAction(ISD::LOAD, MVT::v16i32, Custom);
+
+  setOperationAction(ISD::LOAD, MVT::i64, Custom);
+  setOperationAction(ISD::LOAD, MVT::v2i64, Custom);
+  setOperationAction(ISD::LOAD, MVT::v4i64, Custom);
+  setOperationAction(ISD::LOAD, MVT::v8i64, Custom);
+  setOperationAction(ISD::LOAD, MVT::v16i64, Custom);
+
+  setLoadExtAction(ISD::SEXTLOAD, MVT::i8, Custom);
+  setLoadExtAction(ISD::ZEXTLOAD, MVT::i8, Custom);
+  setLoadExtAction(ISD::EXTLOAD, MVT::i8, Custom);
+
+  setLoadExtAction(ISD::SEXTLOAD, MVT::i16, Custom);
+  setLoadExtAction(ISD::ZEXTLOAD, MVT::i16, Custom);
+  setLoadExtAction(ISD::EXTLOAD, MVT::i16, Custom);
+
+
+  setLoadExtAction(ISD::SEXTLOAD, MVT::v8i16, Custom);
+  setLoadExtAction(ISD::ZEXTLOAD, MVT::v8i16, Custom);
+  setLoadExtAction(ISD::EXTLOAD, MVT::v8i16, Custom);
+
+  setLoadExtAction(ISD::SEXTLOAD, MVT::i32, Expand);
+  setLoadExtAction(ISD::ZEXTLOAD, MVT::i32, Expand);
+  setLoadExtAction(ISD::EXTLOAD, MVT::i32, Expand);
 
   for (int I = MVT::FIRST_INTEGER_VECTOR_VALUETYPE;
        I <= MVT::LAST_INTEGER_VECTOR_VALUETYPE; ++I) {
@@ -401,13 +481,12 @@ AMDILTargetLowering::AMDILTargetLowering(TargetMachine &TM)
     setIntCondCodeActions(VT);
   }
 
-  for (unsigned x = 0; x < array_lengthof(FloatTypes); ++x) {
-    MVT::SimpleValueType VT = (MVT::SimpleValueType)FloatTypes[x];
+  for (unsigned I = 0; I < array_lengthof(FloatTypes); ++I) {
+    MVT VT(FloatTypes[I]);
     // IL does not have these operations for floating point types
     setOperationAction(ISD::FP_ROUND_INREG, VT, Expand);
     setOperationAction(ISD::FP_ROUND, VT, Custom);
   }
-
 
   for (int I = MVT::FIRST_FP_VALUETYPE;
        I <= MVT::LAST_FP_VALUETYPE; ++I) {
@@ -419,8 +498,8 @@ AMDILTargetLowering::AMDILTargetLowering(TargetMachine &TM)
     setFloatCondCodeActions(static_cast<MVT::SimpleValueType>(I));
   }
 
-  for (unsigned int x = 0; x < numIntTypes; ++x) {
-    MVT::SimpleValueType VT = (MVT::SimpleValueType)IntTypes[x];
+  for (unsigned int i = 0; i < array_lengthof(IntTypes); ++i) {
+    MVT VT(IntTypes[i]);
 
     // GPU also does not have divrem function for signed or unsigned
     setOperationAction(ISD::SDIVREM, VT, Expand);
@@ -442,9 +521,8 @@ AMDILTargetLowering::AMDILTargetLowering(TargetMachine &TM)
     setOperationAction(ISD::CTLZ, VT, Expand);
   }
 
-  for ( unsigned int ii = 0; ii < numVectorTypes; ++ii )
-  {
-    MVT::SimpleValueType VT = (MVT::SimpleValueType)VectorTypes[ii];
+  for (unsigned int i = 0; i < array_lengthof(VectorTypes); ++i) {
+    MVT VT(VectorTypes[i]);
 
     setOperationAction(ISD::BUILD_VECTOR, VT, Custom);
     setOperationAction(ISD::EXTRACT_SUBVECTOR, VT, Custom);
@@ -482,7 +560,6 @@ AMDILTargetLowering::AMDILTargetLowering(TargetMachine &TM)
   // setOperationAction(ISD::SELECT, MVT::v4f32, Legal);
   // setOperationAction(ISD::SELECT, MVT::v2i64, Legal);
   // setOperationAction(ISD::SELECT, MVT::v2f64, Legal);
-
 
   setOperationAction(ISD::FP_ROUND, MVT::Other, Expand);
   if (stm->isSupported(AMDIL::Caps::LongOps)) {
@@ -533,113 +610,34 @@ AMDILTargetLowering::AMDILTargetLowering(TargetMachine &TM)
     setOperationAction(ISD::SIGN_EXTEND, MVT::v2f64, Expand);
     setOperationAction(ISD::ZERO_EXTEND, MVT::v2f64, Expand);
     setOperationAction(ISD::ANY_EXTEND, MVT::v2f64, Expand);
-    setOperationAction(ISD::FABS, MVT::f64, Expand);
+    setOperationAction(ISD::FABS, MVT::f64, Legal);
     setOperationAction(ISD::FABS, MVT::v2f64, Expand);
     setOperationAction(ISD::SETCC, MVT::v2f64, Custom);
   }
 
-  // We only custom lower these because for now we're stuck with fake i8 and i16
-  // vector support, and Promote on vectors expects a type with the same size,
-  // and operating on that. Instead promote the elements.
-  setOperationAction(ISD::SRL, MVT::i8, Custom);
-  setOperationAction(ISD::SRL, MVT::v2i8, Custom);
-  setOperationAction(ISD::SRL, MVT::v4i8, Custom);
-  setOperationAction(ISD::SRA, MVT::i8, Custom);
-  setOperationAction(ISD::SRA, MVT::v2i8, Custom);
-  setOperationAction(ISD::SRA, MVT::v4i8, Custom);
-
-  setOperationAction(ISD::SRL, MVT::i16, Custom);
-  setOperationAction(ISD::SRL, MVT::v2i16, Custom);
-  setOperationAction(ISD::SRL, MVT::v4i16, Custom);
-  setOperationAction(ISD::SRA, MVT::i16, Custom);
-  setOperationAction(ISD::SRA, MVT::v2i16, Custom);
-  setOperationAction(ISD::SRA, MVT::v4i16, Custom);
-
-  setOperationAction(ISD::SETCC, MVT::i8, Custom);
-  setOperationAction(ISD::SETCC, MVT::v2i8, Custom);
-  setOperationAction(ISD::SETCC, MVT::v4i8, Custom);
-  setOperationAction(ISD::SETCC, MVT::i16, Custom);
-  setOperationAction(ISD::SETCC, MVT::v2i16, Custom);
-  setOperationAction(ISD::SETCC, MVT::v4i16, Custom);
-
-  /*setOperationAction(ISD::SETCC, MVT::i1, Promote);
-  AddPromotedToType(ISD::SETCC, MVT::i1, MVT::i32);
-  setOperationAction(ISD::SETCC, MVT::v2i1, Promote);
-  AddPromotedToType(ISD::SETCC, MVT::v2i1, MVT::v2i32);
-  setOperationAction(ISD::SETCC, MVT::v4i1, Promote);
-  AddPromotedToType(ISD::SETCC, MVT::v4i1, MVT::v4i32);*/
-
-  if (stm->isSupported(AMDIL::Caps::ShortOps)) {
-    // TODO: Remove Caps::ShortOps and these register classes.
-    addRegisterClass(MVT::i16, &AMDIL::GPRI16RegClass);
-    addRegisterClass(MVT::v2i16, &AMDIL::GPRV2I16RegClass);
-    addRegisterClass(MVT::v4i16, &AMDIL::GPRV4I16RegClass);
-
-    setOperationAction(ISD::Constant, MVT::i16, Promote);
-    for (int I = MVT::v1i16; I <= MVT::v16i16; ++I) {
-      MVT VT = static_cast<MVT::SimpleValueType>(I);
-      setOperationAction(ISD::Constant, VT, Promote);
-    }
-
-    /*
-    for (unsigned x = 0; x < array_lengthof(promoteOpCodes); ++x) {
-      setOperationAction(expandOpCodes[x], MVT::i16, Promote);
-      setOperationAction(expandOpCodes[x], MVT::v2i16, Expand);
-      setOperationAction(expandOpCodes[x], MVT::v4i16, Expand);
-      //AddPromotedToType(promoteOpCodes[x], MVT::v2i16, MVT::v1i32);
-      //AddPromotedToType(promoteOpCodes[x], MVT::v4i16, MVT::v2i32);
-    }
-    */
-
-    if (stm->hasShortOps()) {
-      setOperationAction(ISD::ADD, MVT::i16, Legal);
-      setOperationAction(ISD::SUB, MVT::i16, Legal);
-      setOperationAction(ISD::MUL, MVT::i16, Legal);
-      setOperationAction(ISD::SHL, MVT::i16, Legal);
-      setOperationAction(ISD::SRA, MVT::i16, Legal);
-      setOperationAction(ISD::SRL, MVT::i16, Legal);
-    }
+  if (stm->hasShortOps()) {
+    // TODO: There aren't really i16 registers, so this won't work. These should
+    // be selected by patterns checking that only the low 16-bits are demanded.10
+    setOperationAction(ISD::ADD, MVT::i16, Legal);
+    setOperationAction(ISD::SUB, MVT::i16, Legal);
+    setOperationAction(ISD::MUL, MVT::i16, Legal);
+    setOperationAction(ISD::SHL, MVT::i16, Legal);
+    setOperationAction(ISD::SRA, MVT::i16, Legal);
+    setOperationAction(ISD::SRL, MVT::i16, Legal);
   }
 
-  // TODO: These small vector type promotions should be able to just do the op
-  // on the register, but currently are still getting extra instructions to
-  // bitcast back and forth.
-  setOperationAction(ISD::AND, MVT::v2i16, Promote);
-  AddPromotedToType(ISD::AND, MVT::v2i16, MVT::i32);
-  setOperationAction(ISD::OR, MVT::v2i16, Promote);
-  AddPromotedToType(ISD::OR, MVT::v2i16, MVT::i32);
-  setOperationAction(ISD::XOR, MVT::v2i16, Promote);
-  AddPromotedToType(ISD::XOR, MVT::v2i16, MVT::i32);
-
-  setOperationAction(ISD::AND, MVT::v4i16, Promote);
-  AddPromotedToType(ISD::AND, MVT::v4i16, MVT::i64);
-  setOperationAction(ISD::OR, MVT::v4i16, Promote);
-  AddPromotedToType(ISD::OR, MVT::v4i16, MVT::i64);
-  setOperationAction(ISD::XOR, MVT::v4i16, Promote);
-  AddPromotedToType(ISD::XOR, MVT::v4i16, MVT::i64);
-
-  setOperationAction(ISD::AND, MVT::v2i8, Promote);
-  AddPromotedToType(ISD::AND, MVT::v2i8, MVT::i16);
-  setOperationAction(ISD::OR, MVT::v2i16, Promote);
-  AddPromotedToType(ISD::OR, MVT::v2i8, MVT::i16);
-  setOperationAction(ISD::XOR, MVT::v2i16, Promote);
-  AddPromotedToType(ISD::XOR, MVT::v2i8, MVT::i16);
-
-  setOperationAction(ISD::AND, MVT::v4i8, Promote);
-  AddPromotedToType(ISD::AND, MVT::v4i8, MVT::i32);
-  setOperationAction(ISD::OR, MVT::v4i16, Promote);
-  AddPromotedToType(ISD::OR, MVT::v4i8, MVT::i32);
-  setOperationAction(ISD::XOR, MVT::v4i16, Promote);
-  AddPromotedToType(ISD::XOR, MVT::v4i8, MVT::i32);
-
-  // TODO: Fix the UDIV24 algorithm so it works for these
-  // types correctly. This needs vector comparisons
-  // for this to work correctly.
-  setOperationAction(ISD::UDIV, MVT::v2i8, Expand);
-  setOperationAction(ISD::UDIV, MVT::v4i8, Expand);
-  setOperationAction(ISD::UDIV, MVT::v2i16, Expand);
-  setOperationAction(ISD::UDIV, MVT::v4i16, Expand);
   setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i1, Custom);
+  setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::v2i1, Custom);
+  setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::v4i1, Custom);
+  setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i8, Custom);
+  setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::v2i8, Custom);
+  setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::v4i8, Custom);
+  setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i16, Custom);
+  setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::v2i16, Custom);
+  setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::v4i16, Custom);
+  setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i32, Custom);
+  setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::Other, Custom);
+
   setOperationAction(ISD::SUBC, MVT::Other, Expand);
   setOperationAction(ISD::ADDE, MVT::Other, Expand);
   setOperationAction(ISD::ADDC, MVT::Other, Expand);
@@ -647,7 +645,6 @@ AMDILTargetLowering::AMDILTargetLowering(TargetMachine &TM)
   setOperationAction(ISD::BR_JT, MVT::Other, Expand);
   setOperationAction(ISD::BRIND, MVT::Other, Expand);
   setOperationAction(ISD::BR_CC, MVT::Other, Expand);
-  setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::Other, Expand);
   setOperationAction(ISD::FDIV, MVT::f32, Custom);
   setOperationAction(ISD::FDIV, MVT::v2f32, Custom);
   setOperationAction(ISD::FDIV, MVT::v4f32, Custom);
@@ -683,9 +680,27 @@ AMDILTargetLowering::AMDILTargetLowering(TargetMachine &TM)
 #endif
   computeRegisterProperties();
 
+  // The hardware has no true divide instruction.
+  setIntDivIsCheap(false);
+
   maxStoresPerMemcpy  = 4096;
   maxStoresPerMemmove = 4096;
   maxStoresPerMemset  = 4096;
+}
+
+// TODO: Use one in SelectionDAG
+static void ExtractVectorElements(SDValue Op, SelectionDAG &DAG,
+                                  SmallVectorImpl<SDValue> &Args,
+                                  unsigned Start,
+                                  unsigned Count) {
+  EVT VT = Op.getValueType();
+  EVT EltTy = VT.getVectorElementType();
+  DebugLoc DL = Op.getDebugLoc();
+  for (unsigned i = Start, e = Start + Count; i != e; ++i) {
+    Args.push_back(DAG.getNode(ISD::EXTRACT_VECTOR_ELT, DL,
+                               EltTy,
+                               Op, DAG.getConstant(i, MVT::i32)));
+  }
 }
 
 // This only works for region/local/global address spaces on EG/NI as
@@ -735,6 +750,7 @@ AMDILTargetLowering::getTargetNodeName(unsigned Opcode) const
     case AMDILISD::RET_FLAG: return "AMDILISD::RET_FLAG";
     case AMDILISD::BRANCH_COND: return "AMDILISD::BRANCH_COND";
     case AMDILISD::ADDADDR: return "AMDILISD::ADDADDR";
+    case AMDILISD::CONST_ADDRESS: return "AMDILISD::CONST_ADDRESS";
     case AMDILISD::ATOM_F_ADD: return "AMDILISD::ATOM_F_ADD";
     case AMDILISD::ATOM_F_AND: return "AMDILISD::ATOM_F_AND";
     case AMDILISD::ATOM_F_CMPXCHG: return "AMDILISD::ATOM_F_CMPXCHG";
@@ -1447,7 +1463,9 @@ AMDILTargetLowering::computeMaskedBitsForTargetNode(
   APInt KnownOne2;
   unsigned BitWidth = KnownZero.getBitWidth();
   KnownZero = KnownOne = APInt(BitWidth, 0); // Don't know anything
-  switch (Op.getOpcode()) {
+
+  unsigned Opc = Op.getOpcode();
+  switch (Opc) {
     default: break;
     case ISD::SELECT_CC:
     case AMDILISD::SELECT_CC:
@@ -1470,13 +1488,27 @@ AMDILTargetLowering::computeMaskedBitsForTargetNode(
              KnownOne &= KnownOne2;
              KnownZero &= KnownZero2;
              break;
+  case AMDILISD::IBIT_EXTRACT:
+  case AMDILISD::UBIT_EXTRACT: {
+    // TODO: Handle vectors.
+    ConstantSDNode *Width = dyn_cast<ConstantSDNode>(Op.getOperand(0));
+    if (!Width)
+      break;
 
+
+    uint32_t Val = Width->getAPIntValue().getZExtValue();
+    if (Opc == AMDILISD::IBIT_EXTRACT)
+      KnownOne = APInt::getHighBitsSet(32, 32 - Val);
+    else
+      KnownZero = APInt::getHighBitsSet(32, 32 - Val);
+
+    break;
+  }
   case AMDILISD::LCREATE2: {
     EVT HalfVT = Op.getOperand(0).getValueType();
     unsigned HalfBitWidth = HalfVT.getSizeInBits();
     APInt KnownZeroLo, KnownOneLo;
     APInt KnownZeroHi, KnownOneHi;
-
     DAG.ComputeMaskedBits(Op.getOperand(0), KnownZeroLo, KnownOneLo, Depth + 1);
     DAG.ComputeMaskedBits(Op.getOperand(1), KnownZeroHi, KnownOneHi, Depth + 1);
 
@@ -1504,10 +1536,10 @@ AMDILTargetLowering::computeMaskedBitsForTargetNode(
 
 // This is the function that determines which calling convention should
 // be used. Currently there is only one calling convention
-CCAssignFn*
-AMDILTargetLowering::CCAssignFnForNode(unsigned int CC, bool isReturn,
-    bool atCallSite) const
-{
+CCAssignFn *AMDILTargetLowering::CCAssignFnForNode(CallingConv::ID CC,
+                                                   bool isReturn,
+                                                   bool atCallSite,
+                                                   bool isKernel) const {
 #ifndef NDEBUG
   // stress testing passing args and returns on the stack
   if (getenv("AMD_OCL_STRESS_CALLING_CONV") && !isReturn) {
@@ -1519,15 +1551,18 @@ AMDILTargetLowering::CCAssignFnForNode(unsigned int CC, bool isReturn,
 #endif
 
   const AMDILSubtarget &STM = getTargetMachine().getSubtarget<AMDILSubtarget>();
-  if (!STM.isSupported(AMDIL::Caps::UseMacroForCall) || atCallSite) {
-    if (isReturn) {
+  // if (!STM.isSupported(AMDIL::Caps::UseMacroForCall) || atCallSite) {
+  if ((!STM.isSupported(AMDIL::Caps::UseMacroForCall) && !isKernel) ||
+      atCallSite) {
+    if (isReturn)
       return Call_RetCC_AMDIL32;
-    }
+
     return Call_CC_AMDIL32;
   }
-  if (isReturn) {
+
+  if (isReturn)
     return RetCC_AMDIL32;
-  }
+
   return CC_AMDIL32;
 }
 
@@ -1603,6 +1638,17 @@ AMDILTargetLowering::LowerOperation(SDValue Op, SelectionDAG &DAG) const
       LOWER(JumpTable);
       LOWER(ConstantPool);
       LOWER(ExternalSymbol);
+  case ISD::LOAD: {
+    SDValue Result = LowerLOAD(Op, DAG);
+    assert((!Result.getNode() ||
+            Result.getNode()->getNumValues() == 2) &&
+           "Load should return a value and a chain");
+    return Result;
+  }
+
+  case ISD::STORE:
+    return LowerSTORE(Op, DAG);
+
       LOWER(FP_TO_SINT);
       LOWER(FP_TO_UINT);
       LOWER(SINT_TO_FP);
@@ -1640,6 +1686,30 @@ void AMDILTargetLowering::ReplaceNodeResults(SDNode *N,
                                              SmallVectorImpl<SDValue> &Results,
                                              SelectionDAG &DAG) const {
   switch (N->getOpcode()) {
+  case ISD::SIGN_EXTEND_INREG:
+    // Different parts of legalization seem to interpret which type of
+    // sign_extend_inreg is the one to check for custom lowering. The extended
+    // from type is what really matters, but some places check for custom
+    // lowering of the result type. This results in trying to use
+    // ReplaceNodeResults to sext_in_reg to an illegal type, so we'll just do
+    // nothing here and let the illegal result integer be handled normally.
+    return;
+
+  case ISD::LOAD: {
+    SDValue Result = LowerLOAD(SDValue(N, 0), DAG);
+    Results.push_back(Result.getValue(0));
+    Results.push_back(Result.getValue(1));
+
+    // XXX: LLVM seems not to replace Chain Value inside CustomWidenLowerNode
+    // function
+    DAG.ReplaceAllUsesOfValueWith(SDValue(N, 1), Result.getValue(1));
+    break;
+  }
+
+  case ISD::BITCAST:
+    Results.push_back(LowerBITCAST(SDValue(N, 0), DAG));
+    break;
+
 #if 0
   case ISD::EXTRACT_VECTOR_ELT: {
     MVT VT = N->getValueType();
@@ -1705,9 +1775,11 @@ AMDILTargetLowering::LowerGlobalAddress(SDValue Op, SelectionDAG &DAG) const
     // when we figure out which local pointer is allocated in its own buffer.
     if (stm->usesHardware(AMDIL::Caps::LocalMem) &&
         AS == AMDILAS::LOCAL_ADDRESS) {
-      SDValue addr = DAG.getTargetGlobalAddress(G, DL, LocalPtrVT);
+      SDValue addr = DAG.getTargetGlobalAddress(G, DL, PtrVT);
       DST = DAG.getConstant(base_offset, MVT::i32);
-      DST = DAG.getNode(AMDILISD::ADDADDR, DL, LocalPtrVT, addr, DST);
+      DST = DAG.getNode(AMDILISD::ADDADDR, DL, LocalPtrVT,
+                        DAG.getNode(ISD::TRUNCATE, DL, LocalPtrVT, addr),
+                        DST);
       DST = DAG.getNode(ISD::ZERO_EXTEND, DL, PtrVT, DST);
     } else {
       DST = DAG.getConstant(arrayoffset, PtrVT);
@@ -1829,6 +1901,537 @@ AMDILTargetLowering::LowerExternalSymbol(SDValue Op, SelectionDAG &DAG) const
   SDValue Result = DAG.getTargetExternalSymbol(Sym, getPointerTy());
   return Result;
 }
+
+
+SDValue AMDILTargetLowering::ScalarizeVectorLoad(SDValue Op,
+                                                 SelectionDAG &DAG) const {
+  LoadSDNode *Load = cast<LoadSDNode>(Op);
+  EVT MemVT = Load->getMemoryVT();
+  EVT MemEltVT = MemVT.getVectorElementType();
+
+  EVT LoadVT = Op.getValueType();
+  EVT EltVT = LoadVT.getVectorElementType();
+
+  EVT PtrVT = Load->getBasePtr().getValueType();
+
+  unsigned NumElts = Load->getMemoryVT().getVectorNumElements();
+  SmallVector<SDValue, 8> Loads;
+  SmallVector<SDValue, 8> Chains;
+  DebugLoc SL = Op.getDebugLoc();
+
+  unsigned MemEltSize = MemEltVT.getStoreSize();
+  MachinePointerInfo SrcValue(Load->getMemOperand()->getValue());
+
+  for (unsigned i = 0; i < NumElts; ++i) {
+    SDValue Ptr = DAG.getNode(ISD::ADD, SL, PtrVT, Load->getBasePtr(),
+                              DAG.getConstant(i * MemEltSize, PtrVT));
+    SDValue NewLoad
+      = DAG.getExtLoad(Load->getExtensionType(), SL, EltVT,
+                       Load->getChain(), Ptr,
+                       SrcValue.getWithOffset(i * MemEltSize),
+                       MemEltVT, Load->isVolatile(), Load->isNonTemporal(),
+                       Load->getAlignment());
+    Loads.push_back(NewLoad.getValue(0));
+    Chains.push_back(NewLoad.getValue(1));
+  }
+
+  SDValue Ops[2] = {
+    DAG.getNode(ISD::BUILD_VECTOR, SL, LoadVT, Loads.data(), Loads.size()),
+    DAG.getNode(ISD::TokenFactor, SL, MVT::Other, Chains.data(), Chains.size())
+  };
+
+  return DAG.getMergeValues(Ops, 2, SL);
+}
+
+SDValue AMDILTargetLowering::SplitVectorLoad(SDValue Op,
+                                             SelectionDAG &DAG) const {
+  EVT VT = Op.getValueType();
+
+  // If this is a 2 element vector, we really want to scalarize and not create
+  // weird 1 element vectors.
+  if (VT.getVectorNumElements() == 2)
+    return ScalarizeVectorLoad(Op, DAG);
+
+  LoadSDNode *Load = cast<LoadSDNode>(Op);
+  SDValue Chain = Load->getChain();
+  SDValue BasePtr = Load->getBasePtr();
+  EVT PtrVT = BasePtr.getValueType();
+  EVT MemVT = Load->getMemoryVT();
+  DebugLoc SL = Op.getDebugLoc();
+
+  EVT LoVT, HiVT;
+  EVT LoMemVT, HiMemVT;
+  SDValue Lo, Hi;
+
+  llvm::tie(LoVT, HiVT) = DAG.GetSplitDestVTs(VT);
+  llvm::tie(LoMemVT, HiMemVT) = DAG.GetSplitDestVTs(MemVT);
+  llvm::tie(Lo, Hi) = DAG.SplitVector(Op, SL, LoVT, HiVT);
+
+  MachinePointerInfo SrcValue(Load->getMemOperand()->getValue());
+
+  SDValue LoLoad
+    = DAG.getExtLoad(Load->getExtensionType(), SL, LoVT,
+                     Chain, BasePtr,
+                     SrcValue,
+                     LoMemVT, Load->isVolatile(), Load->isNonTemporal(),
+                     Load->getAlignment());
+
+  SDValue HiPtr = DAG.getNode(ISD::ADD, SL, PtrVT, BasePtr,
+                              DAG.getConstant(LoMemVT.getStoreSize(), PtrVT));
+  SDValue HiLoad
+    = DAG.getExtLoad(Load->getExtensionType(), SL, HiVT,
+                     Chain, HiPtr,
+                     SrcValue.getWithOffset(LoMemVT.getStoreSize()),
+                     HiMemVT, Load->isVolatile(), Load->isNonTemporal(),
+                     Load->getAlignment());
+
+  SDValue Ops[2] = {
+    DAG.getNode(ISD::CONCAT_VECTORS, SL, VT, LoLoad, HiLoad),
+    DAG.getNode(ISD::TokenFactor, SL, MVT::Other,
+                LoLoad.getValue(1), HiLoad.getValue(1))
+  };
+
+  return DAG.getMergeValues(Ops, 2, SL);
+}
+
+// Extract the small type VT packed in a 32-bit integer, into a 32-bit vector,
+// and cast to a desired type.
+// (SrcVT = v4i8) -> v4i32 (0, 8, 16, 24)
+// (SrcVT = v2i16) -> v2i32 (0, 16)
+SDValue AMDILTargetLowering::unpackSmallVector(SelectionDAG &DAG,
+                                               SDValue Op,
+                                               DebugLoc DL,
+                                               EVT FinalVT,
+                                               EVT SrcVT,
+                                               bool Signed) const {
+  unsigned SrcBitSize = SrcVT.getScalarSizeInBits();
+
+  EVT LoadVT = Op.getValueType();
+
+  assert(LoadVT.getScalarType() == MVT::i32 &&
+         "All loads should be to an i32 vector");
+
+  unsigned LoadNElts = LoadVT.isVector() ? LoadVT.getVectorNumElements() : 1;
+  unsigned NElts = SrcVT.isVector() ? SrcVT.getVectorNumElements() : 1;
+
+  assert(NElts % LoadNElts == 0);
+
+  EVT FinalScalarVT = FinalVT.getScalarType();
+
+  SDValue Width = DAG.getConstant(SrcBitSize, MVT::i32);
+
+  unsigned NEltsPerLoadElt = NElts / LoadNElts;
+
+  // The small vector element has NElts packed into LoadNElts i32 components.
+  // TODO: Don't scalarize this. We can do a vector bit_extract.
+  SmallVector<SDValue, 8> Ops;
+  for (unsigned I = 0; I < LoadNElts; ++I) {
+    SDValue LoadElt = LoadNElts == 1 ?
+      Op :
+      DAG.getNode(ISD::EXTRACT_VECTOR_ELT, DL, MVT::i32, Op,
+                  DAG.getConstant(I, MVT::i32));
+
+    for (unsigned J = 0; J < NEltsPerLoadElt; ++J) {
+      SDValue Offset = DAG.getConstant(SrcBitSize * J, MVT::i32);
+      SDValue BFE
+        = DAG.getNode(Signed ? AMDILISD::IBIT_EXTRACT : AMDILISD::UBIT_EXTRACT,
+                      DL, MVT::i32, Width, Offset, LoadElt);
+
+      // Convert to the original type.
+      SDValue ExtOrig = DAG.getNode(Signed ? ISD::SIGN_EXTEND : ISD::ZERO_EXTEND,
+                                    DL, FinalScalarVT, BFE);
+      Ops.push_back(ExtOrig);
+    }
+  }
+
+  return DAG.getNode(ISD::BUILD_VECTOR, DL, FinalVT, Ops.data(), Ops.size());
+}
+
+SDValue AMDILTargetLowering::packSmallVector(SelectionDAG &DAG,
+                                             ArrayRef<SDValue> Elts,
+                                             DebugLoc DL,
+                                             EVT PackedVT) const {
+  unsigned BitWidth = PackedVT.getScalarSizeInBits();
+  SDValue BitWidthVal = DAG.getTargetConstant(BitWidth, MVT::i32);
+  unsigned NElts = Elts.size();
+
+  EVT StoreVT = getEquivalentMemType(*DAG.getContext(), PackedVT);
+
+  assert(NElts > 0);
+
+  int NPackedElts = StoreVT.isVector() ? StoreVT.getVectorNumElements() : 1;
+
+  // bit_insert(int width, int offset, int src2, int src3):
+  //   if (width != 0) {
+  //     int bitmask = (((1 << width) - 1) << offset) & 0xFFFFFFFF
+  //     dst = ((src2 << offset) & bitmask) | (src3 & ~bitmask)
+  //   }
+
+  assert(NElts % NPackedElts == 0);
+
+  SmallVector<SDValue, 4> PackedElts;
+  for (int I = 0; I < NPackedElts; ++I) {
+    SDValue Packed = DAG.getConstant(0, MVT::i32); // Could really be undef.
+    unsigned NEltsPerPack = NElts / NPackedElts;
+    for (unsigned J = 0; J < NEltsPerPack; ++J) {
+      uint32_t Offset = J * BitWidth;
+
+      SDValue Elt = Elts[NEltsPerPack * I + J];
+      Packed = DAG.getNode(AMDILISD::UBIT_INSERT,
+                           DL,
+                           MVT::i32,
+                           BitWidthVal,
+                           DAG.getTargetConstant(Offset, MVT::i32),
+                           Elt, // Replace bits from.
+                           Packed); // Replace bits in.
+    }
+
+    PackedElts.push_back(Packed);
+  }
+
+  if (NPackedElts == 1)
+    return PackedElts.front();
+
+  return DAG.getNode(ISD::BUILD_VECTOR, DL, StoreVT,
+                     PackedElts.data(), PackedElts.size());
+}
+
+static bool isConstantAddressBlock(unsigned AS) {
+  return AS >= AMDILAS::CONSTANT_BUFFER_0 && AS <= AMDILAS::CONSTANT_BUFFER_14;
+}
+
+// TODO: Struct loads are not handled, and end up being split into per-element
+// loads.
+SDValue AMDILTargetLowering::LowerLOAD(SDValue Op, SelectionDAG &DAG) const {
+  const LoadSDNode *Load = cast<LoadSDNode>(Op);
+  EVT MemEVT = Load->getMemoryVT();
+
+  if (!MemEVT.isSimple())
+    return SDValue();
+
+  DebugLoc DL = Op.getDebugLoc();
+  ISD::LoadExtType ExtType = Load->getExtensionType();
+  EVT VT = Op.getValueType();
+  MVT MemVT = MemEVT.getSimpleVT();
+  unsigned AS = Load->getAddressSpace();
+
+  unsigned StoreSize = MemVT.getStoreSizeInBits();
+  if (StoreSize > Subtarget.getMaxLoadSizeInBits(AS) && VT.isVector() &&
+      VT.isPow2VectorType() && (StoreSize % 32 == 0)) {
+    // Split in half.
+    return SplitVectorLoad(Op, DAG);
+  }
+
+  // Don't combine volatile loads, and instead scalarize them.
+  // XXX - Should this really not be OK for a volatile load?
+  if (MemVT.isVector() && Load->isVolatile())
+    return ScalarizeVectorLoad(Op, DAG);
+  // Custom unpack small vectors. We can load them in a single word, and then
+  // unpack with BFE instructions.
+  // e.g.
+  // v4i8 (load ...) ->
+  //   x = i32 load
+  //   trunc (build_vector (bfe x, 0, 8),
+  //                       (bfe x, 8, 8),
+  //                       (bfe x, 16, 8),
+  //                       (bfe x, 24, 8))
+  //
+  if (ExtType != ISD::NON_EXTLOAD &&
+      Subtarget.hasBFE() &&
+      MemVT.isVector() &&
+      MemVT.getScalarSizeInBits() < 32) {
+    assert(!VT.isFloatingPoint() && "FP ext loads not yet handled");
+
+    // Figure out what type to load as.
+    EVT LoadVT = getEquivalentMemType(*DAG.getContext(), MemVT);
+    EVT DestLoadVT = getEquivalentLoadRegType(*DAG.getContext(), MemVT);
+
+    // If we're loading a v2i8 as an i16, we need to do an extload of the i16 to
+    // i32.
+    ISD::LoadExtType NewLoadExt
+      = (LoadVT.getSizeInBits() < 32) ? ISD::ZEXTLOAD : ISD::NON_EXTLOAD;
+
+    // FIXME: We are ending up with an extra and x, 255 on the unpacked and
+    // extended vector, even though we know the upper bits have already been
+    // zeroed by the BFE.
+    SDValue NewLoad = DAG.getLoad(Load->getAddressingMode(),
+                                  NewLoadExt,
+                                  DestLoadVT,
+                                  DL,
+                                  Load->getChain(),
+                                  Load->getBasePtr(),
+                                  Load->getOffset(),
+                                  LoadVT,
+                                  Load->getMemOperand());
+
+    SDValue Ops[2] = {
+      unpackSmallVector(DAG, NewLoad, DL, VT, MemVT, ExtType == ISD::SEXTLOAD),
+      NewLoad.getValue(1)
+    };
+
+    return DAG.getMergeValues(Ops, 2, DL);
+  }
+
+  if (ExtType != ISD::NON_EXTLOAD && !VT.isVector() && VT.getSizeInBits() > 32) {
+    // We can do the extload to 32-bits, and then need to separately extend to
+    // 64-bits.
+
+    SDValue ExtLoad32 = DAG.getLoad(Load->getAddressingMode(),
+                                    ExtType, MVT::i32, DL,
+                                    Load->getChain(),
+                                    Load->getBasePtr(),
+                                    Load->getOffset(),
+                                    MemVT,
+                                    Load->getMemOperand());
+    SDValue Result = DAG.getNode(ISD::getExtForLoadExtType(ExtType),
+                                 DL, VT, ExtLoad32);
+
+    SDValue Ops[2] = {
+      Result,
+      ExtLoad32.getValue(1)
+    };
+
+    return DAG.getMergeValues(Ops, 2, DL);
+  }
+
+  if (ExtType == ISD::NON_EXTLOAD && VT.isVector() &&
+      MemVT.getScalarSizeInBits() == 64) {
+    EVT LoadVT = getEquivalentMemType(*DAG.getContext(), MemVT);
+    SDValue NewLoad = DAG.getLoad(Load->getAddressingMode(),
+                                  ISD::NON_EXTLOAD,
+                                  LoadVT,
+                                  DL,
+                                  Load->getChain(),
+                                  Load->getBasePtr(),
+                                  Load->getOffset(),
+                                  LoadVT,
+                                  Load->getMemOperand());
+
+    SDValue Ops[2] = {
+      DAG.getNode(ISD::BITCAST, DL, VT, NewLoad),
+      NewLoad.getValue(1)
+    };
+
+    return DAG.getMergeValues(Ops, 2, DL);
+  }
+
+  if (isConstantAddressBlock(AS)) {
+    SDValue Chain = Load->getChain();
+    SDValue Ptr = Load->getBasePtr();
+    int64_t Offset = Load->getSrcValueOffset();
+    unsigned CBId = AS - AMDILAS::CONSTANT_BUFFER_0;
+    MVT PtrVT = getPointerTy();
+
+    EVT LoadVT = getEquivalentLoadRegType(*DAG.getContext(), MemVT);
+
+    assert(MemVT.getStoreSizeInBits() <= 128);
+    assert((!VT.isVector() || ExtType == ISD::NON_EXTLOAD) &&
+           "Unexpected vector extload from constant buffer");
+    assert((Offset % 16 == 0) && "Unexpected src value offset");
+
+
+    // Each kernel parameter is 128-bit aligned.
+    // Convert to from bytes to 16-byte index.
+    SDValue NewPtr = DAG.getNode(ISD::SRL, DL, PtrVT,
+                                 Ptr, DAG.getConstant(4, PtrVT));
+    SDValue Result = DAG.getNode(AMDILISD::CONST_ADDRESS, DL, MVT::v4i32,
+                                 NewPtr, DAG.getTargetConstant(CBId, MVT::i32));
+
+    // Copy the entire 16-byte CB index, and then extract the components we
+    // need.
+
+    // FIXME: This is a hack to avoid needing to fix source swizzles, and only
+    // handles the cases we need to care about for kernel arguments.
+    if (LoadVT.isVector()) {
+      unsigned NElts = LoadVT.getVectorNumElements();
+      assert(NElts <= 4);
+
+      if (NElts < 4) {
+        SmallVector<SDValue, 8> NewElts;
+        EVT VecVT = EVT::getVectorVT(*DAG.getContext(), MVT::i32, NElts);
+        for (unsigned I = 0; I < NElts; ++I) {
+          SDValue Elt = DAG.getNode(ISD::EXTRACT_VECTOR_ELT, DL, MVT::i32,
+                                    Result, DAG.getConstant(I, MVT::i32));
+          NewElts.push_back(Elt);
+        }
+
+        Result = DAG.getNode(ISD::BUILD_VECTOR, DL, VecVT,
+                             NewElts.data(), NewElts.size());
+      }
+    } else {
+      Result = DAG.getNode(ISD::EXTRACT_VECTOR_ELT, DL, MVT::i32,
+                            Result, DAG.getConstant(0, MVT::i32));
+    }
+
+    if (ExtType == ISD::ZEXTLOAD) {
+      Result = DAG.getZeroExtendInReg(Result, DL, MemVT.getScalarType());
+    } else if (ExtType == ISD::SEXTLOAD) {
+      Result = DAG.getNode(ISD::SIGN_EXTEND_INREG, DL, LoadVT,
+                           Result,
+                           DAG.getValueType(MemVT.getScalarType()));
+    }
+
+    SDValue Ops[2] = {
+      Result,
+      Load->getChain()
+    };
+
+    return DAG.getMergeValues(Ops, 2, DL);
+  }
+
+  return SDValue();
+}
+
+SDValue AMDILTargetLowering::MergeVectorStore(SDValue Op,
+                                              SelectionDAG &DAG) const {
+  StoreSDNode *Store = cast<StoreSDNode>(Op);
+  EVT MemVT = Store->getMemoryVT();
+
+  if (!MemVT.isSimple())
+    return SDValue();
+
+  // Byte stores are really expensive, so if possible, try to pack 32-bit vector
+  // truncating store into an i32 store.
+  assert(MemVT.isVector() && "This only handles vector stores");
+
+  DebugLoc DL = Op.getDebugLoc();
+  SDValue Value = Store->getValue();
+  EVT VT = Value.getValueType();
+  SDValue Ptr = Store->getBasePtr();
+  unsigned MemBits = MemVT.getStoreSizeInBits();
+  EVT MemEltVT = MemVT.getVectorElementType();
+  unsigned MemEltBits = MemEltVT.getSizeInBits();
+  unsigned MemNumElements = MemVT.getVectorNumElements();
+  EVT PackedVT = getEquivalentMemType(*DAG.getContext(), MemVT);
+
+  if (!Store->isTruncatingStore()) {
+    if (MemEltBits != 64)
+      return SDValue();
+
+    EVT StoreVT = getEquivalentMemType(*DAG.getContext(), VT);
+    SDValue Cast = DAG.getNode(ISD::BITCAST, DL, StoreVT, Value);
+
+    return DAG.getStore(Store->getChain(), DL, Cast,
+                        Ptr, Store->getMemOperand());
+  }
+
+  SmallVector<SDValue, 8> Elts;
+  ExtractVectorElements(Value, DAG, Elts, 0, MemNumElements);
+  SDValue Packed = packSmallVector(DAG, Elts, DL, MemVT);
+
+  if (MemBits < 32) {
+    // Doing a byte or short store.
+    EVT StoreVT = getEquivalentMemType(*DAG.getContext(), PackedVT);
+    assert(Packed.getValueType() == MVT::i32);
+
+    return DAG.getTruncStore(Store->getChain(),
+                             DL,
+                             Packed,
+                             Ptr,
+                             StoreVT,
+                             Store->getMemOperand());
+  }
+
+  return DAG.getStore(Store->getChain(), DL, Packed,
+                      Ptr, Store->getMemOperand());
+}
+
+SDValue AMDILTargetLowering::ScalarizeVectorStore(SDValue Op,
+                                                  SelectionDAG &DAG) const {
+  StoreSDNode *Store = cast<StoreSDNode>(Op);
+  EVT MemEltVT = Store->getMemoryVT().getVectorElementType();
+  EVT EltVT = Store->getValue().getValueType().getVectorElementType();
+  EVT PtrVT = Store->getBasePtr().getValueType();
+  unsigned NumElts = Store->getMemoryVT().getVectorNumElements();
+  DebugLoc SL = Op.getDebugLoc();
+
+  unsigned EltSize = EltVT.getStoreSize();
+  MachinePointerInfo SrcValue(Store->getMemOperand()->getValue());
+
+  SmallVector<SDValue, 8> Chains;
+  for (unsigned i = 0, e = NumElts; i != e; ++i) {
+    SDValue Val = DAG.getNode(ISD::EXTRACT_VECTOR_ELT, SL, EltVT,
+                              Store->getValue(),
+                              DAG.getConstant(i, MVT::i32));
+    SDValue Ptr = DAG.getNode(ISD::ADD, SL, PtrVT,
+                              Store->getBasePtr(),
+                              DAG.getConstant(i * MemEltVT.getStoreSize(),
+                                              PtrVT));
+    SDValue NewStore =
+      DAG.getTruncStore(Store->getChain(), SL, Val, Ptr,
+                        SrcValue.getWithOffset(i * EltSize),
+                        MemEltVT, Store->isNonTemporal(), Store->isVolatile(),
+                        Store->getAlignment());
+    Chains.push_back(NewStore);
+  }
+
+  return DAG.getNode(ISD::TokenFactor, SL, MVT::Other,
+                     Chains.data(), Chains.size());
+}
+
+SDValue AMDILTargetLowering::SplitVectorStore(SDValue Op,
+                                              SelectionDAG &DAG) const {
+  StoreSDNode *Store = cast<StoreSDNode>(Op);
+  EVT MemVT = Store->getMemoryVT();
+  SDValue Val = Store->getValue();
+  EVT VT = Val.getValueType();
+
+  SDValue Chain = Store->getChain();
+  SDValue BasePtr = Store->getBasePtr();
+  DebugLoc SL = Op.getDebugLoc();
+
+  EVT LoVT, HiVT;
+  EVT LoMemVT, HiMemVT;
+  SDValue Lo, Hi;
+
+  llvm::tie(LoVT, HiVT) = DAG.GetSplitDestVTs(VT);
+  llvm::tie(LoMemVT, HiMemVT) = DAG.GetSplitDestVTs(MemVT);
+  llvm::tie(Lo, Hi) = DAG.SplitVector(Val, SL, LoVT, HiVT);
+
+  EVT PtrVT = BasePtr.getValueType();
+  SDValue HiPtr = DAG.getNode(ISD::ADD, SL, PtrVT, BasePtr,
+                              DAG.getConstant(LoMemVT.getStoreSize(), PtrVT));
+
+  MachinePointerInfo SrcValue(Store->getMemOperand()->getValue());
+  SDValue LoStore
+    = DAG.getTruncStore(Chain, SL, Lo,
+                        BasePtr,
+                        SrcValue,
+                        LoMemVT,
+                        Store->isNonTemporal(),
+                        Store->isVolatile(),
+                        Store->getAlignment());
+  SDValue HiStore
+    = DAG.getTruncStore(Chain, SL, Hi,
+                        HiPtr,
+                        SrcValue.getWithOffset(LoMemVT.getStoreSize()),
+                        HiMemVT,
+                        Store->isNonTemporal(),
+                        Store->isVolatile(),
+                        Store->getAlignment());
+
+  return DAG.getNode(ISD::TokenFactor, SL, MVT::Other, LoStore, HiStore);
+}
+
+SDValue AMDILTargetLowering::LowerSTORE(SDValue Op, SelectionDAG &DAG) const {
+  StoreSDNode *Store = cast<StoreSDNode>(Op);
+  EVT MemVT = Store->getMemoryVT();
+
+  if (!MemVT.isVector())
+    return SDValue();
+
+  if (Store->isVolatile())
+    return ScalarizeVectorStore(Op, DAG);
+
+  unsigned AS = Store->getAddressSpace();
+  if (MemVT.getStoreSizeInBits() > Subtarget.getMaxStoreSizeInBits(AS)) {
+    // Store instructions are all for 128 bits or less, so split in half.
+    return SplitVectorStore(Op, DAG);
+  }
+
+  return AMDILTargetLowering::MergeVectorStore(Op, DAG);
+}
+
 /// LowerFORMAL_ARGUMENTS - transform physical registers into
 /// virtual registers and generate load operations for
 /// arguments places on the stack.
@@ -1842,8 +2445,7 @@ AMDILTargetLowering::LowerFormalArguments(SDValue Chain,
     SelectionDAG &DAG,
     SmallVectorImpl<SDValue> &InVals) const{
   MachineFunction &MF = DAG.getMachineFunction();
-  AMDILMachineFunctionInfo *FuncInfo
-    = MF.getInfo<AMDILMachineFunctionInfo>();
+  AMDILMachineFunctionInfo *FuncInfo = MF.getInfo<AMDILMachineFunctionInfo>();
   MachineFrameInfo *MFI = MF.getFrameInfo();
   //const Function *Fn = MF.getFunction();
   //MachineRegisterInfo &RegInfo = MF.getRegInfo();
@@ -1855,14 +2457,16 @@ AMDILTargetLowering::LowerFormalArguments(SDValue Chain,
   CCState CCInfo(CC, isVarArg, DAG.getMachineFunction(),
                  getTargetMachine(), ArgLocs, *DAG.getContext());
 
+  bool IsKernel = FuncInfo->isKernel();
   // When more calling conventions are added, they need to be chosen here
-  CCInfo.AnalyzeFormalArguments(Ins, CCAssignFnForNode(CallConv, false, false));
+  CCInfo.AnalyzeFormalArguments(Ins, CCAssignFnForNode(CallConv, false,
+                                                       false, IsKernel));
 
   // first and last vector register used for input/output at a call site
   unsigned FirstReg = AMDIL::IN0;
   unsigned LastReg = AMDIL::IN255;
   const AMDILSubtarget &STM = getTargetMachine().getSubtarget<AMDILSubtarget>();
-  if (!STM.isSupported(AMDIL::Caps::UseMacroForCall)) {
+  if (!IsKernel && !STM.isSupported(AMDIL::Caps::UseMacroForCall)) {
     FirstReg = AMDIL::R1;
     LastReg = AMDIL::R1012;
   }
@@ -1996,127 +2600,330 @@ AMDILTargetLowering::LowerMemOpCallTo(SDValue Chain,
   return PtrOff;
 }
 
+// Promote the value if needed.
+static SDValue promoteCCVal(SelectionDAG &DAG,
+                            DebugLoc DL,
+                            CCValAssign::LocInfo LI,
+                            EVT LocVT,
+                            SDValue Op) {
+  switch (LI) {
+  default:
+    llvm_unreachable("Unknown loc info!");
+  case CCValAssign::Full:
+  case CCValAssign::BCvt:
+    return Op;
+  case CCValAssign::SExt:
+    return DAG.getNode(ISD::SIGN_EXTEND, DL, LocVT, Op);
+  case CCValAssign::ZExt:
+    return DAG.getNode(ISD::ZERO_EXTEND, DL, LocVT, Op);
+  case CCValAssign::AExt:
+    return DAG.getNode(ISD::ANY_EXTEND, DL, LocVT, Op);
+  }
+}
+
+// Temporary hack to fix 3-vector arguments by manually widening to the
+// 4-vector physical register type. This avoids creating creating an
+// unpromotable Register node with an illegal v3 type. This should not be
+// necessary when kernel args are treated correct as loads.
+static SDValue loadVec3ArgAsVec4(SelectionDAG &DAG,
+                                 DebugLoc dl,
+                                 SDValue ArgLoad,
+                                 EVT ExtVecVT) {
+  SmallVector<SDValue, 4> Elts;
+  EVT EltVT = ExtVecVT.getVectorElementType();
+  EVT WideVecVT = EVT::getVectorVT(*DAG.getContext(), EltVT, 4);
+
+  ExtractVectorElements(ArgLoad, DAG, Elts, 0, 3);
+  Elts.push_back(DAG.getUNDEF(EltVT));
+
+  return DAG.getNode(ISD::BUILD_VECTOR, dl, WideVecVT,
+                     Elts.data(), Elts.size());
+}
+
+// FIXME: This is a hack. Kernel arguments are not passed in registers, and
+// should not be modeled as such. They are loads, and this should all be
+// handled in LowerFormalArguments. A kernel calling convention should specify
+// kernel arguments are passed in memory, and set up the argument offsets.
+//
+// What happens now is hard to follow. First, as things worked before (and
+// still do with macro calls disabled), the AsmPrinter directly prints out
+// argument setup, calls into the "body" of the kernel function and then those
+// registers are assumed to hold the kernel arguments. This doesn't have the
+// correct information about the used registers from the generated calling
+// convention and types as is available here in lowering, and makes various
+// broken assumptions about the number and type of used registers, as well as
+// being a hack which will not work in future versions of LLVM which are
+// moving to prevent directly printing text instructions.
+//
+// With macro calls, this setup still occurs, but is then just ignored. The
+// assumption about kernel arguments being passed as registers is moved here
+// and handled somewhat differently differently, but still wrong. This
+// pretends that there is a call to the kernel that has a special argument
+// setup. Here sets up loads from the CBs (which are modelled as special
+// registers instead of memory), and then sets up a call to a "normal" macro
+// function.
+//
+// This all needs to be fixed by creating a kernel calling convention that
+// sets up load from the CBs in LowerFormalArguments. The prelude emitted in
+// the AsmPrinter needs to be removed, and the call to the true kernel body
+// should not involve a call, particularly a macro call.
+
 // Setup and return the source of kernel arguments.
 // See the runtime ABI doc for the ABI of kernel arg passing from runtime
 // to compiled code.
-SDValue
-AMDILTargetLowering::BuildKernelArgVal(ArgListEntry &Arg, unsigned NumParts,
-    unsigned PartIdx, SDValue OutVal, EVT VT, SDValue &Chain, unsigned &CBIdx,
-    SelectionDAG &DAG) const
-{
+void AMDILTargetLowering::BuildKernelArgVal(
+  SmallVectorImpl<SDValue> &Result,
+  ArgListEntry &Arg,
+  unsigned NumParts,
+  SDValue OutVal,
+  EVT VT,
+  EVT ArgVT,
+  SDValue &Chain,
+  unsigned &CBIdx,
+  SelectionDAG &DAG) const {
   assert(VT.isSimple() && "unexpected kernel arg type");
   assert(CBIdx < 256 && "too many kernel args for CB1 registers");
   DebugLoc dl;
-  MVT I32VT = MVT::getIntegerVT(32);
+  MVT PtrVT = getPointerTy();
 
   // Handle the case that the kernel arg is an image pointer
   if (const PointerType *PTy = dyn_cast<PointerType>(Arg.Ty)) {
     const Type *ETy = PTy->getElementType();
     if (isImageType(ETy)) {
-      SDValue Val = DAG.getConstant(CBIdx, I32VT);
+      SDValue Val = DAG.getConstant(CBIdx, MVT::i32);
       CBIdx += NUM_EXTRA_SLOTS_PER_IMAGE + 1;
-      return Val;
+      Result.push_back(Val);
+      return;
+    }
+
+    if (PTy->getAddressSpace() == AMDILAS::CONSTANT_ADDRESS &&
+        Subtarget.usesHardware(AMDIL::Caps::ConstantMem)) {
+      ++CBIdx; // This still reserves an argument index.
+      Result.push_back(DAG.getConstant(0, MVT::i32));
+      return;
     }
   }
 
-  // Byval struct type kernel arg has been passed through pointer to
-  // stack mem. Copy the struct value from cb1 to stack mem.
+  // Byval struct type kernel arg has been passed through pointer to stack
+  // mem. Copy the struct value from cb1 to stack mem.
+  // TODO: In principle we shouldn't have to do this if the struct is never
+  // modified which is the common case.
   if (isa<FrameIndexSDNode>(OutVal.getNode())) {
     PointerType *PTy = dyn_cast<PointerType>(Arg.Ty);
     assert(PTy && PTy->getAddressSpace() == AMDILAS::PRIVATE_ADDRESS);
     StructType *STy = cast<StructType>(PTy->getElementType());
-    MVT V4I32VT = MVT::getVectorVT(I32VT, 4);
-    unsigned Size = getDataLayout()->getTypeStoreSize(STy);
-    // align to 16 bytes boundary
-    Size = (Size + 15) & ~15;
+    unsigned OrigSize = getDataLayout()->getTypeStoreSize(STy);
+    unsigned Size = DataLayout::RoundUpAlignment(OrigSize, 16);
+
+    PointerType *SrcPtrTy = PointerType::get(STy, AMDILAS::CONSTANT_BUFFER_1);
+    MachinePointerInfo SrcPtrInfo(UndefValue::get(SrcPtrTy));
+
+    SmallVector<SDValue, 8> Chains;
+
     for (unsigned Offset = 0; Offset < Size; Offset += 16, ++CBIdx) {
-      assert(CBIdx < 256 && "too many kernel args for CB1 registers");
-      unsigned RegNum = AMDIL::CB1_0 + CBIdx;
-      SDValue Reg = DAG.getRegister(RegNum, V4I32VT);
-      SDValue Ptr = OutVal;
-      if (Offset > 0) {
-        // generat FI + Offset for store address
-        Ptr = DAG.getNode(ISD::ADD, dl, Ptr.getValueType(),
-                          Ptr, DAG.getConstant(Offset, Ptr.getValueType()));
+      assert(CBIdx < 256 && "Too many kernel args for CB1 registers.");
+
+      // Convert to bytes.
+      SDValue SrcPtr = DAG.getConstant(16 * CBIdx, PtrVT);
+
+      SDValue PartLoad = DAG.getLoad(MVT::v4i32,
+                                     dl,
+                                     Chain,
+                                     SrcPtr,
+                                     SrcPtrInfo.getWithOffset(Offset),
+                                     false, // isVolatile
+                                     true, // isNonTemporal
+                                     true, // isInvariant
+                                     16);
+      SDValue DestPtr = OutVal;
+      if (Offset != 0) {
+        // Generate FI + Offset for store address.
+        DestPtr = DAG.getNode(ISD::ADD, dl, DestPtr.getValueType(),
+                              DestPtr,
+                              DAG.getConstant(Offset, DestPtr.getValueType()));
       }
-      MachinePointerInfo PtrInfo(NULL, Offset);
-      Chain = DAG.getStore(Chain, dl, Reg, Ptr, PtrInfo, false/*isVolatile*/,
-                           true/*isNonTemporal*/, 16/*Alignment*/);
+
+      MachinePointerInfo DestPtrInfo(NULL, Offset);
+      SDValue Tmp = DAG.getStore(Chain, dl, PartLoad, DestPtr,
+                                 DestPtrInfo,
+                                 false /* isVolatile */,
+                                 true /* isNonTemporal */,
+                                 16 /* Alignment */);
+      Chains.push_back(Tmp);
     }
-    return OutVal;
+
+    Chain = DAG.getNode(ISD::TokenFactor, dl, MVT::Other,
+                        Chains.data(), Chains.size());
+
+    Result.push_back(OutVal);
+    return;
   }
 
-  // Handle the case that the kernel arg is a vector of elem size < 4byte
-  // Extract element-by-element from the cb1 entry, then form a vector of the
-  // extracted elements
-  if (VT.isVector()) {
-    EVT ElemVT = VT.getVectorElementType();
-    unsigned ElemBits = ElemVT.getSizeInBits();
-    if (ElemBits < 32) {
-      assert((ElemBits == 8 || ElemBits == 16) &&
-             "unexpected vector elem size");
-      SDValue Reg;
-      SDValue Width = DAG.getConstant(ElemBits, I32VT);
-      unsigned nElem = VT.getVectorNumElements();
-      SmallVector<SDValue, 4> Ops;
-      for (unsigned Offset = 0, i = 0; i < nElem; Offset += ElemBits, ++i) {
-        assert(Offset < 64 && "unexpected kernel arg type");
-        if (Offset % 32 == 0) {
-          unsigned RegNum = (Offset == 0) ? AMDIL::CB1_x0 : AMDIL::CB1_y0;
-          Reg = DAG.getRegister(RegNum + CBIdx, I32VT);
-        }
-        SDValue OffsetSD = DAG.getConstant(Offset % 32, I32VT);
-        SDValue N = DAG.getNode(AMDILISD::UBIT_EXTRACT,
-                                dl, I32VT, Width, OffsetSD, Reg);
-        Ops.push_back(N);
+  unsigned ArgSize = ArgVT.getStoreSize();
+  if (ArgVT.isVector()) {
+    EVT ExtVecVT = EVT::getVectorVT(*DAG.getContext(),
+                                    VT.getScalarType(),
+                                    ArgVT.getVectorNumElements());
+    PointerType *PtrTy
+      = PointerType::get(ArgVT.getTypeForEVT(*DAG.getContext()),
+                         AMDILAS::CONSTANT_BUFFER_1);
+
+    ISD::LoadExtType Ext = ISD::NON_EXTLOAD;
+    if (ArgVT.getScalarSizeInBits() < 32)
+      Ext = Arg.isSExt ? ISD::SEXTLOAD : ISD::ZEXTLOAD;
+
+    if (ArgVT.getScalarSizeInBits() < 32) {
+      // The ABI for kernel arguments is really stupid. It neither packs
+      // efficiently, nor avoids extend operations. 8 and 16-bit vectors have 4
+      // components packed into the low 32-bit component of the 128-bit CB
+      // index. The next 4 are then 128-bit aligned in the next index.
+
+      unsigned ArgNElts = ArgVT.getVectorNumElements();
+
+      // FIXME
+      unsigned LoadElts = ArgNElts == 3 ? 4 : ArgNElts;
+
+      // We're really loading 4 elements at a time with a gap in between.
+      EVT RealMemVT = EVT::getVectorVT(*DAG.getContext(),
+                                       ArgVT.getScalarType(),
+                                       std::min(LoadElts, 4u));
+
+      EVT RealLoadVT = EVT::getVectorVT(*DAG.getContext(),
+                                        MVT::i32,
+                                        std::min(LoadElts, 4u));
+
+      unsigned MemSplit = (ArgVT.getVectorNumElements() + 4 - 1) / 4;
+
+      bool Scalarize = !VT.isVector();
+
+      MVT CBPtrVT = getPointerTy();
+      assert((Scalarize || NumParts == 1) &&
+             "Split vector not expected for this type");
+      for (unsigned I = 0; I < MemSplit; ++I, ++CBIdx) {
+        SDValue ArgLoad = DAG.getExtLoad(
+          Ext, dl, RealLoadVT, Chain,
+          DAG.getConstant(16 * CBIdx, CBPtrVT), // Convert to bytes.
+          MachinePointerInfo(UndefValue::get(PtrTy)), // Only uses the CB index.
+          RealMemVT, false, true, 16);
+
+        // Append.
+        if (Scalarize)
+          ExtractVectorElements(ArgLoad, DAG, Result, 0, std::min(ArgNElts, 4u));
+        else
+          Result.push_back(ArgLoad);
       }
-      ++CBIdx;
-      return DAG.getNode(ISD::BUILD_VECTOR, dl, VT, &Ops[0], Ops.size());
+
+      return;
     }
+
+    // We load whatever size we need to here. When the load is lowered, it will
+    // be appropriately split into separate 128-bit loads.
+    SDValue ArgLoad = DAG.getLoad(
+      ISD::UNINDEXED,
+      Ext,
+      ExtVecVT,
+      dl,
+      Chain,
+      DAG.getConstant(16 * CBIdx, PtrVT), // Convert to bytes.
+      DAG.getUNDEF(MVT::i32),
+      MachinePointerInfo(UndefValue::get(PtrTy)), // Only uses the CB index.
+      ArgVT, false, true, true, 16);
+
+    // XXX - What?
+    Chain = SDValue(ArgLoad.getNode(), 1);
+
+    // FIXME: Remove this.
+    if (ExtVecVT.getVectorNumElements() == 3)
+      ArgLoad = loadVec3ArgAsVec4(DAG, dl, ArgLoad, ExtVecVT);
+
+    if (!VT.isVector()) {
+      // Argument was scalarized.
+      ExtractVectorElements(ArgLoad, DAG, Result, 0, NumParts);
+      CBIdx += (ArgSize + 16 - 1) / 16; // FIXME should get offset from CCValAssign
+      return;
+    }
+
+    unsigned NElts = ArgVT.getVectorNumElements();
+    if (NumParts > 1) {
+      // Vector was split.
+      // Extract and recombine into correct vector types.
+
+      assert(VT.getVectorElementType() == ArgVT.getVectorElementType());
+
+      unsigned EltsPerSplit = NElts / NumParts;
+      assert(NElts % NumParts == 0);
+
+
+      for (unsigned I = 0; I < NumParts; ++I) {
+        SmallVector<SDValue, 8> Elts;
+        ExtractVectorElements(ArgLoad, DAG, Elts,
+                              I * EltsPerSplit, EltsPerSplit);
+
+        SDValue NewV = DAG.getNode(ISD::BUILD_VECTOR, dl, VT,
+                                   Elts.data(), Elts.size());
+        Result.push_back(NewV);
+      }
+
+      CBIdx += (ArgSize + 16 - 1) / 16; // FIXME should get offset from CCValAssign
+      return;
+    }
+
+    // Vector was simply promoted.
+    Result.push_back(ArgLoad);
+    CBIdx += (ArgSize + 16 - 1) / 16; // FIXME should get offset from CCValAssign
+    return;
   }
 
-  // Handle the case that the kernel arg is a scalar,
-  // or a vector of elem >= 32bit
-  unsigned RegNum = 0;
-  switch (VT.getStoreSize()) {
-    case 1:
-    case 2:
-    case 4:
-      assert(NumParts == 1);
-      RegNum = AMDIL::CB1_x0;
-      break;
-    case 8:
-      if (PartIdx % 2 == 0)
-        RegNum = AMDIL::CB1_xy0;
-      else
-        RegNum = AMDIL::CB1_zw0;
-      break;
-    case 16:
-      RegNum = AMDIL::CB1_0;
-      break;
-    default:
-      llvm_unreachable("unexpected size");
+  if (ArgVT.getScalarSizeInBits() < 32) {
+    PointerType *PtrTy
+      = PointerType::get(ArgVT.getTypeForEVT(*DAG.getContext()),
+                         AMDILAS::CONSTANT_BUFFER_1);
+
+    ISD::LoadExtType Ext = Arg.isSExt ? ISD::SEXTLOAD : ISD::ZEXTLOAD;
+    SDValue ArgLoad = DAG.getExtLoad(
+      Ext, dl, VT, Chain,
+      DAG.getConstant(16 * CBIdx, PtrVT), // Convert to bytes.
+      MachinePointerInfo(UndefValue::get(PtrTy)), // Only uses the CB index.
+      ArgVT, false, true, 16);
+
+    // XXX - What?
+    Chain = SDValue(ArgLoad.getNode(), 1);
+
+    Result.push_back(ArgLoad);
+    CBIdx += (ArgSize + 16 - 1) / 16; // FIXME should get offset from CCValAssign
+    return;
   }
-  SDValue Reg = DAG.getRegister(RegNum + CBIdx, VT);
-  if (PartIdx == NumParts - 1) {
-    ++CBIdx;
-  } else {
-    unsigned PartSize = VT.getStoreSize();
-    assert((PartSize == 8 || PartSize == 16) && "unexpected vector split");
-    if ((PartSize * (PartIdx + 1)) % 16 == 0) {
-      ++CBIdx;
-    }
-  }
-  return Reg;
+
+  assert(!Arg.isSExt && !Arg.isZExt);
+  // Handle the basic case when the arg is a scalar, or vector of elem >=
+  // 32-bit.
+
+  PointerType *PtrTy
+    = PointerType::get(ArgVT.getTypeForEVT(*DAG.getContext()),
+                       AMDILAS::CONSTANT_BUFFER_1);
+
+  SDValue NewLoad = DAG.getLoad(VT,
+                                dl,
+                                Chain,
+                                DAG.getConstant(16 * CBIdx, PtrVT),
+                                MachinePointerInfo(UndefValue::get(PtrTy)),
+                                false,
+                                true,
+                                false,
+                                16);
+  // XXX - What?
+  Chain = SDValue(NewLoad.getNode(), 1);
+
+  Result.push_back(NewLoad);
+  CBIdx += (ArgSize + 16 - 1) / 16; // FIXME should get offset from CCValAssign
 }
 
 /// LowerCALL - functions arguments are copied from virtual
 /// regs to (physical regs)/(stack frame), CALLSEQ_START and
 /// CALLSEQ_END are emitted.
 /// TODO: isVarArg, isTailCall, hasStructRet
-SDValue
-AMDILTargetLowering::LowerCall(CallLoweringInfo &CLI,
-                               SmallVectorImpl<SDValue> &InVals) const {
+SDValue AMDILTargetLowering::LowerCall(CallLoweringInfo &CLI,
+                                       SmallVectorImpl<SDValue> &InVals) const {
   SelectionDAG &DAG                     = CLI.DAG;
   DebugLoc &DL                          = CLI.DL;
   SmallVector<ISD::OutputArg, 32> &Outs = CLI.Outs;
@@ -2157,7 +2964,7 @@ AMDILTargetLowering::LowerCall(CallLoweringInfo &CLI,
                  getTargetMachine(), ArgLocs, *DAG.getContext());
   // Analyize the calling operands, but need to change
   // if we have more than one calling convetion
-  CCInfo.AnalyzeCallOperands(Outs, CCAssignFnForNode(CallConv, false, true));
+  CCInfo.AnalyzeCallOperands(Outs, CCAssignFnForNode(CallConv, false, true /*, IsStubToKernelCall*/)); // XXX
 
   unsigned int NumBytes = CCInfo.getNextStackOffset();
 
@@ -2188,47 +2995,50 @@ AMDILTargetLowering::LowerCall(CallLoweringInfo &CLI,
       ArgNumParts.push_back(NumParts);
     }
   }
+
+  // Walk the register/memloc assignments, insert copies/loads.
   unsigned CBIdx = 0;
-  unsigned ArgIdx = 0;
-  // Walk the register/memloc assignments, insert copies/loads
-  for (unsigned int i = 0, j = 0, e = ArgLocs.size(); i != e; ++i, ++j) {
+  for (unsigned i = 0, ArgIdx = 0, e = ArgLocs.size(); i != e; ++ArgIdx) {
     CCValAssign &VA = ArgLocs[i];
     SDValue OutVal = OutVals[i];
+    const ISD::OutputArg &Arg = Outs[i];
+
     if (IsStubToKernelCall) {
-      if (j == ArgNumParts[ArgIdx]) {
-        ++ArgIdx;
-        j = 0;
+      SmallVector<SDValue, 8> BuildArg;
+
+      // FIXME: This should be handled in LowerFormalArguments with a kernel
+      // calling convention. Handling this here at the "call site" for the
+      // kernel is backwards.
+      unsigned NumParts = ArgNumParts[ArgIdx];
+
+      // If this is a call from a kernel stub to a kernel function, setup the
+      // value to be passed into the kernel arg.
+      BuildKernelArgVal(BuildArg, Args[ArgIdx], NumParts, OutVal,
+                        VA.getValVT(), Arg.ArgVT, Chain, CBIdx, DAG);
+      if (BuildArg.size() != 1) {
+        // If the argument was scalarized or split, we have to copy each
+        // component.
+        for (unsigned K = 0; K != NumParts; ++K) {
+          assert((VA.getLocInfo() == CCValAssign::Full ||
+                  VA.getLocInfo() == CCValAssign::BCvt) && "Unimplemented");
+          CCValAssign &VA = ArgLocs[i + K];
+          assert(VA.isRegLoc());
+          SDValue PromoteVal = promoteCCVal(DAG, DL, VA.getLocInfo(),
+                                            VA.getLocVT(), BuildArg[K]);
+          RegsToPass.push_back(std::make_pair(VA.getLocReg(), PromoteVal));
+        }
+
+        // We've processed all parts for this argument.
+        i += BuildArg.size();
+        continue;
       }
-      assert((VA.getLocInfo() == CCValAssign::Full ||
-              VA.getLocInfo() == CCValAssign::BCvt) && "Unimplemented");
-      // if this is a call from a kernel stub to a kernel function, setup
-      // the value to be passed into the kernel arg
-      OutVal = BuildKernelArgVal(Args[ArgIdx], ArgNumParts[ArgIdx], j, OutVal,
-                                 VA.getValVT(), Chain, CBIdx, DAG);
+
+      assert(BuildArg.size() == 1);
+      OutVal = BuildArg.front();
     }
-    //Promote the value if needed
-    switch(VA.getLocInfo()) {
-      default:
-        llvm_unreachable("Unknown loc info!");
-      case CCValAssign::Full:
-      case CCValAssign::BCvt:
-               break;
-      case CCValAssign::SExt:
-               OutVal = DAG.getNode(ISD::SIGN_EXTEND,
-                   DL,
-                   VA.getLocVT(), OutVal);
-               break;
-      case CCValAssign::ZExt:
-               OutVal = DAG.getNode(ISD::ZERO_EXTEND,
-                   DL,
-                   VA.getLocVT(), OutVal);
-               break;
-      case CCValAssign::AExt:
-               OutVal = DAG.getNode(ISD::ANY_EXTEND,
-                   DL,
-                   VA.getLocVT(), OutVal);
-               break;
-    }
+
+    ++i;
+    OutVal = promoteCCVal(DAG, DL, VA.getLocInfo(), VA.getLocVT(), OutVal);
 
     if (VA.isRegLoc()) {
       RegsToPass.push_back(std::make_pair(VA.getLocReg(), OutVal));
@@ -2236,7 +3046,7 @@ AMDILTargetLowering::LowerCall(CallLoweringInfo &CLI,
       // SP has been updated to top of stack at function prolog. Since our
       // stack grows upwards, start of callee's frame is at SP-NumBytes.
       unsigned LocMemOffset = VA.getLocMemOffset();
-      SDValue PtrOff = DAG.getIntPtrConstant(LocMemOffset-NumBytes);
+      SDValue PtrOff = DAG.getIntPtrConstant(LocMemOffset - NumBytes);
       PtrOff = DAG.getNode(ISD::ADD, DL, getPointerTy(), StackPtr, PtrOff);
       SDValue StoreOpToMem
         = DAG.getStore(Chain, DL, OutVal, PtrOff,
@@ -2248,11 +3058,8 @@ AMDILTargetLowering::LowerCall(CallLoweringInfo &CLI,
     }
   }
   if (!MemOpChains.empty()) {
-    Chain = DAG.getNode(ISD::TokenFactor,
-                        DL,
-        MVT::Other,
-        &MemOpChains[0],
-        MemOpChains.size());
+    Chain = DAG.getNode(ISD::TokenFactor, DL, MVT::Other,
+                        MemOpChains.data(), MemOpChains.size());
   }
 
   // Build a sequence of copy-to-reg nodes chained together with token chain
@@ -3397,22 +4204,20 @@ AMDILTargetLowering::LowerFDIV(SDValue Op, SelectionDAG &DAG) const
   return DST;
 }
 
-SDValue
-AMDILTargetLowering::LowerSDIV(SDValue Op, SelectionDAG &DAG) const
-{
-  EVT OVT = Op.getValueType();
-  SDValue DST;
-  if (OVT.getScalarType() == MVT::i64) {
-    DST = LowerSDIV64(Op, DAG);
-  } else if (OVT.getScalarType() == MVT::i32) {
-    DST = LowerSDIV32(Op, DAG);
-  } else if (OVT.getScalarType() == MVT::i16
-      || OVT.getScalarType() == MVT::i8) {
-    DST = LowerSDIV24(Op, DAG);
-  } else {
-    DST = SDValue(Op.getNode(), 0);
+SDValue AMDILTargetLowering::LowerSDIV(SDValue Op, SelectionDAG &DAG) const {
+  EVT VT = Op.getValueType().getScalarType();
+
+  if (VT == MVT::i32) {
+    if (DAG.ComputeNumSignBits(Op.getOperand(0)) > 8 &&
+        DAG.ComputeNumSignBits(Op.getOperand(1)) > 8) {
+      return LowerSDIV24(Op, DAG);
+    }
+
+    return LowerSDIV32(Op, DAG);
   }
-  return DST;
+
+  assert(VT == MVT::i64 && "Unexpected custom lowered type for SDIV");
+  return LowerSDIV64(Op, DAG);
 }
 
 SDValue
@@ -5050,6 +5855,15 @@ static SDValue PerformMULADDCombine(SDNode *N, SelectionDAG &DAG,
                      Opr0, Opr1, Opr2);
 }
 
+static bool usesAllNormalStores(SDNode *LoadVal) {
+  for (SDNode::use_iterator I = LoadVal->use_begin(); !I.atEnd(); ++I) {
+    if (!ISD::isNormalStore(*I))
+      return false;
+  }
+
+  return true;
+}
+
 SDValue AMDILTargetLowering::PerformDAGCombine(SDNode *N,
                                                DAGCombinerInfo &DCI) const {
   SelectionDAG &DAG = DCI.DAG;
@@ -5060,8 +5874,43 @@ SDValue AMDILTargetLowering::PerformDAGCombine(SDNode *N,
     return PerformMULADDCombine(N, DAG, DCI);
     break;
 
-  case ISD::LOAD:
   case ISD::STORE: {
+    if (DCI.isBeforeLegalize()) {
+      StoreSDNode *SN = cast<StoreSDNode>(N);
+      SDValue Value = SN->getValue();
+      EVT VT = Value.getValueType();
+
+      // If we have a copy of an illegal type, replace it with a load / store of
+      // an equivalently sized legal type. This avoids intermediate bit pack /
+      // unpack instructions emitted when handling extloads and
+      // truncstores. Ideally we could recognize the pack / unpack pattern to
+      // eliminate it.
+      if (!isTypeLegal(VT) &&
+          ISD::isNormalLoad(Value.getNode()) &&
+          usesAllNormalStores(Value.getNode())) {
+        LoadSDNode *LoadVal = cast<LoadSDNode>(Value);
+        EVT MemVT = LoadVal->getMemoryVT();
+        EVT LoadVT = getEquivalentMemType(*DAG.getContext(), MemVT);
+
+        SDValue NewLoad = DAG.getLoad(ISD::UNINDEXED, ISD::NON_EXTLOAD,
+                                      LoadVT, LoadVal->getDebugLoc(),
+                                      LoadVal->getChain(),
+                                      LoadVal->getBasePtr(),
+                                      LoadVal->getOffset(),
+                                      LoadVT,
+                                      LoadVal->getMemOperand());
+
+        return DAG.getStore(SN->getChain(),
+                            SN->getDebugLoc(),
+                            NewLoad,
+                            SN->getBasePtr(),
+                            SN->getMemOperand());
+      }
+    }
+
+    // Fall through.
+  }
+  case ISD::LOAD: {
     LSBaseSDNode *LSN = cast<LSBaseSDNode>(N);
     if (LSN->isIndexed())
       break;
@@ -5070,8 +5919,7 @@ SDValue AMDILTargetLowering::PerformDAGCombine(SDNode *N,
     if (TM.getOptLevel() == CodeGenOpt::None)
       break;
 
-    const AMDILSubtarget &STM = TM.getSubtarget<AMDILSubtarget>();
-    if (!STM.is64bit())
+    if (!Subtarget.is64bit())
       break;
 
     unsigned AS = LSN->getAddressSpace();
@@ -5096,7 +5944,7 @@ SDValue AMDILTargetLowering::PerformDAGCombine(SDNode *N,
     }
 
     if (AS == AMDILAS::GLOBAL_ADDRESS || AS == AMDILAS::CONSTANT_ADDRESS) {
-      if (!STM.smallGlobalObjects())
+      if (!Subtarget.smallGlobalObjects())
         break;
       SDValue Ptr = LSN->getBasePtr();
       EVT PtrVT = Ptr.getValueType();

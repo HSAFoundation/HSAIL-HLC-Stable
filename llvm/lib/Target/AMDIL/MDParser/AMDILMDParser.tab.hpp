@@ -1,10 +1,8 @@
-
-/* A Bison parser, made by GNU Bison 2.4.1.  */
+/* A Bison parser, made by GNU Bison 2.7.1.  */
 
 /* Skeleton interface for Bison LALR(1) parsers in C++
    
-      Copyright (C) 2002, 2003, 2004, 2005, 2006, 2007, 2008 Free Software
-   Foundation, Inc.
+      Copyright (C) 2002-2013 Free Software Foundation, Inc.
    
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -32,14 +30,18 @@
    This special exception was added by the Free Software Foundation in
    version 2.2 of Bison.  */
 
+/**
+ ** \file AMDILMDParser.tab.hpp
+ ** Define the llvm::parser class.
+ */
+
 /* C++ LALR(1) parser skeleton written by Akim Demaille.  */
 
-#ifndef PARSER_HEADER_H
-# define PARSER_HEADER_H
+#ifndef YY_YY_AMDILMDPARSER_TAB_HPP_INCLUDED
+# define YY_YY_AMDILMDPARSER_TAB_HPP_INCLUDED
 
 /* "%code requires" blocks.  */
-
-/* Line 35 of lalr1.cc  */
+/* Line 33 of lalr1.cc  */
 #line 30 "AMDILMDParser.y"
 
 #include <string>
@@ -49,32 +51,13 @@
   }
   
 
-
-/* Line 35 of lalr1.cc  */
-#line 55 "AMDILMDParser.tab.hpp"
+/* Line 33 of lalr1.cc  */
+#line 56 "AMDILMDParser.tab.hpp"
 
 
 #include <string>
 #include <iostream>
 #include "stack.hh"
-
-
-/* Line 35 of lalr1.cc  */
-#line 5 "AMDILMDParser.y"
-namespace llvm {
-
-/* Line 35 of lalr1.cc  */
-#line 68 "AMDILMDParser.tab.hpp"
-  class position;
-  class location;
-
-/* Line 35 of lalr1.cc  */
-#line 5 "AMDILMDParser.y"
-} // llvm
-
-/* Line 35 of lalr1.cc  */
-#line 77 "AMDILMDParser.tab.hpp"
-
 #include "location.hh"
 
 /* Enabling traces.  */
@@ -82,45 +65,11 @@ namespace llvm {
 # define YYDEBUG 1
 #endif
 
-/* Enabling verbose error messages.  */
-#ifdef YYERROR_VERBOSE
-# undef YYERROR_VERBOSE
-# define YYERROR_VERBOSE 1
-#else
-# define YYERROR_VERBOSE 0
-#endif
-
-/* Enabling the token table.  */
-#ifndef YYTOKEN_TABLE
-# define YYTOKEN_TABLE 0
-#endif
-
-/* YYLLOC_DEFAULT -- Set CURRENT to span from RHS[1] to RHS[N].
-   If N is 0, then set CURRENT to the empty location which ends
-   the previous symbol: RHS[0] (always defined).  */
-
-#ifndef YYLLOC_DEFAULT
-# define YYLLOC_DEFAULT(Current, Rhs, N)		\
-do {							\
-  if (N)						\
-    {							\
-      (Current).begin = (Rhs)[1].begin;			\
-      (Current).end   = (Rhs)[N].end;			\
-    }							\
-  else							\
-    {							\
-      (Current).begin = (Current).end = (Rhs)[0].end;	\
-    }							\
-} while (false)
-#endif
-
-
-/* Line 35 of lalr1.cc  */
+/* Line 33 of lalr1.cc  */
 #line 5 "AMDILMDParser.y"
 namespace llvm {
-
-/* Line 35 of lalr1.cc  */
-#line 124 "AMDILMDParser.tab.hpp"
+/* Line 33 of lalr1.cc  */
+#line 73 "AMDILMDParser.tab.hpp"
 
   /// A Bison parser.
   class AMDILMDParser
@@ -130,8 +79,7 @@ namespace llvm {
 #ifndef YYSTYPE
     union semantic_type
     {
-
-/* Line 35 of lalr1.cc  */
+/* Line 33 of lalr1.cc  */
 #line 46 "AMDILMDParser.y"
 
     unsigned token;
@@ -151,9 +99,8 @@ namespace llvm {
     CompUnit*   CU;
 
 
-
-/* Line 35 of lalr1.cc  */
-#line 157 "AMDILMDParser.tab.hpp"
+/* Line 33 of lalr1.cc  */
+#line 104 "AMDILMDParser.tab.hpp"
     };
 #else
     typedef YYSTYPE semantic_type;
@@ -223,6 +170,10 @@ namespace llvm {
 #endif
 
   private:
+    /// This class is not copyable.
+    AMDILMDParser (const AMDILMDParser&);
+    AMDILMDParser& operator= (const AMDILMDParser&);
+
     /// Report a syntax error.
     /// \param loc    where the syntax error is found.
     /// \param msg    a description of the syntax error.
@@ -231,7 +182,7 @@ namespace llvm {
     /// Generate an error message.
     /// \param state   the state where the error occurred.
     /// \param tok     the lookahead token.
-    virtual std::string yysyntax_error_ (int yystate);
+    virtual std::string yysyntax_error_ (int yystate, int tok);
 
 #if YYDEBUG
     /// \brief Report a symbol value on the debug stream.
@@ -267,6 +218,14 @@ namespace llvm {
     /// The location stack.
     location_stack_type yylocation_stack_;
 
+    /// Whether the given \c yypact_ value indicates a defaulted state.
+    /// \param yyvalue   the value to check
+    static bool yy_pact_value_is_default_ (int yyvalue);
+
+    /// Whether the given \c yytable_ value indicates a syntax error.
+    /// \param yyvalue   the value to check
+    static bool yy_table_value_is_error_ (int yyvalue);
+
     /// Internal symbol numbers.
     typedef unsigned char token_number_type;
     /* Tables.  */
@@ -274,7 +233,7 @@ namespace llvm {
     static const short int yypact_[];
     static const signed char yypact_ninf_;
 
-    /// For a state, default rule to reduce.
+    /// For a state, default reduction number.
     /// Unless\a  yytable_ specifies something else to do.
     /// Zero means the default is an error.
     static const unsigned char yydefact_[];
@@ -298,19 +257,12 @@ namespace llvm {
     /// For a rule, its LHS.
     static const unsigned char yyr1_[];
     /// For a rule, its RHS length.
-    static const unsigned char yyr2_[];
-
-#if YYDEBUG || YYERROR_VERBOSE || YYTOKEN_TABLE
-    /// For a symbol, its name in clear.
-    static const char* const yytname_[];
-#endif
-
-#if YYERROR_VERBOSE
-    /// Convert the symbol name \a n to a form suitable for a diagnostic.
-    virtual std::string yytnamerr_ (const char *n);
-#endif
+    static const unsigned char yyr2_[]; 
 
 #if YYDEBUG
+    /// For a symbol, its name in clear.
+    static const char* const yytname_[];
+
     /// A type to store symbol numbers and -1.
     typedef signed char rhs_number_type;
     /// A `-1'-separated list of the rules' RHS.
@@ -336,6 +288,7 @@ namespace llvm {
 
     /// \brief Reclaim the memory associated to a symbol.
     /// \param yymsg        Why this token is reclaimed.
+    ///                     If null, do not display the symbol, just free it.
     /// \param yytype       The symbol type.
     /// \param yyvaluep     Its semantic value.
     /// \param yylocationp  Its location.
@@ -366,14 +319,12 @@ namespace llvm {
     bool _merror;
     std::string _mmsg;
   };
-
-/* Line 35 of lalr1.cc  */
+/* Line 33 of lalr1.cc  */
 #line 5 "AMDILMDParser.y"
 } // llvm
-
-/* Line 35 of lalr1.cc  */
-#line 376 "AMDILMDParser.tab.hpp"
-
+/* Line 33 of lalr1.cc  */
+#line 327 "AMDILMDParser.tab.hpp"
 
 
-#endif /* ! defined PARSER_HEADER_H */
+
+#endif /* !YY_YY_AMDILMDPARSER_TAB_HPP_INCLUDED  */

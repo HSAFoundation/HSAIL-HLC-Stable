@@ -547,6 +547,7 @@ llvm::operator<<(raw_ostream& os, MDValue& MDNode)
   AccessType_ = "RW";
   Volatile_ = 0;
   Restrict_ = 0;
+  Pipe_ = 0;
 }
 MDPointer::~MDPointer()
 {
@@ -565,7 +566,7 @@ llvm::operator<<(raw_ostream& os, MDPointer& MDNode)
   os << ":" << MDNode.MemType_ << ":";
   os << MDNode.BufNum_ << ":" << MDNode.Alignment_;
   os << ":" << MDNode.AccessType_ << ":";
-  os << MDNode.Volatile_ << ":" << MDNode.Restrict_;
+  os << MDNode.Volatile_ << ":" << MDNode.Restrict_ << ":" << MDNode.Pipe_;
   os << "\n";
   return os;
 }
@@ -840,6 +841,8 @@ llvm::DataType strToDataType(std::string &dataType)
     return llvm::DATATYPE_union;
   } else if (!memcmp(str, "event", 5)) {
     return llvm::DATATYPE_event;
+  } else if (!memcmp(str, "clk_event_t",11)) {
+    return llvm::DATATYPE_opaque;
   } else if (!memcmp(str, "opaque", 6)) {
     return llvm::DATATYPE_opaque;
   } else {
@@ -955,6 +958,10 @@ void MDBlock::updateMetadata(AMDILMetadata *MD) {
           MD->cbID = curMD->getMDInt()->Int_;
         } else if (!memcmp(nameStr, ";lws", 4)) {
           MD->lws = curMD->getMDInt()->Int_;
+        } else if (!memcmp(nameStr, ";enqueue_kernel", 15)) {
+          MD->enqueue_kernel = curMD->getMDInt()->Int_;
+        } else if (!memcmp(nameStr, ";kernel_index", 13)) {
+          MD->kernel_index = curMD->getMDInt()->Int_;
         } else {
           llvm_unreachable("Found an MDType that isn't handled correctly!");
         }
@@ -1097,6 +1104,7 @@ void MDBlock::updateMetadata(AMDILMetadata *MD) {
           }
          curArg.arg.pointer.volatile_ = pointer->Volatile_;
          curArg.arg.pointer.restrict_ = pointer->Restrict_;
+         curArg.arg.pointer.pipe_ = pointer->Pipe_;
           MD->arguments.push_back(curArg);
         } else {
           llvm_unreachable("Found an MDType that isn't handled correctly!");

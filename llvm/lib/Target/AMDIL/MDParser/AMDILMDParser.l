@@ -412,6 +412,20 @@ mdef {
   return llvm::AMDILMDParser::token::MD_INT;
 }
 
+<MD_STATE>;enqueue_kernel {
+  MATCH(MD_STATE/;enqueue_kernel);
+  SAVE_STR_TOKEN;
+  ENTER_STATE(MD_ARG);
+  ECHO;
+  return llvm::AMDILMDParser::token::MD_INT;
+}
+<MD_STATE>;kernel_index {
+  MATCH(MD_STATE/;kernel_index);
+  SAVE_STR_TOKEN;
+  ENTER_STATE(MD_ARG);
+  ECHO;
+  return llvm::AMDILMDParser::token::MD_INT;
+}
 <MD_STATE>;printf_fmt {
   MATCH(MD_STATE/;printf_fmt);
   SAVE_STR_TOKEN;

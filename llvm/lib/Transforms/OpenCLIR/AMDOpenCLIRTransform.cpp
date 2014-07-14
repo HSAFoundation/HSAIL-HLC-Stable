@@ -251,9 +251,19 @@ void OpenCLIRTransform::emitSPIR(llvm::Function *F) {
   NamedMDNode *OpenCLKernelMetadata =
       curModule->getOrInsertNamedMetadata("opencl.kernels");
   OpenCLKernelMetadata->addOperand(kernelMDNode);
+
+  // Add SPIR version (1.2)
+  Value *SPIRVerElts[] = {
+    ConstantInt::get(Type::getInt32Ty(curModule->getContext()), 1),
+    ConstantInt::get(Type::getInt32Ty(curModule->getContext()), 2)
+  };
+  llvm::NamedMDNode *SPIRVerMD =
+    curModule->getOrInsertNamedMetadata("opencl.spir.version");
+  SPIRVerMD->addOperand(llvm::MDNode::get(curModule->getContext(), SPIRVerElts));
 }
 
 bool OpenCLIRTransform::parseMetaData(Module &M) {
+  bool flag = false;
   for (Module::const_named_metadata_iterator I = M.named_metadata_begin(),
                                              E = M.named_metadata_end();
        I != E; ++I) {
@@ -282,6 +292,7 @@ bool OpenCLIRTransform::parseMetaData(Module &M) {
         if (MDStr) {
           Function *Func = M.getFunction(MDStr->getString());
           if (Func) {
+            flag = true;
             emitSPIR(Func);
             addGlobalId(Func);
           }
@@ -289,6 +300,8 @@ bool OpenCLIRTransform::parseMetaData(Module &M) {
       }
     }
   }
+  
+  if (!flag) return false;
 
   return true;
 }
@@ -305,7 +318,6 @@ bool OpenCLIRTransform::runOnModule(Module &M) {
   const char *NewTriple = "spir-unknown-unknown";
   M.setTargetTriple(NewTriple);
   SPIRPasses.add(new llvm::DataLayout(M.getDataLayout()));
-  SPIRPasses.add(llvm::createSPIRLoader(TripleStr));
   SPIRPasses.run(M);
 
   return true;

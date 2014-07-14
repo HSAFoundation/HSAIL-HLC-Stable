@@ -326,24 +326,12 @@ const TargetRegisterClass *AMDILRegisterInfo::getRegClassFromID(unsigned ID) {
   default:
     llvm_unreachable("Passed in ID does not match any register classes.");
     return NULL;
-  case AMDIL::GPRI8RegClassID:
-    return &AMDIL::GPRI8RegClass;
-  case AMDIL::GPRI16RegClassID:
-    return &AMDIL::GPRI16RegClass;
   case AMDIL::GPR_32RegClassID:
     return &AMDIL::GPR_32RegClass;
   case AMDIL::GPR_64RegClassID:
     return &AMDIL::GPR_64RegClass;
-  case AMDIL::GPRV4I8RegClassID:
-    return &AMDIL::GPRV4I8RegClass;
-  case AMDIL::GPRV4I16RegClassID:
-    return &AMDIL::GPRV4I16RegClass;
   case AMDIL::GPRV4I32RegClassID:
     return &AMDIL::GPRV4I32RegClass;
-  case AMDIL::GPRV2I8RegClassID:
-    return &AMDIL::GPRV2I8RegClass;
-  case AMDIL::GPRV2I16RegClassID:
-    return &AMDIL::GPRV2I16RegClass;
   case AMDIL::GPRV2I32RegClassID:
     return &AMDIL::GPRV2I32RegClass;
   case AMDIL::GPRV2I64RegClassID:
@@ -355,27 +343,15 @@ const TargetRegisterClass *AMDILRegisterInfo::getRegClassFromType(MVT VT) {
   switch (VT.SimpleTy) {
   default:
       llvm_unreachable("Passed in type does not match any register classes.");
-  case MVT::i8:
-    return &AMDIL::GPRI8RegClass;
-  case MVT::i16:
-    return &AMDIL::GPRI16RegClass;
   case MVT::i32:
   case MVT::f32:
     return &AMDIL::GPR_32RegClass;
   case MVT::i64:
   case MVT::f64:
     return &AMDIL::GPR_64RegClass;
-  case MVT::v4i8:
-    return &AMDIL::GPRV4I8RegClass;
-  case MVT::v4i16:
-    return &AMDIL::GPRV4I16RegClass;
   case MVT::v4i32:
   case MVT::v4f32:
     return &AMDIL::GPRV4I32RegClass;
-  case MVT::v2i8:
-    return &AMDIL::GPRV2I8RegClass;
-  case MVT::v2i16:
-    return &AMDIL::GPRV2I16RegClass;
   case MVT::v2i32:
   case MVT::v2f32:
     return &AMDIL::GPRV2I32RegClass;
@@ -398,18 +374,6 @@ unsigned AMDILRegisterInfo::getRegClassFromName(StringRef Name) {
     return AMDIL::GPRV2I32RegClassID;
   } else if (Name.find("f32") != StringRef::npos) {
     return AMDIL::GPR_32RegClassID;
-  } else if (Name.find("v4i16") != StringRef::npos) {
-    return AMDIL::GPRV4I16RegClassID;
-  } else if (Name.find("v2i16") != StringRef::npos) {
-    return AMDIL::GPRV2I16RegClassID;
-  } else if (Name.find("i16") != StringRef::npos) {
-    return AMDIL::GPRI16RegClassID;
-  } else if (Name.find("v4i8") != StringRef::npos) {
-    return AMDIL::GPRV4I8RegClassID;
-  } else if (Name.find("v2i8") != StringRef::npos) {
-    return AMDIL::GPRV2I8RegClassID;
-  } else if (Name.find("i8") != StringRef::npos) {
-    return AMDIL::GPRI8RegClassID;
   } else if (Name.find("v2i64") != StringRef::npos) {
     return AMDIL::GPRV2I64RegClassID;
   } else if (Name.find("i64") != StringRef::npos) {

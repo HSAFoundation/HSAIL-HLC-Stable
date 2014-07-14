@@ -24,15 +24,11 @@ add_definitions(-DANDROID)
 add_definitions(-DBUILD_HSA_TARGET)
 add_definitions(-DOPENCL_MAJOR=1)
 
-set (USEDLIBS LLVMLibHSAIL.a)
+#set (USEDLIBS libhsail.a)
 
-#include_directories(/home/sraghave/HSAIL-Tools-git)
-#include_directories(/home/sraghave/HSAIL-Tools-git/libHSAIL/libBRIGDwarf)
-#include_directories(/home/sraghave/HSAIL-Tools-git/libHSAIL/libHSAIL/generated)
-
-include_directories(/home/sraghave/drivers/opencl/compiler/hsail-tools)
-include_directories(/home/sraghave/drivers/opencl/compiler/hsail-tools/libBRIGDwarf)
-include_directories(/home/sraghave/drivers/opencl/compiler/hsail-tools/libHSAIL/generated)
+include_directories(/home/amd/Prakash/praghave_msdnkv69_9870/praghave_msdnkv69_9870/drivers/opencl/compiler/hsail-tools)
+include_directories(/home/amd/Prakash/praghave_msdnkv69_9870/praghave_msdnkv69_9870/drivers/opencl/compiler/hsail-tools/libBRIGDwarf/)
+include_directories(/home/amd/Prakash/praghave_msdnkv69_9870/praghave_msdnkv69_9870/drivers/opencl/compiler/hsail-tools/libHSAIL/generated)
 
 set(PACKAGE_VERSION "${LLVM_VERSION_MAJOR}.${LLVM_VERSION_MINOR}svn")
 
@@ -95,7 +91,6 @@ set(LLVM_EXAMPLES_BINARY_DIR ${LLVM_BINARY_DIR}/examples)
 set(LLVM_LIBDIR_SUFFIX "" CACHE STRING "Define suffix of library directory name (32/64)" )
 
 set(LLVM_ALL_TARGETS
-  AMDIL
   HSAIL
   X86
   )
@@ -340,6 +335,8 @@ foreach(t ${LLVM_TARGETS_TO_BUILD})
   if( asmp_file )
     set(LLVM_ENUM_ASM_PRINTERS
       "${LLVM_ENUM_ASM_PRINTERS}LLVM_ASM_PRINTER(${t})\n")
+    set(LLVM_ENUM_ASM_PRINTERS
+	    "${LLVM_ENUM_ASM_PRINTERS}LLVM_ASM_PRINTER(BRIG)\n")
   endif()
   if( EXISTS ${td}/AsmParser/CMakeLists.txt )
     set(LLVM_ENUM_ASM_PARSERS
@@ -430,7 +427,6 @@ endif()
 
 if( LLVM_INCLUDE_TESTS )
   add_subdirectory(test)
-  add_subdirectory(utils/unittest)
   add_subdirectory(unittests)
   if (MSVC)
     # This utility is used to prevent chrashing tests from calling Dr. Watson on
