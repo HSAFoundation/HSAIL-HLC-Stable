@@ -26,3 +26,8 @@ This drop has the latest compiler (OpenCL branch from AMD). This has been tested
 with CLANG (CLC2), the binary of this is given along with this drop. The hsail-tools
 is also given. However it is recommended to use the separate libHSAIL drop found on
 the Foundation github. Follow the same steps as above.
+
+July 21, 2014:
+
+Updated the changes for 1.0P HSAIL spec. The libHSAIL bundled with this as hsail-tools
+should be used for this D1 compiler version, till HSAIL-Tools is updated on the GITHUB.
