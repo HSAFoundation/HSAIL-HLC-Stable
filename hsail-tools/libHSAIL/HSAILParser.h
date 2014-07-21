@@ -53,6 +53,8 @@ namespace HSAIL_ASM
 
 Inst parseMnemo(const char* str, Brigantine& bw);
 
+struct ModuleStatementPrefix;
+
 class Parser
 {
 public:
@@ -87,28 +89,24 @@ private:
     void parseVersion();
     void parseTopLevelStatement();
     Optional<uint16_t> tryParseFBar();
-    void parseKernel(const struct DeclPrefix* declPrefix=NULL);
-    void parseFunction(const struct DeclPrefix* declPrefix=NULL);
-    void parseSigArgs(Scanner& s,DirectiveSignatureArguments types, DirectiveSignatureArguments::ArgKind argKind);
-    void parseSignature();
+    //void parseSigArgs(Scanner& s,DirectiveSignatureArguments types, DirectiveSignatureArguments::ArgKind argKind);
+    //void parseSignature();
     int  parseCodeBlock(); // returns the number of instructions inside
     int  parseBodyStatement(); // returns the number of instructions inside
     void parseLabel();
-    void parseLabelTargets();
     Inst parseInst();
 
-    DirectiveVariable parseDecl(bool isArg, bool isLocal);
-    DirectiveVariable parseDecl(bool isArg, bool isLocal,const struct DeclPrefix& declPfx);
-    struct DeclPrefix parseDeclPrefix();
 
-    Directive                   parseVariableInitializer(Brig::BrigType16_t type, unsigned expectedSize);
-    DirectiveImageInit          parseImageInitializer(Brig::BrigType16_t type, unsigned expectedSize);
-    DirectiveSamplerInit        parseSamplerInitializer(Brig::BrigType16_t type, unsigned expectedSize);
-    DirectiveImageProperties    parseImageProperties();
-    DirectiveSamplerProperties  parseSamplerProperties();
+    OperandData                 parseVariableInitializer(Brig::BrigType16_t type, unsigned expectedSize);
+    OperandOperandList          parseOpaqueInitializer(Brig::BrigType16_t type, unsigned expectedSize);
+    Operand    parseImageProperties(Brig::BrigType16_t type);
+    Operand    parseSamplerProperties();
 
-    DirectiveFbarrier parseFbarrier(bool isLocal);
-
+    
+    void parseExecutable(ETokens kw, const ModuleStatementPrefix* modPfx);
+    DirectiveVariable parseVariable(bool nameRequired = true, const ModuleStatementPrefix* modPfx = 0);
+    void parseFbarrier(const ModuleStatementPrefix* modPfx = 0);
+    
     void parseDebug();
     void parsePragma();
     void parseEmbeddedText();
@@ -118,11 +116,7 @@ private:
     void parseFileDecl();
     void parseControl();
    
-    unsigned parseValueList(Brig::BrigType16_t type, class ArbitraryData& data, unsigned maxValues=0);
-
-    void parseBlock();
-    
-    typedef void (Parser::*OperandParser)(Inst);
+    typedef ItemList (Parser::*OperandParser)(Inst);
     static OperandParser getOperandParser(Brig::BrigOpcode16_t opcode);
 
     Inst parseInstLdSt();
@@ -136,38 +130,33 @@ private:
 
     void checkVxIsValid(int Vx, Operand o);
 
-    void parseOperands(Inst inst);
-    void parseLdcOperands(Inst inst);
-    void parseCallOperands(Inst inst);
-    void parseRdImageOperands(Inst inst);
-    void parseAtomicNoRetImageOperands(Inst inst);
-    void parseQueryOperands(Inst inst);
-    void parseNoOperands(Inst inst);
+    ItemList parseOperands(Inst inst);
+    ItemList parseCallOperands(Inst inst);
+    ItemList parseSbrOperands(Inst inst);
+    ItemList parseNoOperands(Inst inst);
 
     Operand parseOperandGeneric(unsigned requiredType);
 
-    void parseOperandGeneric(Inst inst, unsigned opndIdx);
+    Operand parseOperandGeneric(Inst inst, unsigned opndIdx);
     Operand parseConstantGeneric(unsigned requiredType);
-    void validateImmType(unsigned required, unsigned actual);
 
-    OperandRef parseOperandRef();
+    void parseImmediate(ArbitraryData *data, unsigned requiredType, size_t pos);
+
+    OperandCodeRef parseOperandRef();
     OperandReg parseOperandReg();
     Operand parseOperandVector(unsigned requiredType);
 
     Operand parseLabelOperand();
-    OperandFunctionRef parseFunctionRef();
+    OperandCodeRef parseFunctionRef();
     Operand parseSigRef();
 
     Operand parseOperandInBraces();
     Operand parseActualParamList();
 
-    Operand parseObjectOperand();
     void parseAddress(SRef& reg, int64_t& offset);
 
-    template <typename List>
-    unsigned parseLabelList(List list, unsigned expectedSize);
-
-    void storeComments(Inst before=Inst());
+    void parseSLComment();
+    void parseMLComment();
 };
 
 inline void Parser::syntaxError(const std::string& message,const SourceInfo* srcInfo) {

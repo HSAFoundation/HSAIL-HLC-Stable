@@ -158,6 +158,8 @@ MDType::typeIDToName(unsigned ID)
       return "Value";
     case MDPointerTy:
       return "Pointer";
+    case MDQueueTy:
+      return "Queue";
     case MDDefaultTy:
       return "Default";
   };
@@ -396,6 +398,8 @@ llvm::operator<<(raw_ostream& os, MDArg& MDNode)
     os << *MDNode.getMDSampler();
   } else if (MDNode.getMDCBArg()) {
     os << *MDNode.getMDCBArg();
+  } else if (MDNode.getMDQueue()) {
+    os << *MDNode.getMDQueue();
   }  else {
     os << MDNode.Name_ << ":" << MDNode.Arg_;
   }
@@ -420,6 +424,29 @@ llvm::operator<<(raw_ostream& os, MDSampler& MDNode)
 {
   os << MDNode.Name_ << ":" << MDNode.Arg_ << ":" << MDNode.ID_ << ":" ;
   os << ((MDNode.isArg_) ? 0 : 1) << ":" << MDNode.Val_ << "\n";
+  return os;
+}
+//===--------------------------- MDQueue -------------------------------===//
+  MDQueue::MDQueue(std::string name)
+: MDArg(name)
+{
+  TypeID_ = MDQueueTy;
+}
+MDQueue::~MDQueue()
+{
+}
+  void
+MDQueue::dump()
+{
+  errs() << *this;
+}
+  raw_ostream&
+llvm::operator<<(raw_ostream& os, MDQueue& MDNode)
+{
+  os << MDNode.Name_ << ":" << MDNode.Arg_ << ":";
+  os << MDNode.Type_ << ":" << MDNode.Size_;
+  os << ":" << MDNode.CBNum_ << ":" << MDNode.CBOffset_;
+  os << ":" << MDNode.MemType_ << ":";
   return os;
 }
 //===--------------------------- MDCBArg ---------------------------------===//
@@ -811,7 +838,7 @@ llvm::DataType strToDataType(std::string &dataType)
   if (!memcmp(str, "i1", 2) && (dataType.size() == 2)) {
 #else
   if (!memcmp(str, "i1", 2)) {
-#endif 
+#endif
 	  return llvm::DATATYPE_i1;
   } else if (!memcmp(str, "i8", 2)) {
     return llvm::DATATYPE_i8;
@@ -842,6 +869,8 @@ llvm::DataType strToDataType(std::string &dataType)
   } else if (!memcmp(str, "event", 5)) {
     return llvm::DATATYPE_event;
   } else if (!memcmp(str, "clk_event_t",11)) {
+    return llvm::DATATYPE_opaque;
+  } else if (!memcmp(str, "queue_t", 7)) {
     return llvm::DATATYPE_opaque;
   } else if (!memcmp(str, "opaque", 6)) {
     return llvm::DATATYPE_opaque;
@@ -933,7 +962,7 @@ void MDBlock::updateMetadata(AMDILMetadata *MD) {
           llvm_unreachable("Found an MDType that isn't handled correctly!");
         }
         break;
-      case llvm::MDReflectionTy:
+	  case llvm::MDReflectionTy:
         MD->reflection[curMD->getMDReflection()->Int_] = nameStr;
         break;
       case llvm::MDConstArgTy:
@@ -1084,7 +1113,7 @@ void MDBlock::updateMetadata(AMDILMetadata *MD) {
       case llvm::MDPointerTy:
         if (!memcmp(nameStr, ";pointer", 8)) {
           argType curArg;
-          curArg.type = llvm::ARG_TYPE_POINTER;
+		  curArg.type = llvm::ARG_TYPE_POINTER;
           curArg.isConst = false;
           class MDPointer* pointer = curMD->getMDPointer();
           curArg.argName = pointer->Arg_;
@@ -1105,6 +1134,23 @@ void MDBlock::updateMetadata(AMDILMetadata *MD) {
          curArg.arg.pointer.volatile_ = pointer->Volatile_;
          curArg.arg.pointer.restrict_ = pointer->Restrict_;
          curArg.arg.pointer.pipe_ = pointer->Pipe_;
+         MD->arguments.push_back(curArg);
+        } else {
+          llvm_unreachable("Found an MDType that isn't handled correctly!");
+        }
+        break;
+      case llvm::MDQueueTy:
+         if (!memcmp(nameStr, ";queue", 6)) {
+          argType curArg;
+          class MDQueue* queue = curMD->getMDQueue();
+          curArg.type = llvm::ARG_TYPE_QUEUE;
+          curArg.isConst = false;
+          curArg.argName = curMD->getMDArg()->Arg_;
+          curArg.arg.queue.numElements = 1;
+          curArg.arg.queue.data = strToDataType(queue->Type_);
+          curArg.arg.queue.cbNum = queue->CBNum_;
+          curArg.arg.queue.cbOffset = queue->CBOffset_;
+          curArg.arg.queue.memory = strToMemType(queue->MemType_);
           MD->arguments.push_back(curArg);
         } else {
           llvm_unreachable("Found an MDType that isn't handled correctly!");
@@ -1219,27 +1265,7 @@ ILFunc::getTmpLineNumber(const std::string& tmp)
   raw_ostream&
 llvm::operator<<(raw_ostream& os, ILFunc& i)
 {
-  DEBUG(
-    os << "func " << i.ID_ << " ;" << i.FuncName_;
-    if (i.useLineNum_) {
-      os << ";" << i.baseLineNum_ << " ";
-    }
-    os << "\n";
-  );
   os << *cast<StmtBlock>(&i);
-
-  DEBUG(
-    for (std::map<std::string, unsigned>::iterator lmb = i.labelMap_.begin(),
-           lme = i.labelMap_.end(); lmb != lme; ++lmb) {
-      os << ';' << lmb->first;
-      if (i.useLineNum_) {
-        os << ':' << lmb->second;
-      }
-      os << '\n';
-    }
-    os << ";" << i.FuncName_ << "\n";
-  );
-
   return os;
 }
 ///===------------------------------ MainFunc -------------------------------===//
@@ -1623,8 +1649,7 @@ AMDILDwarf::AMDILDwarf(std::vector<DBSection*>& debugData,
 : mILData(ilData)
 {
   for (size_t x = 0; x < AMDILDwarf::DEBUG_LAST; ++x) {
-    dwarfSections[x] = new char[1024];
-    memset(dwarfSections[x], 0, 1024);
+    dwarfSections[x] = new char[1024]();
     dwarfSizes[x] = 1024;
     dwarfOffsets[x] = 0;
     dwarfStrings[x].clear();
@@ -2067,8 +2092,7 @@ AMDILDwarf::tokenToFormula(const std::string &curTkn)
           std::string substr = std::string(ctBegin, endTkn);
           unsigned val = tokenToValue(substr);
           if (val == ~0U) {
-            DEBUG(dbgs() << "Token: " << substr << "\n");
-            val = 0;
+            DEBUG(dbgs() << "Token: " << substr << '\n');
             llvm_unreachable("Found a case where we could not find the definition or the"
                              " line number for the token offset");
           }
@@ -2091,8 +2115,7 @@ AMDILDwarf::tokenToFormula(const std::string &curTkn)
         std::string substr = std::string(ctBegin, endTkn);
         unsigned val = tokenToValue(substr);
         if (val == ~0U) {
-          DEBUG(dbgs() << "Token: " << substr << "\n");
-          val = 0;
+          DEBUG(dbgs() << "Token: " << substr << '\n');
           llvm_unreachable("Found a case where we could not find the definition or the"
                            " line number for the token offset");
         }

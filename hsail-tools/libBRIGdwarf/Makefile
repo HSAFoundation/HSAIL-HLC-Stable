@@ -1,11 +1,9 @@
-OPENCL_DEPTH = ../../..
-ASM_DEPTH = ..
+HT_DEPTH = ..
 
-include $(ASM_DEPTH)/asmdefs
+include $(HT_DEPTH)/htdefs
 
-SUBDIRS = $(OPENCL_DEPTH)/compiler/lib/loaders/elf/utils/libelf \
+SUBDIRS = $(LIBBRIGDWARF_ELFUTILS)/libelf \
           libdwarf \
           build
 
-
-include $(ASM_DEPTH)/asmrules
+include $(HT_DEPTH)/htrules

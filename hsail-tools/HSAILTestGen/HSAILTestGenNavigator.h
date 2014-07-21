@@ -1,4 +1,4 @@
-//===-- HSAILTestGenSample.h - HSAIL Test Generator - Navigator ------------===//
+//===-- HSAILTestGenNavigator.h - HSAIL Test Generator - Navigator ------------===//
 //
 //===----------------------------------------------------------------------===//
 //
@@ -9,11 +9,12 @@
 #ifndef INCLUDED_HSAIL_TESTGEN_NAVIGATOR_H
 #define INCLUDED_HSAIL_TESTGEN_NAVIGATOR_H
 
-#include "HSAILTestGenUtilities.h"
+#include "HSAILItems.h"
 
 #include <vector>
 #include <string>
 
+using HSAIL_ASM::Inst;
 using std::vector;
 using std::string;
 
@@ -32,17 +33,14 @@ private:
     TestGenNavigatorImpl* impl;
 
 public:
-    TestGenNavigator(string path);
+    TestGenNavigator();
     ~TestGenNavigator();
 
 public:
     bool isOpcodeEnabled(unsigned opcode) const;
-    bool isTestEnabled(Inst inst);
-
-public:
     bool startTest(Inst inst);
-    void registerTest(unsigned opcode, unsigned idx);
-    string getTestPath();
+    string getTestTags(unsigned testIdx, bool isFullDesc = true);
+    string getRelTestPath();
 };
 
 //==============================================================================

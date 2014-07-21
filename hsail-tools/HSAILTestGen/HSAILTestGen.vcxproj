@@ -21,6 +21,7 @@
   <ItemGroup>
     <ClCompile Include="HSAILTestGen.cpp" />
     <ClCompile Include="HSAILTestGenBackend.cpp" />
+    <ClCompile Include="HSAILTestGenBrigContext.cpp" />
     <ClCompile Include="HSAILTestGenContext.cpp" />
     <ClCompile Include="HSAILTestGenDataProvider.cpp" />
     <ClCompile Include="HSAILTestGenDump.cpp" />
@@ -31,19 +32,23 @@
     <ClCompile Include="HSAILTestGenPropDesc.cpp" />
     <ClCompile Include="HSAILTestGenProvider.cpp" />
     <ClCompile Include="HSAILTestGenSample.cpp" />
+    <ClCompile Include="HSAILTestGenTestDesc.cpp" />
     <ClCompile Include="HSAILTestGenUtilities.cpp" />
     <ClCompile Include="HSAILTestGenVal.cpp" />
   </ItemGroup>
   <ItemGroup>
     <CLInclude Include="$(ProjectDir)\generated\HSAILTestGen_gen.hpp" />
     <ClInclude Include="HSAILTestGenBackend.h" />
+    <ClInclude Include="HSAILTestGenBackendEml.h" />
+    <ClInclude Include="HSAILTestGenBackendLua.h" />
+    <ClInclude Include="HSAILTestGenBrigContext.h" />
     <ClInclude Include="HSAILTestGenContext.h" />
     <ClInclude Include="HSAILTestGenDataProvider.h" />
     <ClInclude Include="HSAILTestGenDump.h" />
     <ClInclude Include="HSAILTestGenEmulator.h" />
+    <ClInclude Include="HSAILTestGenFilter.h" />
     <ClInclude Include="HSAILTestGenInstDesc.h" />
-    <ClInclude Include="HSAILTestGenLuaBackend.h" />
-    <ClInclude Include="HSAILTestGenLuaTestData.h" />
+    <ClInclude Include="HSAILTestGenTestData.h" />
     <ClInclude Include="HSAILTestGenManager.h" />
     <ClInclude Include="HSAILTestGenNavigator.h" />
     <ClInclude Include="HSAILTestGenOptions.h" />
@@ -51,6 +56,7 @@
     <ClInclude Include="HSAILTestGenPropDesc.h" />
     <ClInclude Include="HSAILTestGenProvider.h" />
     <ClInclude Include="HSAILTestGenSample.h" />
+    <ClInclude Include="HSAILTestGenTestDesc.h" />
     <ClInclude Include="HSAILTestGenUtilities.h" />
     <ClInclude Include="HSAILTestGenVal.h" />
   </ItemGroup>

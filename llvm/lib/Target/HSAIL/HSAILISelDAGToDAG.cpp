@@ -592,12 +592,12 @@ SDValue HSAILDAGToDAGISel::getBRIGMemoryOrder(AtomicOrdering memOrder) {
   unsigned BRIGMemOrder;
   switch(memOrder) {
     case Monotonic: BRIGMemOrder = Brig::BRIG_MEMORY_ORDER_RELAXED;break;
-    case Acquire: BRIGMemOrder = Brig::BRIG_MEMORY_ORDER_ACQUIRE;break;
-    case Release: BRIGMemOrder = Brig::BRIG_MEMORY_ORDER_RELEASE;break;
+    case Acquire: BRIGMemOrder = Brig::BRIG_MEMORY_ORDER_SC_ACQUIRE;break;
+    case Release: BRIGMemOrder = Brig::BRIG_MEMORY_ORDER_SC_RELEASE;break;
     case AcquireRelease:
     case SequentiallyConsistent: // atomic_load and atomic_store with SC
                                  // are custom lowered
-                  BRIGMemOrder = Brig::BRIG_MEMORY_ORDER_ACQUIRE_RELEASE; break;
+                  BRIGMemOrder = Brig::BRIG_MEMORY_ORDER_SC_ACQUIRE_RELEASE; break;
     default: llvm_unreachable("unexpected memory order");
   }
   SDValue memOrderSD = CurDAG->getTargetConstant(BRIGMemOrder,

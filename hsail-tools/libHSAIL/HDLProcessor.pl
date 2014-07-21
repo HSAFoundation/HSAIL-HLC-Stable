@@ -513,9 +513,10 @@ sub getTokenName
 my %hdlProp;               # $hdlProp{$PropName}{$PropVal} = 1;
 
                            # Special properties are labelled as follows:
-my %hdlPropType;           # $hdlPropType{$PropName} = 'brig';      # brig property
-                           # $hdlPropType{$PropName} = 'brigBit';   # brigBit property
-                           # $hdlPropType{$PropName} = 'operand';   # operand property
+my %hdlPropType;           # $hdlPropType{$PropName} = 'brig...';      # brig property
+                           # $hdlPropType{$PropName} = 'brigBit...';   # brigBit property
+                           # $hdlPropType{$PropName} = 'operand...';   # operand property
+                           # $hdlPropType{$PropName} = '...custom';    # needs custom check
 
                            # Property prefix - used to translate HDL names to BRIG names
 my %hdlPropPref;           # $hdlPropPref{$PropName} = "...";
@@ -722,7 +723,7 @@ sub isBrigProp
 sub isBrigBitProp 
 {
     my $prop = shift;
-    return isProp($prop) && $hdlPropType{getBaseProp($prop)} && $hdlPropType{getBaseProp($prop)} eq 'brigBit';
+    return isProp($prop) && $hdlPropType{getBaseProp($prop)} && $hdlPropType{getBaseProp($prop)} =~ /^brigBit/;
 }
 
 sub getOperandIdx { my $prop = shift; $prop =~ /(\d)$/; return $1; }
@@ -730,7 +731,13 @@ sub getOperandIdx { my $prop = shift; $prop =~ /(\d)$/; return $1; }
 sub isOperandProp 
 {
     my ($prop, $idx) = @_;
-    return isProp($prop) && $hdlPropType{getBaseProp($prop)} && $hdlPropType{getBaseProp($prop)} eq 'operand' && getOperandIdx($prop) == $idx;
+    return isProp($prop) && $hdlPropType{getBaseProp($prop)} && $hdlPropType{getBaseProp($prop)} =~ /^operand/ && getOperandIdx($prop) == $idx;
+}
+
+sub needCustomCheck
+{
+    my $prop = shift;
+    return isProp($prop) && $hdlPropType{getBaseProp($prop)} && $hdlPropType{getBaseProp($prop)} =~ /custom$/;
 }
 
 sub getBaseProp     # Given a property or clone name, return corresponding true property name
@@ -771,6 +778,13 @@ sub markOperandProp
 {
     my $prop = shift;
     $hdlPropType{getBaseProp($prop)} = 'operand';
+}
+
+sub markCustomCheck
+{
+    my $prop = shift;
+    $hdlPropType{getBaseProp($prop)} or die "Internal error";
+    $hdlPropType{getBaseProp($prop)} .= '.custom';
 }
 
 sub addClone
@@ -1209,7 +1223,7 @@ sub getTargetPropName
 #
 sub getTargetInstName         { my $name = shift;                   return "Brig::BRIG_OPCODE_" . uc($name); }
 sub getTargetFormatClass      { my $name = shift; $name =~ s/_//g;  return 'Inst' . $name ; }
-sub getTargetFormatName       { my $name = shift;                   return 'Brig::BRIG_INST_' . uc($name); }
+sub getTargetFormatName       { my $name = shift;                   return 'Brig::BRIG_KIND_INST_' . uc($name); }
 sub getTargetCategoryName     { my $name = shift; $name =~ s/\./_/g; return "C_" . uc($name); }
 sub genTargetGetAttr          { my $prop = ucfirst(shift());         return "get${prop}Attr"; }
 
@@ -1484,6 +1498,20 @@ sub parseAttr          # Attr ::= PropList ";"
         !isAttr($currentBaseProp, $name) or lexError "Redefinition of attribute '$name'";
         addAttr($currentBaseProp, $name);
     }
+}
+
+sub parseCustomCheck
+{
+    defined $currentProp or lexError "No property context to set custom check";
+    setContext "parsing CustomCheck of property '$currentProp'";
+
+    skipToken('TERM');
+
+    isBaseProp($currentProp)  or lexError "Custom check is not supported yet for clones";
+    isBrigProp($currentProp) or lexError "Custom check is only possible for brig properties";
+    !needCustomCheck($currentProp) or lexError "Custom check is already specified for this property";
+
+    markCustomCheck($currentProp);
 }
 
 sub parseBrigProp 
@@ -1999,7 +2027,7 @@ sub genSwitchHeader
     my ($type, $name, $args) = @_;
 
     print cpp(<<"EOT");
-        |$type $className\::$name($args)
+        |$type ${className}::$name($args)
         |{
         |    switch (inst.opcode())
         |    {
@@ -2015,7 +2043,7 @@ sub genSwitchFooter
         |            @{[ $errHdlr->() ]}
         |            break;
         |    }
-        |} // $className\::$name 
+        |} // ${className}::$name 
 EOT
 }
 
@@ -2130,7 +2158,7 @@ sub genCheck
     my ($chk, $indent) = @_;
     my $prop = getChkPropName($chk);
 
-    if (isBrigProp($prop))
+    if (isBrigProp($prop) && !needCustomCheck($prop))
     {
         my @values = getChkPropValues($chk);
         return $indent . genDirectCheck($prop, shift @values);
@@ -2154,7 +2182,7 @@ sub genAssert
     my $prop = getChkPropName($chk);
     my $res;
 
-    if (isBrigProp($prop))
+    if (isBrigProp($prop) && !needCustomCheck($prop))
     {
         my ($val0) = getChkPropValues($chk);
         $res = '    if (!' . genDirectCheck($prop, $val0) . ") ";
@@ -2253,7 +2281,7 @@ sub genArrayDef
     my ($prop, $name) = getAliasComponents(shift);
     my $targetName = getTargetArrayName($prop, $name);
 
-    print "unsigned $className\::$targetName\[] = {\n    ";
+    print "unsigned ${className}::${targetName}[] = {\n    ";
     print join(",\n    ", translateValues($prop, getTargetArrayValues($prop, $name)));
     print "\n};\n\n";
 }
@@ -2275,7 +2303,7 @@ sub genCheckDef
     my $targetChkName = getTargetBrigChkName(getTargetArrayName($prop, $name));
 
     print cpp(<<"EOT");
-        |bool $className\::$targetChkName(unsigned val)
+        |bool ${className}::$targetChkName(unsigned val)
         |{
         |    switch(val)
         |    {    
@@ -2666,6 +2694,7 @@ while (my $val = getToken('NAME', 1))
     elsif ($val eq 'Attr')         { parseAttr; }
     elsif ($val eq 'Req')          { parseReq;  }
     elsif ($val eq 'Inst')         { parseInst; }
+    elsif ($val eq 'CustomCheck')  { parseCustomCheck; }
     else {
         lexError "Invalid identifier '$val', expected one of: BrigProp, Prop, Clone, Alias, Req, Inst";
     }
@@ -2882,7 +2911,7 @@ genCommonDefinitions();
 setContext "generating isBrigProp";
 
 print cpp(<<"EOT");
-    |bool $className\::isBrigProp(unsigned propId)
+    |bool ${className}::isBrigProp(unsigned propId)
     |{
     |    switch(propId)
     |    {
@@ -2910,7 +2939,7 @@ EOT
 setContext "generating getOpcodes";
 
 print cpp(<<"EOT");
-    |unsigned $className\::OPCODES[] = 
+    |unsigned ${className}::OPCODES[] = 
     |{
 EOT
 
@@ -2923,7 +2952,7 @@ for my $name (@hdlInstList)
 print cpp(<<"EOT");
     |};
     |
-    |const unsigned* $className\::getOpcodes(unsigned& num)
+    |const unsigned* ${className}::getOpcodes(unsigned& num)
     |{
     |    num = sizeof(OPCODES) / sizeof(unsigned);
     |    return OPCODES;
@@ -2937,7 +2966,7 @@ EOT
 setContext "generating getOpcodes";
 
 print cpp(<<"EOT");
-    |unsigned $className\::getFormat(unsigned opcode)
+    |unsigned ${className}::getFormat(unsigned opcode)
     |{
     |    switch(opcode)
     |    {
@@ -2997,7 +3026,7 @@ sub printPropValues
 }
 
 for my $prop (keys %hdlProp) {
-    print "unsigned $className\::", getTargetPropValListName($prop), "[] = \n{\n"; 
+    print "unsigned ${className}::", getTargetPropValListName($prop), "[] = \n{\n"; 
     printPropValues($prop);
     print "};\n\n"
 }
@@ -3010,7 +3039,7 @@ sub printPropValsCode
 }
 
 print cpp(<<"EOT");
-    |const unsigned* $className\::getPropVals(unsigned propId, unsigned& num) // should include XXX_VAL_INVALID for invalid values (non-brig only)
+    |const unsigned* ${className}::getPropVals(unsigned propId, unsigned& num) // should include XXX_VAL_INVALID for invalid values (non-brig only)
     |{
     |    switch(propId)
     |    {
@@ -3044,7 +3073,7 @@ setContext "generating getProps";
 
 for my $inst (getRegisteredInst()) 
 {
-    print "unsigned $className\::", getTargetReqPropsName($inst), "[] =\n";
+    print "unsigned ${className}::", getTargetReqPropsName($inst), "[] =\n";
     print "{\n";
     for my $prop (getOrderedPropList($inst)) {
         print '    ', getTargetPropName($prop), ',', ' ' x (20 - length(getTargetPropName($prop))), '// ', getPropKindName($inst, $prop), "\n"; 
@@ -3053,7 +3082,7 @@ for my $inst (getRegisteredInst())
 }
 
 print cpp(<<"EOT");
-    |const unsigned* $className\::getProps(unsigned opcode, unsigned& prm, unsigned& sec) 
+    |const unsigned* ${className}::getProps(unsigned opcode, unsigned& prm, unsigned& sec) 
     |{
     |    switch(opcode)
     |    {
@@ -3089,7 +3118,7 @@ setContext "generating getPropVals(opcode, propId, num)";
 
 for my $inst (getRegisteredInst()) {
     for my $prop (getOrderedPropList($inst)) {
-        print "unsigned $className\::", getTargetReqPropValListName($inst, $prop), "[] =\n";
+        print "unsigned ${className}::", getTargetReqPropValListName($inst, $prop), "[] =\n";
         print "{\n";
         printPropValList($prop, getInstPropVals($inst, $prop));
         print "};\n\n";
@@ -3097,7 +3126,7 @@ for my $inst (getRegisteredInst()) {
 }
 
 print cpp(<<"EOT");
-    |const unsigned* $className\::getPropVals(unsigned opcode, unsigned propId, unsigned& num) 
+    |const unsigned* ${className}::getPropVals(unsigned opcode, unsigned propId, unsigned& num) 
     |{
     |    switch(opcode)
     |    {
@@ -3280,7 +3309,7 @@ sub genIsValidProp
 
 for my $inst (getRegisteredInst()) 
 {
-    print "template<class T> bool $className\::", getTargetChkReqPropName($inst), "(T inst, unsigned propId)\n";
+    print "template<class T> bool ${className}::", getTargetChkReqPropName($inst), "(T inst, unsigned propId)\n";
     print "{\n";
     print "    switch(propId)\n";
     print "    {\n";
@@ -3322,7 +3351,7 @@ genSwitchFooter('isValidProp', sub { return 'assert(false); return false;' });
 
 print cpp(<<"EOT");
     |
-    |bool $className\::validatePrimaryProps(Inst inst)
+    |bool ${className}::validatePrimaryProps(Inst inst)
     |{
     |    unsigned prm;
     |    unsigned sec;
@@ -3361,7 +3390,7 @@ sub genIsValid
 if ($validateTestGen)
 {
     for my $inst (getRegisteredInst()) {
-        print "template<class T> bool $className\::", getTargetReqValidatorName($inst), "(T inst)\n";
+        print "template<class T> bool ${className}::", getTargetReqValidatorName($inst), "(T inst)\n";
         print "{\n";
 
         genIsValidInst($inst);

@@ -50,7 +50,10 @@ static const char* getBrigPropName(unsigned prop)
     case PROP_EQUIVCLASS: return "equivClass";
     case PROP_FTZ: return "ftz";
     case PROP_GEOMETRY: return "geometry";
+    case PROP_GLOBALSEGMENTMEMORYSCOPE: return "globalSegmentMemoryScope";
+    case PROP_GROUPSEGMENTMEMORYSCOPE: return "groupSegmentMemoryScope";
     case PROP_IMAGEQUERY: return "imageQuery";
+    case PROP_IMAGESEGMENTMEMORYSCOPE: return "imageSegmentMemoryScope";
     case PROP_IMAGETYPE: return "imageType";
     case PROP_ISCONST: return "isConst";
     case PROP_ISNONULL: return "isNoNull";
@@ -61,7 +64,6 @@ static const char* getBrigPropName(unsigned prop)
     case PROP_ROUND: return "round";
     case PROP_SAMPLERQUERY: return "samplerQuery";
     case PROP_SEGMENT: return "segment";
-    case PROP_SEGMENTS: return "segments";
     case PROP_SIGNALOPERATION: return "signalOperation";
     case PROP_SIGNALTYPE: return "signalType";
     case PROP_SOURCETYPE: return "sourceType";

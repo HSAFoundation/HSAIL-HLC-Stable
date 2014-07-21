@@ -51,7 +51,7 @@ using HSAIL_ASM::isPackedType;
 using HSAIL_ASM::isSignedType;
 using HSAIL_ASM::isUnsignedType;
 using HSAIL_ASM::isIntType;
-using HSAIL_ASM::getTypeSize;
+using HSAIL_ASM::getBrigTypeNumBits;
 using HSAIL_ASM::getPacking;
 using HSAIL_ASM::isSatPacking;
 using HSAIL_ASM::getPackedDstDim;
@@ -749,7 +749,7 @@ struct op_add_sat
     template<typename T> 
     T operator()(unsigned type, T val1, T val2)
     { 
-        assert(getTypeSize(type) == sizeof(T) * 8);
+        assert(getBrigTypeNumBits(type) == sizeof(T) * 8);
 
         T res  = (T)(val1 + val2);
         
@@ -770,7 +770,7 @@ struct op_sub_sat
     template<typename T> 
     T operator()(unsigned type, T val1, T val2)
     { 
-        assert(getTypeSize(type) == sizeof(T) * 8);
+        assert(getBrigTypeNumBits(type) == sizeof(T) * 8);
 
         T res  = (T)(val1 - val2);
         
@@ -791,7 +791,7 @@ struct op_mul_sat
     template<typename T> 
     T operator()(unsigned type, T val1, T val2)
     { 
-        assert(getTypeSize(type) == sizeof(T) * 8);
+        assert(getBrigTypeNumBits(type) == sizeof(T) * 8);
 
         T res = (T)(val1 * val2);
         
@@ -799,7 +799,7 @@ struct op_mul_sat
 
         if (isSigned(val1))
         {
-            T min = (T)getSignMask(getTypeSize(type));
+            T min = (T)getSignMask(getBrigTypeNumBits(type));
             
             if ((val1 < 0 && val2 == min) || // min negative value is a special case
                 (val1 != 0 && ((T)(res / val1) != val2)))
@@ -1412,6 +1412,7 @@ static Val cvt_x2b1(unsigned type, unsigned stype, AluMod aluMod, Val arg)
 static Val emulateCvt(unsigned type, unsigned stype, AluMod aluMod, Val arg)
 {
     assert(arg.getType() == stype);
+    assert(type != stype);
     
     if (type == BRIG_TYPE_F16) return unimplemented();
 
@@ -1421,7 +1422,6 @@ static Val emulateCvt(unsigned type, unsigned stype, AluMod aluMod, Val arg)
         arg = Val(stype, arg.getAsB64());
     }
 
-    if (type == stype)         return arg;
     if (type == BRIG_TYPE_B1)  return cvt_x2b1(type, stype, aluMod, arg);
     else                       return isFloatType(stype)? 
                                       cvt_f2x(type, stype, aluMod, arg) :
@@ -1442,22 +1442,22 @@ static Val emulateAtomicMem(unsigned type, unsigned atomicOperation, Val arg1, V
 
     switch (atomicOperation)
     {
-    case BRIG_ATOMIC_AND:  return emulateBinOpB(type, arg1, arg2, op_and());
-    case BRIG_ATOMIC_OR:   return emulateBinOpB(type, arg1, arg2, op_or()); 
-    case BRIG_ATOMIC_XOR:  return emulateBinOpB(type, arg1, arg2, op_xor());
+    case BRIG_ATOMIC_AND:     return emulateBinOpB(type, arg1, arg2, op_and());
+    case BRIG_ATOMIC_OR:      return emulateBinOpB(type, arg1, arg2, op_or()); 
+    case BRIG_ATOMIC_XOR:     return emulateBinOpB(type, arg1, arg2, op_xor());
+                              
+    case BRIG_ATOMIC_ADD:     return emulateBinOpSU(type, arg1, arg2, op_add());
+    case BRIG_ATOMIC_SUB:     return emulateBinOpSU(type, arg1, arg2, op_sub());
+    case BRIG_ATOMIC_MAX:     return emulateBinOpSU(type, arg1, arg2, op_max());
+    case BRIG_ATOMIC_MIN:     return emulateBinOpSU(type, arg1, arg2, op_min());
 
-    case BRIG_ATOMIC_ADD:  return emulateBinOpSU(type, arg1, arg2, op_add());
-    case BRIG_ATOMIC_SUB:  return emulateBinOpSU(type, arg1, arg2, op_sub());
-    case BRIG_ATOMIC_MAX:  return emulateBinOpSU(type, arg1, arg2, op_max());
-    case BRIG_ATOMIC_MIN:  return emulateBinOpSU(type, arg1, arg2, op_min());
+    case BRIG_ATOMIC_WRAPINC: return emulateBinOpSU(type, arg1, arg2, op_inc()); 
+    case BRIG_ATOMIC_WRAPDEC: return emulateBinOpSU(type, arg1, arg2, op_dec()); 
+    case BRIG_ATOMIC_EXCH:    return emulateBinOpB(type, arg1, arg2, op_arg2());
+    case BRIG_ATOMIC_CAS:     return emulateTrnOpB(type, arg1, arg2, arg3, op_cas());
 
-    case BRIG_ATOMIC_INC:  return emulateBinOpSU(type, arg1, arg2, op_inc()); 
-    case BRIG_ATOMIC_DEC:  return emulateBinOpSU(type, arg1, arg2, op_dec()); 
-    case BRIG_ATOMIC_EXCH: return emulateBinOpB(type, arg1, arg2, op_arg2());
-    case BRIG_ATOMIC_CAS:  return emulateTrnOpB(type, arg1, arg2, arg3, op_cas());
-
-    case BRIG_ATOMIC_LD:   assert(arg1.getType() == type); return arg1;
-    case BRIG_ATOMIC_ST:   assert(arg2.getType() == type); return arg2;
+    case BRIG_ATOMIC_LD:      assert(arg1.getType() == type); return arg1;
+    case BRIG_ATOMIC_ST:      assert(arg2.getType() == type); return arg2;
 
     default: return emulationFailed();
     }
@@ -1483,7 +1483,7 @@ static Val emulateAluFlag(unsigned type, Val arg1, Val arg2, T op)
 
     if (isSignedType(type)) // Convert args to unsigned (to simplify functor implementation)
     {
-        utype = (getTypeSize(type) == 32)? BRIG_TYPE_U32 : BRIG_TYPE_U64;
+        utype = (getBrigTypeNumBits(type) == 32)? BRIG_TYPE_U32 : BRIG_TYPE_U64;
 
         arg1 = Val(utype, arg1.getAsB64()); // copy bits w/o sign-extension
         arg2 = Val(utype, arg2.getAsB64()); // copy bits w/o sign-extension
@@ -1506,7 +1506,7 @@ static Val emulate_shuffle(unsigned type, Val arg1, Val arg2, Val arg3)
     assert(arg1.isPacked());
     assert(arg1.getType() == type);
     assert(arg2.getType() == type);
-    assert(isBitType(arg3.getType()) && arg3.getSize() == arg1.getSize());
+    assert(isBitType(arg3.getType()) && arg3.getSize() == 32);
 
     Val dst(type, 0);
 
@@ -1956,13 +1956,13 @@ static Val emulateMulHiPacked(unsigned type, unsigned baseType, Val arg1, Val ar
     using namespace Brig;
 
     unsigned elementType = packedType2elementType(type);
-    unsigned opcode = (getTypeSize(elementType) < 32)? BRIG_OPCODE_MUL : BRIG_OPCODE_MULHI;
+    unsigned opcode = (getBrigTypeNumBits(elementType) < 32)? BRIG_OPCODE_MUL : BRIG_OPCODE_MULHI;
 
     Val res = emulateMod(opcode, baseType, AluMod(), arg1, arg2);
 
     if (opcode == BRIG_OPCODE_MUL)
     {
-        res = Val(baseType, res.getAsB64() >> getTypeSize(elementType));
+        res = Val(baseType, res.getAsB64() >> getBrigTypeNumBits(elementType));
     }
 
     return res;
@@ -2034,7 +2034,7 @@ static Val emulateDstValPackedRegular(Inst inst, Val arg0, Val arg1, Val arg2, V
         {
             assert(x2.getType() == BRIG_TYPE_U32);
             
-            unsigned elementSize = getTypeSize(type) / typeDim;
+            unsigned elementSize = getBrigTypeNumBits(type) / typeDim;
             x2 = Val(BRIG_TYPE_U32, x2.u32() & getRangeMask(elementSize));
         }
         
@@ -2106,7 +2106,7 @@ static Val emulateDstValCommon(Inst inst, Val arg0, Val arg1, Val arg2, Val arg3
 // Public interface with Emulator
 
 // Check generic limitations on instruction being tested
-// NB: Most limitations should be encoded in HSAILTestGenLuaTestData.h
+// NB: Most limitations should be encoded in HSAILTestGenTestData.h
 //     This function shall only check limitations which cannot be expressed there
 bool testableInst(Inst inst)
 {
@@ -2122,13 +2122,11 @@ bool testableInst(Inst inst)
     }
     else if (InstCvt instCvt = inst)
     {
-        //if (isOperandExtended(instCvt.type(),       instCvt.operand(0))) return false; // Disable dst extension
-        //if (isOperandExtended(instCvt.sourceType(), instCvt.operand(1))) return false; // Disable src extension
+        if (AluMod(instCvt.modifier().allBits()).isSignaling()) return false;
     }
     else if (InstMem instMem = inst)
     {
         if (!isSupportedSegment(instMem.segment())) return false;
-        //if (isOperandExtended(inst.type(), inst.operand(0))) return false; // Disable dst extension
         if (instMem.width() != BRIG_WIDTH_NONE && instMem.width() != BRIG_WIDTH_1) return false;
         if (instMem.align() != BRIG_ALIGNMENT_1) return false; //F unaligned access is not supported yet
         if (instMem.modifier().isConst()) return false;
@@ -2195,10 +2193,11 @@ Val emulateMemVal(Inst inst, Val arg0, Val arg1, Val arg2, Val arg3, Val arg4)
     return res.normalize();
 }
 
-// Return precision of result computation for this instruction:
-// If the value is greater than or equals to 1, the precision is specified in ULPS.
+// Return precision of result computation for this instruction.
+// If the value is 0, the precision is infinite.
 // If the value is between 0 and 1, the precision is relative.
-// NB: This is a property of target HW, not emulator!
+// If the value is greater than or equals to 1, the precision is specified in ULPS.
+// This is a property of target HW, not emulator!
 double getPrecision(Inst inst)
 {
     using namespace Brig;

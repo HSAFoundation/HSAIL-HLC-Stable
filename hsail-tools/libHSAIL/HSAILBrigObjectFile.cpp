@@ -80,14 +80,13 @@ struct SectionDesc {
     unsigned    flags;
     unsigned    align;
 } sectionDescs[] = {
-    { BRIG_SECTION_DIRECTIVES, ".directives", ".brig_directives", "__BRIG__directives",   SHT_PROGBITS, 0,           4 },
-    { BRIG_SECTION_CODE,       ".code",       ".brig_code",       "__BRIG__code",         SHT_PROGBITS, 0,           4 },
-    { BRIG_SECTION_OPERANDS,   ".operands",   ".brig_operands",   "__BRIG__operands",     SHT_PROGBITS, 0,           4 },
-    { BRIG_SECTION_DEBUG,      ".debug",      ".debug_hsa",       "__debug_brig__",       SHT_PROGBITS, 0,           4 },
-    { BRIG_SECTION_STRINGS,    ".strtab",     ".brig_strtab",     "__BRIG__strtab",       SHT_PROGBITS, 0,           1 },
-    { ELF_SECTION_STRTAB,      0,             ".strtab",          0,                      SHT_STRTAB,   SHF_STRINGS, 1 },
-    { ELF_SECTION_SYMTAB,      0,             ".symtab",          0,                      SHT_SYMTAB,   0,           8 },
-    { ELF_SECTION_SHSTRTAB,    ".shstrtab",   ".shstrtab",        0,                      SHT_STRTAB,   SHF_STRINGS, 1 },
+    { Brig::BRIG_SECTION_INDEX_DATA,                   "hsa_data",    ".brig_strtab",   "__BRIG__strtab",   SHT_PROGBITS, 0,           4 },
+    { Brig::BRIG_SECTION_INDEX_CODE,                   "hsa_code",    ".brig_code",     "__BRIG__code",     SHT_PROGBITS, 0,           4 },
+    { Brig::BRIG_SECTION_INDEX_OPERAND,                "hsa_operand", ".brig_operands", "__BRIG__operands", SHT_PROGBITS, 0,           4 },
+    { Brig::BRIG_SECTION_INDEX_IMPLEMENTATION_DEFINED, "hsa_debug",   ".debug_hsa",     "__debug_brig__",   SHT_PROGBITS, 0,           4 },
+    { ELF_SECTION_STRTAB,                              0,             ".strtab",        0,                  SHT_STRTAB,   SHF_STRINGS, 1 },
+    { ELF_SECTION_SYMTAB,                              0,             ".symtab",        0,                  SHT_SYMTAB,   0,           8 },
+    { ELF_SECTION_SHSTRTAB,                            ".shstrtab",   ".shstrtab",      0,                  SHT_STRTAB,   SHF_STRINGS, 1 },
 };
 
 const int NUM_PREDEFINED_ELF_SECTIONS = sizeof(sectionDescs)/sizeof(const SectionDesc*);
@@ -170,11 +169,10 @@ public:
 public:
     int readContainer(BrigContainer &c, ReadAdapter *s) {
         if (s->pread((char*)&elfHeader, sizeof(elfHeader), 0)) {
-            s->errs << " reading ELF header";
             return 1;
         }
         if (!elfHeader.checkMagic()) {
-            s->errs << "Invalid ELF header";
+            s->errs << "Invalid ELF header" << std::endl;
             return 1;
         }
         if (fmt == FILE_FORMAT_AUTO) {
@@ -186,7 +184,8 @@ public:
                 s->errs << "Unable to detect format with type=" 
                           << elfHeader.e_type
                           << ", machine = "
-                          << elfHeader.e_machine;
+                          << elfHeader.e_machine
+                          << std::endl;
             }
         }
         sectionHeaders.resize(elfHeader.e_shnum);
@@ -194,7 +193,6 @@ public:
             if (s->pread((char*)&sectionHeaders[i], sizeof(Shdr),
                               elfHeader.e_shoff + i * elfHeader.e_shentsize)) 
             {
-                s->errs << " reading section headers";
                 return 1;
             }
         };
@@ -213,10 +211,10 @@ public:
             std::vector<char> data;
             if (readSection(data, s, i)) return 1;
 
-            if (!data.empty()) {
-                c.sectionById(desc->sectionId).setData(&data[0],data.size()); // TBD095 replace with normal swap
+            if (c.loadSection(desc->sectionId, data, s->errs)) {
+                return 1;
             }
-        };
+        }
         return 0;
     }
 private:
@@ -252,19 +250,17 @@ private:
 
     int readSection(std::vector<char> &dst, ReadAdapter *s, unsigned index) {
         if (index >= sectionHeaders.size()) {
-            s->errs << "Section index " << index << " out of bounds";
+            s->errs << "Section index " << index << " out of bounds" << std::endl;
             return 1;
         }
         Shdr &shdr = sectionHeaders[index];
         if (shdr.sh_size > (std::numeric_limits<unsigned>::max)()) {
-            s->errs << "Section size more than 4GB is not supported";
+            s->errs << "Section size more than 4GB is not supported" << std::endl;
             return 1;
         }
         if (preadVec(s, dst, static_cast<unsigned>(shdr.sh_size), shdr.sh_offset))
         {
             const char* name = sectionName(index);
-            s->errs << " reading section ";
-            if (name) { s->errs << name; } else { s->errs << index; } 
             return 1;
         }
         return 0;
@@ -276,7 +272,7 @@ public:
 
     int writeContainer(WriteAdapter *s, const BrigContainer& c) {
         reset();
-        for(int i = 0; i < NUM_BRIG_SECTIONS; ++i) {
+        for(int i = 0; i < c.getNumSections(); ++i) {
             addSection(descById(i), c.sectionById(i).data());
         }
         unsigned strTabNdx = 0;
@@ -379,10 +375,14 @@ private:
         if (s && s->write((char*)&elfHeader, sizeof(Ehdr))) {
             return 1;
         }
-        alignFilePos(s, filePos, 4);
+        if (alignFilePos(s, filePos, 4)) {
+            return 1;
+        }
         for(unsigned secIndex = 1; secIndex < sectionHeaders.size(); ++secIndex) {
             Shdr &shdr = sectionHeaders[secIndex];
-            alignFilePos(s, filePos, shdr.sh_addralign);
+            if (alignFilePos(s, filePos, shdr.sh_addralign)) {
+                return 1;
+            }
             shdr.sh_offset = filePos;
             if (s && s->write(sectionData[secIndex].begin, shdr.sh_size)) {
                 return 1;
@@ -390,7 +390,9 @@ private:
             filePos += shdr.sh_size;
         }
 
-        alignFilePos(s, filePos, 4);
+        if (alignFilePos(s, filePos, 4)) {
+            return 1;
+        }
         elfHeader.e_shoff = filePos;
         if (s && s->write((char*)&sectionHeaders[0], elfHeader.e_shnum * elfHeader.e_shentsize)) {
             return 1;
@@ -444,7 +446,7 @@ struct FileAdapter : public ReadWriteAdapter {
         }
         if (fd < 0) {
             printErr(errs);
-            errs << " opening \"" << filename << "\"";
+            errs << " opening \"" << filename << "\"" << std::endl;
             return 1;
         }
         return 0;
@@ -458,11 +460,13 @@ struct FileAdapter : public ReadWriteAdapter {
         }
     }
     virtual int write(const char* data, size_t numBytes) const {
-//        printf("write fd=%d data=%p size=%d\n", (int)fd, data, numBytes);
         int res = ::write(fd, data, (unsigned)numBytes);
-        if (check1(res)) return 1;
+        if (check1(res)) {
+            errs << " writing" << std::endl;
+            return 1;
+        }
         if (res != (int)numBytes) {
-            errs << "Wrote " << res << " bytes instead of " << numBytes;
+            errs << "Wrote " << res << " bytes instead of " << numBytes << std::endl;
             return 1;
         }
         return 0;
@@ -471,13 +475,16 @@ struct FileAdapter : public ReadWriteAdapter {
         int64_t lrc = ::LSEEK(fd, offset, SEEK_SET);
         if (check1((int)lrc)) return 1;
         if ((uint64_t)lrc != offset) {
-            errs << "Seeked to " << lrc << " instead of " << offset;
+            errs << "Seeked to " << lrc << " instead of " << offset << std::endl;
             return 1;
         }
         int rc = ::read(fd, data, (unsigned)numBytes);
-        if (check1(rc)) return 1;
+        if (check1(rc)) {
+            errs << " reading" << std::endl;
+            return 1;
+        }
         if (rc != (int)numBytes) {
-            errs << "Read " << rc << " bytes instead of " << numBytes;
+            errs << "Read " << rc << " bytes instead of " << numBytes << std::endl;
             return 1;
         }
         return 0;
@@ -505,7 +512,7 @@ struct VectorAdapter : public ReadWriteAdapter {
     }
     virtual int pread(char* data, size_t numBytes, uint64_t offset) const {
         if (offset + numBytes > buf.size()) {
-            errs << "Reading beyond the end of the buffer";
+            errs << "Reading beyond the end of the buffer" << std::endl;
             return 1;
         }
         if (numBytes == 0) return 0;
@@ -530,7 +537,7 @@ struct MemoryAdapter : public ReadWriteAdapter {
     }
     virtual int write(const char* data, size_t numBytes) const {
         if (pos + numBytes > bufSize) {
-            errs << "Writing beyond the end of the buffer";
+            errs << "Writing beyond the end of the buffer" << std::endl;
             return 1;
         }
         memcpy(buf + pos, data, numBytes);
@@ -539,7 +546,7 @@ struct MemoryAdapter : public ReadWriteAdapter {
     }
     virtual int pread(char* data, size_t numBytes, uint64_t offset) const {
         if (offset + numBytes > bufSize) {
-            errs << "Reading beyond the end of the buffer";
+            errs << "Reading beyond the end of the buffer" << std::endl;
             return 1;
         }
         if (numBytes == 0) return 0;
@@ -567,12 +574,12 @@ struct istreamAdapter : public ReadAdapter {
         }
         is.seekg(static_cast<std::streamoff>(offset), std::ios_base::beg);
         if (is.fail()) {
-            errs << "stream seek error" << std::endl;
+            errs << "Stream seek error" << std::endl;
             return 1;
         }
         is.read(data, static_cast<std::streamsize>(numBytes));
         if (is.fail() || static_cast<size_t>(is.gcount()) < numBytes) {
-            errs << "error reading stream" << std::endl;
+            errs << "Error reading stream" << std::endl;
             return 1;
         }
         return 0;
@@ -584,51 +591,51 @@ std::ostream& BrigIO::defaultErrs() {
     return std::cerr;
 }
 
-std::auto_ptr<ReadAdapter> BrigIO::fileReadingAdapter(
+std::unique_ptr<ReadAdapter> BrigIO::fileReadingAdapter(
                 const char* fileName, 
                 std::ostream& errs)
 {
-    std::auto_ptr<FileAdapter> theFile( new FileAdapter(errs) );
+    std::unique_ptr<FileAdapter> theFile( new FileAdapter(errs) );
     if (theFile->open(fileName, false)) {
         theFile.release();
     }
-    return std::auto_ptr<ReadAdapter>(theFile);
+    return std::move(theFile);
 }
 
-std::auto_ptr<WriteAdapter> BrigIO::fileWritingAdapter(
+std::unique_ptr<WriteAdapter> BrigIO::fileWritingAdapter(
                 const char* fileName, 
                 std::ostream& errs)
 {
-    std::auto_ptr<FileAdapter> theFile( new FileAdapter(errs) );
+    std::unique_ptr<FileAdapter> theFile( new FileAdapter(errs) );
     if (theFile->open(fileName, true)) {
         theFile.release();
     }
-    return std::auto_ptr<WriteAdapter>(theFile);
+    return std::move(theFile);
 }
 
-std::auto_ptr<WriteAdapter> BrigIO::memoryWritingAdapter(
+std::unique_ptr<WriteAdapter> BrigIO::memoryWritingAdapter(
                     char         *buf, 
                     size_t        size,
                     std::ostream& errs)
 {
-    return std::auto_ptr<WriteAdapter>(
+    return std::unique_ptr<WriteAdapter>(
             new MemoryAdapter(buf, size, errs) );
 }
 
-std::auto_ptr<ReadAdapter> BrigIO::memoryReadingAdapter(
+std::unique_ptr<ReadAdapter> BrigIO::memoryReadingAdapter(
                     const char   *buf, 
                     size_t        size,
                     std::ostream& errs)
 {
-    return std::auto_ptr<ReadAdapter>(
+    return std::unique_ptr<ReadAdapter>(
             new MemoryAdapter((char*)buf, size, errs) );
 }
 
-std::auto_ptr<ReadAdapter> BrigIO::istreamReadingAdapter(
+std::unique_ptr<ReadAdapter> BrigIO::istreamReadingAdapter(
                     std::istream& is, 
                     std::ostream& errs)
 {
-    return std::auto_ptr<ReadAdapter>(
+    return std::unique_ptr<ReadAdapter>(
             new istreamAdapter(is, errs));
 }
 
@@ -637,7 +644,9 @@ int BrigIO::load(BrigContainer &dst,
                  ReadAdapter&  src)
 {
     unsigned char ident[16];
-    src.pread((char*)ident, 16, 0);
+    if (0 != src.pread((char*)ident, 16, 0)) {
+        return 1;
+    }
     switch(ident[EI_CLASS]) {
     case ELFCLASS32: {
         BrigIOImpl<Elf32Policy> impl(fmt);
@@ -648,7 +657,7 @@ int BrigIO::load(BrigContainer &dst,
         return impl.readContainer(dst, &src);
         }
     default:
-        src.errs << "Invalid ELFCLASS";
+        src.errs << "Invalid ELFCLASS" << std::endl;
         return 1;
     }
 }

@@ -1,7 +1,8 @@
-ASM_DEPTH = $(COMPONENT_DEPTH)/..
-LIBHSAIL_DEPTH = $(COMPONENT_DEPTH)/../libHSAIL
+HT_DEPTH = $(COMPONENT_DEPTH)/..
 
-include $(ASM_DEPTH)/asmdefs
+include $(HT_DEPTH)/htdefs
+
+include $(LLVM_DEPTH)/llvmlibs
 
 #
 ## Targets
@@ -22,7 +23,9 @@ endif
 
 CPPFILES := $(notdir $(wildcard $(COMPONENT_DEPTH)/*.cpp))
 
-CPPFLAGS += -Wno-reorder -Wno-deprecated
+GCPPFLAGS += $(DEFSWITCH) __STDC_LIMIT_MACROS \
+	    $(DEFSWITCH) __STDC_CONSTANT_MACROS \
+    	$(DEFSWITCH) __STDC_FORMAT_MACROS
 
 PRE_TARGETS = $(GENFILES)
 
@@ -32,9 +35,8 @@ GENFILES = \
 GENINPUTS = $(LIBHSAIL_DEPTH)/HDLProcessor.pl \
 	$(LIBHSAIL_DEPTH)/HSAILBrigInstr.hdl
 
-LCINCS = $(INCSWITCH) $(COMPONENT_DEPTH) \
-         $(INCSWITCH) $(ASM_DEPTH)/libHSAIL \
-         $(INCSWITCH) $(ASM_DEPTH)/libHSAIL/$(FULL_BUILD_DIR)
+LCINCS += $(INCSWITCH) $(COMPONENT_DEPTH) \
+          $(LIBHSAIL_INCS)
 
 $(BUILD_DIR)/generate-stamp: $(GENINPUTS)
 	@$(MAKENOISE) "Generating TestGen source files ..."
@@ -59,5 +61,5 @@ else
     LLOPTS = /subsystem:console
 endif
 
-include $(ASM_DEPTH)/asmrules
+include $(HT_DEPTH)/htrules
 

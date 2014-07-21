@@ -90,6 +90,16 @@ do {
 	close F;
 };
 #use re 'debug';
+
+sub parseError() {
+    	my $pos = pos($_);
+		my $text = substr($_, 0, $pos, "");
+		my $ln = 1;
+		my $lpos = 0;
+		while($text =~ /\G[^\n]*\n/gc) { $ln++; $lpos = pos($text); }
+		my $col = $pos - $lpos + 1;
+		die "Parse error at line $ln, col $col : $_";
+}
 while(pos($_) < length($_)) {
 	if (m/\G\s+/gc) {
 	} elsif (m/\G\}\s*(\w*)\s*;/gc) {
@@ -102,7 +112,7 @@ while(pos($_) < length($_)) {
 		} elsif ($enum) {
 			$enum = $entity = undef;
 		} else {
-			die;
+			parseError;
 		}
 		} elsif ($struct && !$unionMode && /\Gunion\s*\{/gc) {
 			$unionMode = 1;
@@ -133,6 +143,12 @@ while(pos($_) < length($_)) {
 	elsif (!$struct && !$enum && /\Genum\s+(?<name>\w+)\s*\{/gc) {
 		$enums->{$1} = $enum = $entity = +{%+,%preprops};
 		%preprops=();
+	}
+    elsif(m{\G//\.ignore\{.*?//\}}gsc) {
+        # do nothing
+    }
+    elsif(m{\G//\+(\w++)\s*([^\n]*)}gc) {
+		push @{$entity->{$1}}, $2;
 	}
 	elsif(m{\G(///[^\n]*+)}gc) {
 		push @{$preprops{comments}}, $&;
@@ -174,13 +190,7 @@ while(pos($_) < length($_)) {
 		# do nothing #push @{$entity->{comments}}, $1;
 	}
 	else {
-		my $pos = pos($_);
-		my $text = substr($_, 0, $pos, "");
-		my $ln = 1;
-		my $lpos = 0;
-		while($text =~ /\G[^\n]*\n/gc) { $ln++; $lpos = pos($text); }
-		my $col = $pos - $lpos + 1;
-		die "Parse error at line $ln, col $col : $_";
+        parseError;
 	}
 };
 
@@ -203,10 +213,10 @@ for my $s (@wstructs) {
 	if (!$s->{wname}) {
 		($s->{wname} = $sname) =~ s/^Brig//;
 	}
-	$s->{enum} //= "BRIG".Name2MACRO($s->{wname});
+	$s->{enum} //= "BRIG_KIND".Name2MACRO($s->{wname});
 	next if $s->{isroot};
 	if (!$s->{parent}) {
-		$sname =~ /^(Brig[A-Z][a-z]+)/ or die;
+		$sname =~ /^(Brig[A-Z][a-z]+)/ or die "$sname";
 		$s->{parent} = $1;
 	}
 	die "$sname: bad parent: $s->{parent}" unless exists $structs->{$s->{parent}};
@@ -307,7 +317,7 @@ sub makeHSAILInitBrig {
 
 			my $rhs;
 			$rhs //= "sizeof(Brig::".$s->{name}.")"
-							if ($fname eq "size");
+							if ($fname eq "byteCount");
 			$rhs //= "Brig::".$s->{enum}    if ($fname eq "kind");
 			$rhs //= $f->{defValue}         if (exists $f->{defValue});
 
@@ -344,7 +354,8 @@ sub makeSwitch($$%) {
 		my $entryName = $entry->{name};
 		my $attrValue = $entry->{$attrKey};
 		next unless defined $attrValue;
-		next if $entry->{skip};
+    	next if $entry->{skip};
+    	next if $entry->{"no_".$attrKey};
 		$attrValue="\"$attrValue\"" if $proto=~/^(?:const\s+)?char\s*\*/;
 		my $attrCode = "return $attrValue";
 		my $scanner = $options{scanner} || $options{token};
@@ -355,7 +366,11 @@ sub makeSwitch($$%) {
 			if ($token) {
 				# HACK: modifier token ids have an underscore as prefix.
 				# This underscore is stripped from token id and added to token text.
-				if ($token=~s/^_//) { $tokenText =~ s/^"/"_/; $scanner = "_mods_"; }
+				if ($token=~s/^_//) { 
+                  $tokenText =~ s/^"/"_/; $tokenText .= "/EOMOD"; $scanner = "_mods_"; 
+                } else {
+                  $tokenText .= ($scanner eq "Instructions") ? "/EOMOD" : "/EOKW";
+                }
 				$block = sprintf "%-50s %-30s", "brigId = Brig::$entryName;", "return $token; ";
 				if ($context) {
 					$scanner{$scanner}->{$tokenText}->{$context} = $block;
@@ -369,7 +384,14 @@ sub makeSwitch($$%) {
 			
 		}
 		if (defined($attrCode) && $attrCode ne $defaultCode) {
-			$$text .= sprintf "    case %-30s : %s;\n", $entryName, $attrCode;
+            if ($options{reverse}) {
+#                print STDERR "$attrCode $entryName\n";
+                $attrCode =~ s/^return\s*//;
+                $entryName =~ s/^/return /;
+    			$$text .= sprintf "    case %-30s : %s;\n", $attrCode, $entryName;
+            } else {
+    			$$text .= sprintf "    case %-30s : %s;\n", $entryName, $attrCode;
+            }
 		}
 	}
 	$$text .= "$options{post}    default : $defaultCode;\n    }\n}\n\n";
@@ -404,7 +426,7 @@ sub generateBrigUtilities {
 }
 
 sub printComments {
-	my $cc = $_[0]->{comments};
+	my $cc = $_[0];
 	my $pfx = $_[1] // "";
 	return unless defined $cc;
 	for my $c (@$cc) {
@@ -426,7 +448,7 @@ sub makeWrappers {
 		my %pfields = map { ($_->{name},1) } @{$parent->{fields}};
 		my $pwname  = $s->{isroot} ? "ItemBase" : $parent->{wname};
 
-		printComments($s);
+		printComments($s->{comments});
 
 		print "class $swname : public $pwname {\n";
 
@@ -436,7 +458,10 @@ sub makeWrappers {
 
 		print "public:\n";
 
-		print "\n\ttypedef $swname Kind;\n" if ($s->{isroot} && !$s->{standalone});
+        if ($s->{isroot} && !$s->{standalone}) {
+        	print "\n\ttypedef $swname Kind;\n" ;
+        	print "\n\tenum { SECTION = Brig::",$s->{section}," };\n";
+        }
 
 		print "\n\t/// accessors\n";
 		my $findex = -1;
@@ -448,7 +473,7 @@ sub makeWrappers {
 				next if $s->{isroot};
 				my $pf = $parent->{fields}->[$findex];
 				if ($pf->{name} ne $fname or $pf->{type} ne $ftype) {
-					die "Parent mismatch: $sname $findex=$ftype $fname $parent->{name} $findex = $pf->{type} $pf->{name}"
+					die "Parent mismatch: $sname $findex=$ftype $fname $parent->{name} $findex = $pf->{type} $pf->{name} pfields=",Dumper(\%pfields);
 				}
 				if ($pf->{wname} eq $wname and $pf->{wtype} eq $wtype) {
 					next;
@@ -471,7 +496,7 @@ sub makeWrappers {
 				$fldvalue = $fldvalue."[index]";
 			}
 			my $constness = "";
-			printComments $f, "\t";
+			printComments $f->{comments}, "\t";
 
 			if ($f->{wspecial}) {
 				my $specialType = $f->{wspecial};
@@ -486,6 +511,17 @@ sub makeWrappers {
 
 			printf("\t%-50s %s;\n", $wtype, "$wname$args$constness");
 			$wrapperImpls .= "inline $wtype ${\$swname}::$wname$args$constness { return $helper(&brig()->$fldvalue); }\n";
+
+            if (defined $f->{hcode}) {
+                my $t = "\t".join("\n\t", @{$f->{hcode}})."\n";
+                $t =~ s/KLASS/$swname/g;
+                print $t;
+            }
+            if (defined $f->{implcode}) {
+                my $t = join("\n", @{$f->{implcode}})."\n";
+                $t =~ s/KLASS/$swname/g;
+                $wrapperImpls .= $t;
+            }
 		}
 
 
@@ -494,25 +530,29 @@ sub makeWrappers {
 		print "\t$swname(MySection* s, Offset o)     : $pwname(s, o) { } \n";
 		my @children = $s->{children} ? grep { !$_->{generic} } values %{$s->{children}} : ($s);
 		if (!$s->{standalone}) {
-			print "\t$swname(BrigContainer* c, Offset o) : $pwname(&(c->section<Kind>()), o) { } \n";
+			print "\t$swname(BrigContainer* c, Offset o) : $pwname(&c->sectionById(SECTION), o) { } \n";
 		}
 
-		if (!$s->{isroot}) {
+#		if (!$s->{isroot}) {
+        if (!$s->{standalone}) {
 			print "\n\t/// assignment\n";
-			print "\tstatic bool isAssignable(const Kind& rhs) {\n\t\treturn ",
+			print "\tstatic bool isAssignable(const ItemBase& rhs) {\n\t\treturn ",
 				join("\n\t\t    || ", (map { "rhs.brig()->kind == Brig::".$_->{enum} } @children ))
 				,";\n\t}\n";
-			print "\t$swname(const Kind& rhs) { assignItem(*this,rhs); } \n";
-		} else {
-			print "\n\t/// assignment\n\tstatic bool isAssignable(const $swname& rhs) { return true; } \n" unless ($s->{standalone});
-		}
+			print "\t$swname(const ItemBase& rhs) { assignItem(*this,rhs); } \n";
+    		print "\t$swname& operator=(const ItemBase& rhs) { assignItem(*this,rhs); return *this; }\n";
+        } else {
+    		print "\t$swname(const $swname& rhs) : ItemBase(rhs) { } \n";
+			print "\t$swname& operator=(const $swname& rhs) { reset(rhs); return *this; }\n";
+        }
+#		} else {
+#			print "\n\t/// assignment\n\tstatic bool isAssignable(const $swname& rhs) { return true; } \n" unless ($s->{standalone});
+#		}
 
-		my $swkind = $s->{isroot} ? $swname : "Kind";
-		if (!$s->{standalone}) {
-			print "\t$swname& operator=(const $swkind& rhs) { assignItem(*this,rhs); return *this; }\n";
-		} else {
-			print "\t$swname& operator=(const $swkind& rhs) { reset(rhs); return *this; }\n";
-		}
+		#my $swkind = $s->{isroot} ? $swname : "Kind";
+#		if (!$s->{standalone}) {
+#		} else {
+#		}
 
 		print "\n\t/// raw brig access\n";
 		print "\ttypedef Brig::$sname BrigStruct;\n";
@@ -521,7 +561,7 @@ sub makeWrappers {
 
 		if ($s->{isroot} && !$s->{standalone}) {
 			print "\n\t/// root utilities\n";
-			print "\tOffset  brigSize() const { return brig()->size; }\n";
+			print "\tOffset  brigSize() const { return brig()->byteCount; }\n";
 			print "\t$swname next() const { return $swname(section(), brigOffset() + brigSize()); }\n";
 		}
 
@@ -591,7 +631,7 @@ sub makeEnumFlds {
 		for my $f (@{$s->{fields}}) {
 			next if $f->{skip} || $f->{novisit};
 			die if $f->{wspecialgeneric};
-			next if $f->{name} eq "size" or $f->{name} eq "kind";
+			next if $f->{name} eq "byteCount" or $f->{name} eq "kind";
 			my $acc = "obj.$f->{wname}";
 			if ($f->{size}) {
 				my $size = $f->{size};
@@ -648,13 +688,14 @@ sub cpp
 }
 
 sub makeValidatorFunc {
-    my ($name, $type) = @_;
-    $type //= $name;
-
+    my ($name, $suff, $filter) = @_;
+    $suff //= "Fields";
+    $filter //= '^*$';
+    
     print cpp(<<"EOT");
         |
         |
-        |bool ValidatorImpl::ValidateBrig${name}Fields($type item) const
+        |bool ValidatorImpl::ValidateBrig${name}${suff}($name item) const
         |{
         |    using namespace Brig;
         |
@@ -684,12 +725,12 @@ EOT
 
         for my $f (@{$s->{fields}}) {
             next if $f->{phantomof};
-            next if $f->{name} =~ /^(size|kind|operands)$/;
-            next if $f->{wspecial}; # variable-size arrays should be validated separately
+            next if $f->{name} =~ /^(byteCount|kind)$/;
+            next if $f->{wtype} !~ $filter;
 
             my $fieldType = $f->{type};
 
-            if ($fieldType =~ /^Brig/) {
+            if ($fieldType =~ /^Brig/ && $fieldType !~ /^BrigUInt64$/) {
                 $fieldType =~ s/^(.*?)[0-9]+_t$/$1/;
             } else {
                 $fieldType = "fld_" . ucfirst($f->{name});
@@ -728,7 +769,6 @@ sub makeBrigValidator {
     printf $textLicense;
 
     makeValidatorFunc("Directive");
-    makeValidatorFunc("Block", "Directive");
     makeValidatorFunc("Inst");
     makeValidatorFunc("Operand");
 };
@@ -800,7 +840,7 @@ sub registerInstProps {
         registerInst($inst, $enum);
 
         for my $f (@{$s->{fields}}) {
-            next if $f->{name} =~ /^(size|kind|operands|reserved)$/;
+            next if $f->{name} =~ /^(byteCount|kind|operands|reserved)$/;
 
             die "unexpected array" if $f->{size};
 
@@ -1077,6 +1117,11 @@ sub make {
 	$sub->(@_);
 	close STDOUT;
 }
+
+make "enums0_dump.pl", \&makePrint, Data::Dumper->Dump([$enums], ["enums"]);
+make "structs0_dump.pl", \&makePrint, Data::Dumper->Dump([$structs], ["structs"]);
+make "typedefs0_dump.pl", \&makePrint, Data::Dumper->Dump([$typedefs],["typedefs"]);
+
 
 make "HSAILInitBrig_gen.hpp", \&makeHSAILInitBrig;
 

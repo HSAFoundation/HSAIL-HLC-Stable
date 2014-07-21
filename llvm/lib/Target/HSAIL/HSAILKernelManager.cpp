@@ -46,6 +46,7 @@
 // Industry and Securitys website at http://www.bis.doc.gov/.
 //
 //==-----------------------------------------------------------------------===//
+#include "libHSAIL/HSAILBrigantine.h"
 #include "HSAILKernelManager.h"
 #include "HSAILAlgorithms.tpp"
 #include "HSAILDeviceInfo.h"
@@ -83,6 +84,7 @@ using namespace llvm;
 namespace clk {
 typedef unsigned int uint;
 typedef uint32_t cl_mem_fence_flags;
+//#include <amdocl/cl_kernel.h>
 //kernel arg access qualifier and type qualifier
 typedef enum clk_arg_qualifier_t
 {
@@ -100,7 +102,6 @@ typedef enum clk_arg_qualifier_t
 
 } clk_arg_qualifier_t;
 
-//#include <amdocl/cl_kernel.h>
 } // end of namespace clk
 
 static bool errorPrint(const char *ptr, OSTREAM_TYPE &O) {
@@ -315,6 +316,7 @@ void HSAILKernelManager::processArgMetadata(OSTREAM_TYPE &ignored,
   uint32_t RWArg = 0;
   uint32_t NumArg = 0;
   uint32_t SamplerNum = 0;
+  uint32_t QueueNum = 0;
   while (Ip != Ep) {
     Type *cType = Ip->getType();
     if (cType->isIntOrIntVectorTy() || cType->isFPOrFPVectorTy()) {
@@ -401,7 +403,24 @@ void HSAILKernelManager::processArgMetadata(OSTREAM_TYPE &ignored,
             + ":1:" + itostr(mCBSize * 16);
           mMFI->addMetadata(samplerArg, true);
           ++mCBSize;
-        } else {
+        } else if (OT == QueueT) {
+          std::string queueArg("queue:");
+          PointerType *PT = cast<PointerType>(Ip->getType());
+          const char *MemType = "uav";
+          if (PT->getAddressSpace() == HSAILAS::PRIVATE_ADDRESS) {
+              if (mSTM->device()->usesHardware(HSAILDeviceInfo::PrivateMem)) {
+              MemType = (mSTM->device()->isSupported(HSAILDeviceInfo::PrivateUAV))
+              ? "up\0" : "hp\0";
+              } else {
+               MemType = "p\0";
+              }
+          }
+          queueArg += Ip->getName().str() + ":"
+            + HSAILgetTypeName(PT, symTab, mMFI, mMFI->isSignedIntType(Ip))
+            + ":1:1:" + itostr(mCBSize * 16) + ":" + MemType;
+          mMFI->addMetadata(queueArg, true);
+          ++mCBSize;
+		} else {
           updatePtrArg(Ip, raw_uav_buffer, mCBSize, isKernel,
                        F, pointerCount++);
           ++mCBSize;
@@ -469,22 +488,6 @@ void HSAILKernelManager::printHeader(const std::string &name)
  * @param kernel 
  */
 
-void
-HSAILKernelManager::printMetaData(OSTREAM_TYPE &O, uint32_t id, bool kernel) {
-  if (kernel) {
-    int kernelId = mAMI->getOrCreateFunctionID(mName);
-    mMFI->addCalledFunc(id);
-    mUniqueID = kernelId;
-    mIsKernel = true;
-  }
-  printKernelArgs(O);
-  if (kernel) {
-    mIsKernel = false;
-    mMFI->eraseCalledFunc(id);
-    mUniqueID = id;
-  }
-}
-
 void HSAILKernelManager::setKernel(bool kernel) {
   mIsKernel = kernel;
   if (kernel) {
@@ -501,28 +504,30 @@ void HSAILKernelManager::setName(const std::string &name) {
   mName = name;
 }
 
-class BlockString {
+class RTI {
     std::string m_str;
-    HSAIL_ASM::BrigContainer&  m_bc;
+    HSAIL_ASM::Brigantine&  m_brig;
     mutable llvm::raw_string_ostream m_os;
 public:
-    BlockString(HSAIL_ASM::BrigContainer& bc) : m_bc(bc),m_os(m_str) {}
+    RTI(HSAIL_ASM::Brigantine&  brig) : m_brig(brig),m_os(m_str) { }
 
-    ~BlockString() {
-        const std::string& str = m_os.str();
-        if (!str.empty()) {
-            m_bc.append< HSAIL_ASM::BlockString>().string() = str;
-        }
+    ~RTI() {
+      HSAIL_ASM::DirectivePragma pragma = m_brig.append<HSAIL_ASM::DirectivePragma>();
+      HSAIL_ASM::ItemList opnds;
+      opnds.push_back(m_brig.createOperandString("AMD RTI"));
+      const std::string& str = m_os.str();
+      opnds.push_back(m_brig.createOperandString(str));
+      pragma.operands() = opnds;
     }
 
     llvm::raw_string_ostream& os() const { return m_os; }
 };
 
 template <typename T>
-const BlockString& operator << (const BlockString& os, const T& s)    { os.os() << s; return os; } 
-const BlockString& operator << (const BlockString& os, const char *s) { os.os() << s; return os; } 
+const RTI& operator << (const RTI& os, const T& s)    { os.os() << s; return os; } 
+const RTI& operator << (const RTI& os, const char *s) { os.os() << s; return os; } 
 
-void HSAILKernelManager::brigEmitMetaData(HSAIL_ASM::BrigContainer& bc, uint32_t id, bool isKernel) {
+void HSAILKernelManager::brigEmitMetaData(HSAIL_ASM::Brigantine& brig, uint32_t id, bool isKernel) {
 
     // Initialization block related to current function being processed
     int kernelId = id;
@@ -537,19 +542,14 @@ void HSAILKernelManager::brigEmitMetaData(HSAIL_ASM::BrigContainer& bc, uint32_t
     
     if (kernel && isKernel && kernel->sgv) {
       if (kernel->sgv->mHasRWG) {
-          HSAIL_ASM::OperandImmed i1 = bc.append< HSAIL_ASM::OperandImmed>();
-          HSAIL_ASM::setImmed(i1,kernel->sgv->reqGroupSize[0],Brig::BRIG_TYPE_U32);
-          HSAIL_ASM::OperandImmed i2 = bc.append< HSAIL_ASM::OperandImmed>();
-          HSAIL_ASM::setImmed(i2,kernel->sgv->reqGroupSize[1],Brig::BRIG_TYPE_U32);
-          HSAIL_ASM::OperandImmed i3 = bc.append< HSAIL_ASM::OperandImmed>();
-          HSAIL_ASM::setImmed(i3,kernel->sgv->reqGroupSize[2],Brig::BRIG_TYPE_U32);
-          HSAIL_ASM::DirectiveControl dc = bc.append< HSAIL_ASM::DirectiveControl>();
-          dc.code() = bc.insts().end();
+          HSAIL_ASM::DirectiveControl dc = brig.append< HSAIL_ASM::DirectiveControl>();
           dc.control() = Brig::BRIG_CONTROL_REQUIREDWORKGROUPSIZE;
-          dc.type() = Brig::BRIG_TYPE_U32;
-          dc.values().push_back(i1);
-          dc.values().push_back(i2);
-          dc.values().push_back(i3);
+
+          HSAIL_ASM::ItemList opnds;
+          for(int i=0; i<3; ++i) {
+            opnds.push_back(brig.createImmed(kernel->sgv->reqGroupSize[i],Brig::BRIG_TYPE_U32));
+          }
+          dc.operands() = opnds;
       }
     }
 
@@ -557,21 +557,17 @@ void HSAILKernelManager::brigEmitMetaData(HSAIL_ASM::BrigContainer& bc, uint32_t
       std::string emptyStr("");
       std::string &refEmptyStr(emptyStr);
       llvm::raw_string_ostream oss(refEmptyStr);
-      // metadata block start
-      HSAIL_ASM::BlockStart sBlock = bc.append< HSAIL_ASM::BlockStart>();
-      sBlock.name() = "rti";
-      sBlock.code() = bc.insts().end();
       // function name
-      BlockString(bc)  << "ARGSTART:" << mName;
+      RTI(brig)  << "ARGSTART:" << mName;
       if(isKernel) {
         // version
-        BlockString(bc) << "version:" << itostr(mSTM->supportMetadata30() ? HSAIL_MAJOR_VERSION : 2) << ":"
+        RTI(brig) << "version:" << itostr(mSTM->supportMetadata30() ? HSAIL_MAJOR_VERSION : 2) << ":"
                         << itostr(HSAIL_MINOR_VERSION) + ":" 
                         << itostr(mSTM->supportMetadata30() ? HSAIL_REVISION_NUMBER : HSAIL_20_REVISION_NUMBER);
         // device info
-        BlockString(bc) << "device:" << mSTM->getDeviceName();
+        RTI(brig) << "device:" << mSTM->getDeviceName();
       }
-      BlockString(bc) << "uniqueid:" << kernelId;
+      RTI(brig) << "uniqueid:" << kernelId;
       if (kernel) {
         size_t local = kernel->curSize;
         size_t hwlocal = ((kernel->curHWSize + 3) & (~0x3));
@@ -582,17 +578,17 @@ void HSAILKernelManager::brigEmitMetaData(HSAIL_ASM::BrigContainer& bc, uint32_t
         bool usehwregion = mSTM->device()->usesHardware(HSAILDeviceInfo::RegionMem);
         bool useuavprivate = mSTM->device()->isSupported(HSAILDeviceInfo::PrivateUAV);
         // private memory
-        BlockString(bc) << "memory:" << ((usehwprivate) ?  (useuavprivate) ? "uav" : "hw" : "" ) << "private:" << (((mMFI->getStackSize() + mMFI->getPrivateSize() + 15) & (~0xF)));
+        RTI(brig) << "memory:" << ((usehwprivate) ?  (useuavprivate) ? "uav" : "hw" : "" ) << "private:" << (((mMFI->getStackSize() + mMFI->getPrivateSize() + 15) & (~0xF)));
         // region memory
-        BlockString(bc) << "memory:" << ((usehwregion) ? "hw" : "") << "region:" << ((usehwregion) ? hwregion : hwregion + region);
+        RTI(brig) << "memory:" << ((usehwregion) ? "hw" : "") << "region:" << ((usehwregion) ? hwregion : hwregion + region);
         // local memory
-        BlockString(bc) << "memory:" << ((usehwlocal) ? "hw" : "") << "local:" << ((usehwlocal) ? hwlocal : hwlocal + local)+mMFI->getGroupSize();
+        RTI(brig) << "memory:" << ((usehwlocal) ? "hw" : "") << "local:" << ((usehwlocal) ? hwlocal : hwlocal + local)+mMFI->getGroupSize();
         if (kernel && isKernel && kernel->sgv) {
           if (kernel->sgv->mHasRWG) {
-            BlockString(bc) << "cws:" << kernel->sgv->reqGroupSize[0] << ":" << kernel->sgv->reqGroupSize[1] << ":" << kernel->sgv->reqGroupSize[2];
+            RTI(brig) << "cws:" << kernel->sgv->reqGroupSize[0] << ":" << kernel->sgv->reqGroupSize[1] << ":" << kernel->sgv->reqGroupSize[2];
           }
           if (kernel->sgv->mHasRWR) {
-            BlockString(bc) << "crs:" << kernel->sgv->reqRegionSize[0] << ":" << kernel->sgv->reqRegionSize[1] << ":" << kernel->sgv->reqRegionSize[2];
+            RTI(brig) << "crs:" << kernel->sgv->reqRegionSize[0] << ":" << kernel->sgv->reqRegionSize[1] << ":" << kernel->sgv->reqRegionSize[2];
           }
         }
       }
@@ -600,100 +596,98 @@ void HSAILKernelManager::brigEmitMetaData(HSAIL_ASM::BrigContainer& bc, uint32_t
         for (std::vector<std::string>::iterator ib = mMFI->kernel_md_begin(), ie = mMFI->kernel_md_end(); ib != ie; ++ib) {
           std::string md = *ib;
           if ( md.find("argmap") == std::string::npos ) {
-            BlockString(bc) << (*ib);
+            RTI(brig) << (*ib);
           }
         }
       }
 
     for (std::set<std::string>::iterator ib = mMFI->func_md_begin(), ie = mMFI->func_md_end(); ib != ie; ++ib) {
-      BlockString(bc) << (*ib);
+      RTI(brig) << (*ib);
     }
 
     if (!mMFI->func_empty()) {
       oss.str().clear();  
       oss << "function:" << mMFI->func_size();
       binaryForEach(mMFI->func_begin(), mMFI->func_end(), HSAILcommaPrint, oss);
-      BlockString(bc) << oss.str();
+      RTI(brig) << oss.str();
     }
 
     if (!mSTM->device()->isSupported(HSAILDeviceInfo::MacroDB) && !mMFI->intr_empty()) {
       oss.str().clear();  
       oss << "intrinsic:" << mMFI->intr_size();
       binaryForEach(mMFI->intr_begin(), mMFI->intr_end(), HSAILcommaPrint, oss);
-      BlockString(bc) << oss.str();
+      RTI(brig) << oss.str();
     }
   
     if (!isKernel) {
       oss.str().clear();  
       binaryForEach(mMFI->printf_begin(), mMFI->printf_end(), printfPrint, oss);
       if ( ! oss.str().empty() ) {
-        BlockString(bc) << oss.str();
+        RTI(brig) << oss.str();
       }
       mMF->getMMI().getObjFileInfo<HSAILModuleInfo>().add_printf_offset(mMFI->printf_size());
     } else {
       for (StringMap<SamplerInfo>::iterator 
         smb = mMFI->sampler_begin(),
         sme = mMFI->sampler_end(); smb != sme; ++ smb) {
-        BlockString(bc) << "sampler:" << (*smb).second.name << ":" << (*smb).second.idx
+        RTI(brig) << "sampler:" << (*smb).second.name << ":" << (*smb).second.idx
           << ":" << ((*smb).second.val == (uint32_t)-1 ? 0 : 1) 
           << ":" << ((*smb).second.val != (uint32_t)-1 ? (*smb).second.val : 0);
       }
     }
     if (mSTM->is64Bit()) {
-      BlockString(bc) << "memory:64bitABI";
+      RTI(brig) << "memory:64bitABI";
     }
 
     if (mMFI->errors_empty()) {
       oss.str().clear();  
       binaryForEach(mMFI->errors_begin(), mMFI->errors_end(), errorPrint, oss);
       if ( ! oss.str().empty() ) {
-        BlockString(bc) << oss.str();
+        RTI(brig) << oss.str();
       }
     }
     if (isKernel && mSTM->device()->getGeneration() <= HSAILDeviceInfo::HD6XXX) {
       if (mSTM->device()->getResourceID(HSAILDevice::RAW_UAV_ID) > mSTM->device()->getResourceID(HSAILDevice::ARENA_UAV_ID)) {
         if (mMFI->uav_size() == 1) {
           if (mSTM->device()->isSupported(HSAILDeviceInfo::ArenaSegment) && *(mMFI->uav_begin()) >= ARENA_SEGMENT_RESERVED_UAVS) {
-            BlockString(bc) << "uavid:";
+            RTI(brig) << "uavid:";
           } else {
-            BlockString(bc) << "uavid:" << *(mMFI->uav_begin());
+            RTI(brig) << "uavid:" << *(mMFI->uav_begin());
           }
         } else if (mMFI->uav_count(mSTM->device()-> getResourceID(HSAILDevice::RAW_UAV_ID))) {
-          BlockString(bc) << "uavid:" << mSTM->device()->getResourceID(HSAILDevice::RAW_UAV_ID);
+          RTI(brig) << "uavid:" << mSTM->device()->getResourceID(HSAILDevice::RAW_UAV_ID);
         } else {
-          BlockString(bc) << "uavid:" << mSTM->device()->getResourceID(HSAILDevice::ARENA_UAV_ID);
+          RTI(brig) << "uavid:" << mSTM->device()->getResourceID(HSAILDevice::ARENA_UAV_ID);
         }
       } else if (!mSTM->device()->isSupported(HSAILDeviceInfo::ArenaSegment)
                  && mMFI->uav_count(mSTM->device()-> getResourceID(HSAILDevice::RAW_UAV_ID))) {
-        BlockString(bc) << "uavid:" << mSTM->device()->getResourceID(HSAILDevice::RAW_UAV_ID);
+        RTI(brig) << "uavid:" << mSTM->device()->getResourceID(HSAILDevice::RAW_UAV_ID);
       } else if (mMFI->uav_size() == 1) {
-        BlockString(bc) << "uavid:" << *(mMFI->uav_begin());
+        RTI(brig) << "uavid:" << *(mMFI->uav_begin());
       } else {
-        BlockString(bc) << "uavid:" << mSTM->device()->getResourceID(HSAILDevice::ARENA_UAV_ID);
+        RTI(brig) << "uavid:" << mSTM->device()->getResourceID(HSAILDevice::ARENA_UAV_ID);
       }
     } else if (isKernel && mSTM->device()->getGeneration() > HSAILDeviceInfo::HD6XXX) {
         if (mMFI->printf_size() > 0) {
-          BlockString(bc) << ";uavid:" << mSTM->device()->getResourceID(HSAILDevice::GLOBAL_ID);
+          RTI(brig) << ";uavid:" << mSTM->device()->getResourceID(HSAILDevice::GLOBAL_ID);
         }
     }
     if (isKernel) {
-      BlockString(bc) << "privateid:" << mSTM->device()->getResourceID(HSAILDevice::SCRATCH_ID);
+      RTI(brig) << "privateid:" << mSTM->device()->getResourceID(HSAILDevice::SCRATCH_ID);
     }
     // Metadata for the device enqueue.
-    if (isKernel) {
-      BlockString(bc) << "enqueue_kernel:" << kernel->EnqueuesKernel;
-      BlockString(bc) << "kernel_index:" << kernel->KernelIndex;
+    if (kernel && isKernel) {
+      RTI(brig) << "enqueue_kernel:" << kernel->EnqueuesKernel;
+      RTI(brig) << "kernel_index:" << kernel->KernelIndex;
     }
 
     if (kernel) {
       for (unsigned I = 0, E = kernel->ArgTypeNames.size(); I != E; ++I) {
-        BlockString(bc) << "reflection:" << I << ":" << kernel->ArgTypeNames[I];
+        RTI(brig) << "reflection:" << I << ":" << kernel->ArgTypeNames[I];
       }
     }
 
-    BlockString(bc) << "ARGEND:" << mName;
-    // we're done - gen end_of_block
-    HSAIL_ASM::BlockEnd eBlock = bc.append<HSAIL_ASM::BlockEnd>();
+    RTI(brig) << "ARGEND:" << mName;
   }
 
   // De-initialization block
@@ -702,237 +696,6 @@ void HSAILKernelManager::brigEmitMetaData(HSAIL_ASM::BrigContainer& bc, uint32_t
     mMFI->eraseCalledFunc(id);
     mUniqueID = id;
   }
-}
-
-void HSAILKernelManager::printKernelArgs(OSTREAM_TYPE &O) {
-  std::string version("version:");
-  version += itostr(mSTM->supportMetadata30() ? HSAIL_MAJOR_VERSION : 2) + ":"
-    + itostr(HSAIL_MINOR_VERSION) + ":" 
-    + itostr(mSTM->supportMetadata30() 
-        ? HSAIL_REVISION_NUMBER : HSAIL_20_REVISION_NUMBER);
-  const HSAILKernel *kernel = mAMI->getKernel(mName);
-  bool isKernel = (kernel) ? kernel->mKernel : false;
-  if (isKernel) {
-    O << "\tblock " << "\"rti\"" << "\n";
-    O << "\tblockstring " << "\"";
-    O << "ARGSTART:" << mName;
-    O << "\"" << ";" << "\n";
-    if (isKernel) {
-      O << "\tblockstring " << "\"";
-      O << version;
-      O << "\"" << ";" << "\n";
-
-      O << "\tblockstring " << "\"";
-      O << "device:" << mSTM->getDeviceName();
-      O << "\"" << ";" << "\n";
-    }
-    O << "\tblockstring " << "\"";
-    O << "uniqueid:" << mUniqueID;
-    O << "\"" << ";" << "\n";
-
-    if (kernel) {
-      size_t local = kernel->curSize+ mMFI->getGroupSize();
-      size_t hwlocal = ((kernel->curHWSize + 3) & (~0x3));
-      size_t region = kernel->curRSize;
-      size_t hwregion = ((kernel->curHWRSize + 3) & (~0x3));
-      bool usehwlocal = mSTM->device()->usesHardware(HSAILDeviceInfo::LocalMem);
-      bool usehwprivate = mSTM->device()->usesHardware(HSAILDeviceInfo::PrivateMem);
-      bool usehwregion = mSTM->device()->usesHardware(HSAILDeviceInfo::RegionMem);
-      bool useuavprivate = mSTM->device()->isSupported(HSAILDeviceInfo::PrivateUAV);
-      if (isKernel) {
-        O << "\tblockstring " << "\"";
-        O << "memory:" << ((usehwprivate) ? 
-                           (useuavprivate) ? "uav" : "hw" : "" ) << "private:"
-          << (((mMFI->getStackSize() + mMFI->getPrivateSize() + 15) & (~0xF)));
-        O << "\"" << ";" << "\n";
-      }
-      if (mSTM->device()->isSupported(HSAILDeviceInfo::RegionMem)) {
-        O << "\tblockstring " << "\"";
-        O << "memory:" << ((usehwregion) ? "hw" : "") << "region:"
-          << ((usehwregion) ? hwregion : hwregion + region);
-        O << "\"" << ";" << "\n";
-      }
-      O << "\tblockstring " << "\"";
-      O << "memory:" << ((usehwlocal) ? "hw" : "") << "local:"
-        << ((usehwlocal) ? hwlocal : hwlocal + local) + mMFI->getGroupSize();
-      O << "\"" << ";" << "\n";
-
-      if (kernel && isKernel && kernel->sgv) {
-        if (kernel->sgv->mHasRWG) {
-          O << "\tblockstring " << "\"";
-          O << "cws:"
-            << kernel->sgv->reqGroupSize[0] << ":"
-            << kernel->sgv->reqGroupSize[1] << ":"
-            << kernel->sgv->reqGroupSize[2];
-          O << "\"" << ";" << "\n";
-        }
-        if (kernel->sgv->mHasRWR) {
-          O << "\tblockstring " << "\"";
-          O << "crs:"
-            << kernel->sgv->reqRegionSize[0] << ":"
-            << kernel->sgv->reqRegionSize[1] << ":"
-            << kernel->sgv->reqRegionSize[2];
-          O << "\"" << ";" << "\n";
-        }
-      }
-    }
-
-    if (isKernel) {
-      for (std::vector<std::string>::iterator ib = mMFI->kernel_md_begin(),
-          ie = mMFI->kernel_md_end(); ib != ie; ++ib) {
-        O << "\tblockstring " << "\"";
-        O << (*ib);
-        O << "\"" << ";" << "\n";
-      }
-    }
-
-    for (std::set<std::string>::iterator ib = mMFI->func_md_begin(),
-           ie = mMFI->func_md_end(); ib != ie; ++ib) {
-      O << "\tblockstring " << "\"";
-      O << (*ib);
-      O << "\"" << ";" << "\n";
-    }
-
-    if (!mMFI->func_empty()) {
-      O << "\tblockstring " << "\"";
-      O << "function:" << mMFI->func_size();
-      binaryForEach(mMFI->func_begin(), mMFI->func_end(), HSAILcommaPrint, O);
-      O << "\"" << ";" << "\n";
-    }
-
-    if (!mSTM->device()->isSupported(HSAILDeviceInfo::MacroDB)
-        && !mMFI->intr_empty()) {
-      O << "\tblockstring " << "\"";
-      O << "intrinsic:" << mMFI->intr_size();
-      binaryForEach(mMFI->intr_begin(), mMFI->intr_end(), HSAILcommaPrint, O);
-      O << "\"" << ";" << "\n";
-    }
-
-    if (!isKernel) {
-      binaryForEach(mMFI->printf_begin(), mMFI->printf_end(), printfPrint, O);
-      mMF->getMMI().getObjFileInfo<HSAILModuleInfo>().add_printf_offset(
-          mMFI->printf_size());
-    } else {
-      for (StringMap<SamplerInfo>::iterator 
-          smb = mMFI->sampler_begin(),
-          sme = mMFI->sampler_end(); smb != sme; ++ smb) {
-        O << "\tblockstring " << "\"";
-        O << "sampler:" << (*smb).second.name << ":" << (*smb).second.idx
-          << ":" << ((*smb).second.val == (uint32_t)-1 ? 0 : 1) 
-          << ":" << ((*smb).second.val != (uint32_t)-1 ? (*smb).second.val : 0);
-        O << "\"" << ";" << "\n";
-      }
-    }
-    if (mSTM->is64Bit()) {
-      O << "\tblockstring " << "\"";
-      O << "memory:64bitABI";
-      O << "\"" << ";" << "\n";
-    }
-
-    if (mMFI->errors_empty()) {
-      binaryForEach(mMFI->errors_begin(), mMFI->errors_end(), errorPrint, O);
-    }
-
-    // This has to come last
-    if (isKernel
-        && mSTM->device()->getGeneration() <= HSAILDeviceInfo::HD6XXX) {
-      if (mSTM->device()->getResourceID(HSAILDevice::RAW_UAV_ID) >
-          mSTM->device()->getResourceID(HSAILDevice::ARENA_UAV_ID)) {
-        if (mMFI->uav_size() == 1) {
-          if (mSTM->device()->isSupported(HSAILDeviceInfo::ArenaSegment)
-              && *(mMFI->uav_begin()) >= ARENA_SEGMENT_RESERVED_UAVS) {
-            O << "\tblockstring " << "\"";
-            O << "uavid:";
-            // O << mSTM->device()->getResourceID(HSAILDevice::ARENA_UAV_ID);
-            O << "\"" << ";" << "\n";
-          } else {
-            O << "\tblockstring " << "\"";
-            O << "uavid:" << *(mMFI->uav_begin());
-            O << "\"" << ";" << "\n";
-          }
-        } else if (mMFI->uav_count(mSTM->device()->
-              getResourceID(HSAILDevice::RAW_UAV_ID))) {
-          O << "\tblockstring " << "\"";
-          O << "uavid:"
-            << mSTM->device()->getResourceID(HSAILDevice::RAW_UAV_ID);
-          O << "\"" << ";" << "\n";
-        } else {
-          O << "\tblockstring " << "\"";
-          O << "uavid:";
-          O << mSTM->device()->getResourceID(HSAILDevice::ARENA_UAV_ID);
-          O << "\"" << ";" << "\n";
-        }
-      } else if (!mSTM->device()->isSupported(HSAILDeviceInfo::ArenaSegment)
-                 && mMFI->uav_count(mSTM->device()->
-                                    getResourceID(HSAILDevice::RAW_UAV_ID))) {
-        O << "\tblockstring " << "\"";
-        O << "uavid:";
-        O << mSTM->device()->getResourceID(HSAILDevice::RAW_UAV_ID);
-        O << "\"" << ";" << "\n";
-      } else if (mMFI->uav_size() == 1) {
-        O << "\tblockstring " << "\"";
-        O << "uavid:" << *(mMFI->uav_begin());
-        O << "\"" << ";" << "\n";
-      } else {
-        O << "\tblockstring " << "\"";
-        O << "uavid:";
-        O << mSTM->device()->getResourceID(HSAILDevice::ARENA_UAV_ID);
-        O << "\"" << ";" << "\n";
-      }
-    } else if (isKernel 
-	       && mSTM->device()->getGeneration() > HSAILDeviceInfo::HD6XXX) {
-        if (mMFI->printf_size() > 0) {
-            O << ";uavid:"
-              << mSTM->device()->getResourceID(HSAILDevice::GLOBAL_ID);
-            O << "\n";
-        }
-    }
-    if (isKernel) {
-      O << "\tblockstring " << "\"";
-      O << "privateid:" << mSTM->device()->getResourceID(HSAILDevice::SCRATCH_ID);
-      O << "\"" << ";" << "\n";
-    }
-    if (isKernel) {
-      std::string argKernel = "llvm.argtypename.annotations.";
-      argKernel.append(mName);
-      GlobalVariable *GV = mMF->getFunction()->getParent()
-        ->getGlobalVariable(argKernel);
-      if (GV && GV->hasInitializer()) {
-        const ConstantArray *nameArray
-          = dyn_cast_or_null<ConstantArray>(GV->getInitializer());
-        if (nameArray) {
-          for (unsigned x = 0, y = nameArray->getNumOperands(); x < y; ++x) {
-            const GlobalVariable *gV= dyn_cast_or_null<GlobalVariable>(
-                  nameArray->getOperand(x)->getOperand(0));
-              const ConstantDataArray *argName =
-                dyn_cast_or_null<ConstantDataArray>(gV->getInitializer());
-              if (!argName) {
-                continue;
-              }
-              std::string argStr = argName->getAsString();
-              O << "\tblockstring " << "\"";
-              O << "reflection:" << x << ":";
-              O << argStr.substr(0, argStr.length()-1);
-              O << "\"" << ";" << "\n";
-          }
-        }
-      }
-    }
-    O << "\tblockstring " << "\"";
-    O << "ARGEND:" << mName;
-    O << "\"" << ";" << "\n";
-    O << "\tendblock" << ";" << "\n";
-  }
-
-  if (kernel && isKernel && kernel->sgv) {
-    if (kernel->sgv->mHasRWG) {
-      O << "\titemsperworkgroup \t"
-        << kernel->sgv->reqGroupSize[0] << ", "
-        << kernel->sgv->reqGroupSize[1] << ", "
-        << kernel->sgv->reqGroupSize[2] << ";\n";
-    }
-  }
-
 }
 
 uint32_t HSAILKernelManager::getUAVID(const Value *value) {

@@ -46,11 +46,10 @@
 #include <limits>
 #include <utility>
 #include <strstream>
-#include <cctype>
 
 StreamScannerBase::StreamScannerBase(std::istream& is)
-    : m_is(is)
-    , m_end(0)
+    : m_end(0)
+    , m_is(is)
 {
     readBuffer();
 }
@@ -153,14 +152,6 @@ void printError(std::ostream& os, std::istream& is, const SrcLoc& errLoc, const 
 namespace HSAIL_ASM
 {
 
-void Scanner::Token::clear() {
-    m_comments.clear();
-}
-
-void Scanner::Token::appendComment(const char *begin, const char *end) {
-    m_comments.push_back(SRef(begin,end));
-}
-
 class Scanner::istringstreamalert : public std::istrstream {
 public:
     istringstreamalert(const SRef& s)
@@ -174,10 +165,8 @@ Scanner::Scanner(std::istream& is,bool disableComments)
     , m_peekToken(NULL)
     , m_lineNum(0)
     , m_lineStart(0)
-{     
-    if (!disableComments) {
-        m_comments.reset(new CommentList());
-    }
+    , m_disableComments(disableComments)
+{
 
     m_pool[0].m_scanner = this;
     m_pool[1].m_scanner = this;
@@ -196,11 +185,13 @@ EScanContext Scanner::getTokenContext(ETokens token)
         case EMAtomicOp: return EInstModifierInstAtomicContext;
         case EMImageQuery: return EInstModifierInstQueryContext;
         case EMMemoryFenceSegments: return EInstModifierInstFenceContext;
+        case EMMemoryScope: 
         default: return EInstModifierContext;
         }
     } else {
         switch(token) {
         case EImageOrder: return EImageOrderContext;
+        case EMemoryScope: return EMemoryScopeContext;
         default:;
         }
     }   
@@ -209,15 +200,8 @@ EScanContext Scanner::getTokenContext(ETokens token)
 
 Scanner::CToken& Scanner::peek(EScanContext ctx)
 {
-    // we assume by the nature of hsail that peeks has the same context
-    // thus rescan is not needed
-    // dp: currently if m_peekToken token is EEmpty, this means that previous 
-    // scan failed because the token was found in an unexpected context. 
-    // This will cause syntax error on next step.
-    // TBD: Is there a better solution for handling of context-sensitive scan failures?
-    assert(m_peekToken==NULL || m_peekToken->kind()==EEmpty || getTokenContext(m_peekToken->kind())==ctx);
-
-    if (m_peekToken==NULL) {
+    // rescan if needed
+    if (m_peekToken==NULL || m_peekToken->kind()==EEmpty || getTokenContext(m_peekToken->kind()) != ctx) {
         m_peekToken = &scanNext(ctx);
     }
     return *m_peekToken;
@@ -227,27 +211,16 @@ Scanner::CToken& Scanner::scan(EScanContext ctx)
 {
     if (m_peekToken==NULL) {
         m_curToken = &scanNext(ctx);
-    } else {   
-        // we assume by the nature of hsail that scan that follows peek 
-        // has the same context thus rescan is not needed
-        // dp: currently if m_peekToken token is EEmpty, this means that previous 
-        // scan failed because the token was found in an unexpected context. 
-        // This will cause syntax error on next step.
-        // TBD: Is there a better solution for handling of context-sensitive scan failures?
-        assert(m_peekToken->kind()==EEmpty || getTokenContext(m_peekToken->kind())==ctx);
+    } else {
+        peek(ctx); // rescan if needed
         m_curToken  = m_peekToken;
         m_peekToken = NULL;
-    }
-    // store accumulated before the token comments
-    if (m_comments.get()) {
-        m_comments->splice(m_comments->end(), m_curToken->m_comments);
     }
     return *m_curToken;
 }
 
 Scanner::Token& Scanner::newToken() {
     Scanner::Token& t = m_pool[ m_curToken==&m_pool[0] ? 1:0 ];
-    t.clear();
     return t;
 }
 
@@ -269,7 +242,7 @@ Scanner::Token& Scanner::scanNext(EScanContext ctx)
     t.m_lineNum = m_lineNum;
     t.m_text.begin = t.m_text.end = curPos;
 
-    if (ctx >= EInstModifierContext) {       
+    if (ctx >= EInstModifierContext) {
         t.m_kind = scanModifier(/*in*/ctx, /*in/out*/t); 
     } else {
         skipWhitespaces(t);
@@ -279,7 +252,6 @@ Scanner::Token& Scanner::scanNext(EScanContext ctx)
     }
     return t;
 }
-
 
 void Scanner::nextLine(const char *atPos)
 {
@@ -294,16 +266,121 @@ SrcLoc Scanner::srcLoc(const char* pos) const {
     return res;
 }
 
-SRef Scanner::grabComment() {
-    if (!hasComments()) {
-        return SRef();
+uint64_t Scanner::readIntLiteral()
+{
+    using namespace std;
+    uint64_t v;
+    switch(eatToken(EIntLiteral)) {
+    case ELitDecimal:
+        istringstreamalert(m_curToken->text()) >> dec >> v;        break;
+    case ELitOctal:   
+        istringstreamalert(m_curToken->text().substr(1)) >> oct >> v; break;
+    case ELitHex:     
+        istringstreamalert(m_curToken->text().substr(2)) >> hex >> v; break;
+    default:
+        assert(0);
     }
-    const SRef res = m_comments->front();
-    m_comments->pop_front();
-    return res;
+    return v;
+}
+
+f16_t Scanner::readF16Literal()
+{
+    using namespace std;
+    switch(eatToken(EF16Literal)) {
+    case ELitDecimal:
+        {
+            float v;
+            istringstreamalert(m_curToken->text()) >> v;
+            return f16_t(f32_t(&v));
+        }
+    case ELitDecimalWithSuffix:
+        {
+            float v;
+            istringstreamalert(m_curToken->text().rsubstr(1)) >> v;
+            return f16_t(f32_t(&v));
+        }
+    case ELitHex:
+        {
+            IEEE754Traits<f16_t>::RawBitsType v;
+            istringstreamalert(m_curToken->text().substr(2)) >> hex >> v;
+            return f16_t::fromRawBits(v);
+        }
+    case ELitC99:
+        {
+            return readC99<f16_t>(m_curToken->text());
+        }
+    default:
+        assert(0);
+    }
+    return f16_t();
+}
+
+f32_t Scanner::readF32Literal()
+{
+    using namespace std;
+    switch(eatToken(EF32Literal)) {
+    case ELitDecimal:
+        {
+            float v;
+            istringstreamalert(m_curToken->text()) >> v;
+            return f32_t(&v);
+        }
+    case ELitDecimalWithSuffix:
+        {
+            float v;
+            istringstreamalert(m_curToken->text().rsubstr(1)) >> v;
+            return f32_t(&v);
+        }
+    case ELitHex:
+        {
+            IEEE754Traits<f32_t>::RawBitsType v;
+            istringstreamalert(m_curToken->text().substr(2)) >> hex >> v;
+            return f32_t::fromRawBits(v);
+        }
+    case ELitC99:
+        {
+            return readC99<f32_t>(m_curToken->text());
+        }
+    default:
+        assert(0);
+    }
+    return f32_t();
+}
+
+f64_t Scanner::readF64Literal()
+{
+    using namespace std;
+    switch(eatToken(EF64Literal)) {
+    case ELitDecimal:
+        {
+            double v;
+            istringstreamalert(m_curToken->text()) >> v;
+            return f64_t(&v);
+        }
+    case ELitDecimalWithSuffix:
+        {
+            double v;
+            istringstreamalert(m_curToken->text().rsubstr(1)) >> v;
+            return f64_t(&v);
+        }
+    case ELitHex:
+        {
+            IEEE754Traits<f64_t>::RawBitsType v;
+            istringstreamalert(m_curToken->text().substr(2)) >> hex >> v;
+            return f64_t::fromRawBits(v);
+        }
+    case ELitC99:
+        {
+            return readC99<f64_t>(m_curToken->text());
+        }
+    default:
+        assert(0);
+    }
+    return f64_t();
 }
 
 
+/*
 Scanner::Variant Scanner::readValueVariant()
 {
     using namespace std;
@@ -316,12 +393,11 @@ Scanner::Variant Scanner::readValueVariant()
             } // fall through
         case EPlus:
             {
-                eatToken(EDecimalNumber, "decimal constant expected");
+                eatToken(EDecimalNumber, "decimal constant");
             } // fall through
         case EDecimalNumber:
             {
                 SRef const &litrl = m_curToken->text();
-                istrstream is(litrl.begin,litrl.length());
                 uint64_t ull;
                 istringstreamalert(litrl) >> dec >> ull;
                 if (minus) {
@@ -345,21 +421,8 @@ Scanner::Variant Scanner::readValueVariant()
         case EHlfNumber:
             {
                 float v;
-                istringstreamalert(m_curToken->text().drop_back(1)) >> v;
+                istringstreamalert(m_curToken->text()) >> v;
                 return Variant(f16_t(f32_t(&v)));
-            }
-        case ESglNumber:
-            {
-                float v;
-                istringstreamalert(m_curToken->text().drop_back(1)) >> v;
-                return Variant(&v);
-            }
-        case EDblNumber:
-            {
-                double v;
-                SRef s = m_curToken->text();
-                istringstreamalert(isdigit(s.back()) ? s : s.drop_back(1)) >> v;
-                return Variant(f64_t(&v));
             }
         case EHlfHexNumber:
             {
@@ -367,11 +430,33 @@ Scanner::Variant Scanner::readValueVariant()
                 istringstreamalert(m_curToken->text().mid(2)) >> hex >> v;
                 return Variant(f16_t::fromRawBits(v));
             }
+        case EHlfC99Number:
+            {
+                f16_t const v = readC99<f16_t>(m_curToken->text());
+                return Variant(v);
+            }
+        case ESglNumber:
+            {
+                float v;
+                istringstreamalert(m_curToken->text()) >> v;
+                return Variant(&v);
+            }
         case ESglHexNumber:
             {
                 IEEE754Traits<f32_t>::RawBitsType pad;
                 istringstreamalert(m_curToken->text().mid(2)) >> hex >> pad;
                 return Variant(f32_t::fromRawBits(pad));
+            }
+        case ESglC99Number:
+            {
+                f32_t v = readC99<f32_t>(m_curToken->text());
+                return Variant(v);
+            }
+        case EDblNumber:
+            {
+                double v;
+                istringstreamalert(m_curToken->text()) >> v;
+                return Variant(f64_t(&v));
             }
         case EDblHexNumber:
             {
@@ -379,20 +464,9 @@ Scanner::Variant Scanner::readValueVariant()
                 istringstreamalert(m_curToken->text().mid(2)) >> hex >> pad;
                 return Variant(f64_t::fromRawBits(pad));
             }
-        case EHlfC99Number:
-            {
-                f16_t const v = readC99<f16_t>(m_curToken->text().drop_back(1));
-                return Variant(v);
-            }
-        case ESglC99Number:
-            {
-                f32_t v = readC99<f32_t>(m_curToken->text().drop_back(1));
-                return Variant(v);
-            }
         case EDblC99Number:
             {
-                SRef s = m_curToken->text();
-                f64_t const v = readC99<f64_t>(isdigit(s.back()) ? s : s.drop_back(1));
+                f64_t const v = readC99<f64_t>(m_curToken->text());
                 return Variant(v);
             }
         default:
@@ -406,6 +480,7 @@ Scanner::Variant Scanner::readValueVariant()
     }
     return Variant();
 }
+*/
 
 void Scanner::throwTokenExpected(ETokens token, const char* message, const SrcLoc& loc) {
     if (!message) {
@@ -439,6 +514,7 @@ void Scanner::throwTokenExpected(ETokens token, const char* message, const SrcLo
         case ESamplerCoord:   message = "sampler coord value"; break;
         case EMMemoryOrder:   message = "memory order value"; break;
         case EMMemoryScope:   message = "memory scope value"; break;
+        case EMemoryScope:    message = "memory scope value"; break;
         case ETargetMachine:  message = "machine model"; break;
         case ETargetProfile:  message = "target profile"; break;
         case ESamplerAddressingMode: message = "sampler addressing mode value"; break;
@@ -449,9 +525,16 @@ void Scanner::throwTokenExpected(ETokens token, const char* message, const SrcLo
         case EKWROImg:        message = "read-only image initializer"; break;
         case EKWWOImg:        message = "write-only image initializer"; break;
         case EKWSamp:         message = "sampler initializer"; break;
+        case EKWFunction:     message = "function"; break;
         case EMImageQuery:    message = "image query"; break;
         case EMSamplerQuery:  message = "sampler query"; break;
         case EMMemoryFenceSegments: message = "memory fence segment"; break;
+        case EIntLiteral:     message = "integer literal"; break;
+        case EF16Literal:     message = "f16 literal"; break;
+        case EF32Literal:     message = "f32 literal"; break;
+        case EF64Literal:     message = "f64 literal"; break;
+        case EAllocKind:      message = "allocation kind"; break;
+        case EInstruction:    message = "instruction"; break;
         default:  {
             assert(0);
             std::stringstream ss;

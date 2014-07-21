@@ -23,6 +23,7 @@ using namespace llvm;
 namespace clk {
 typedef unsigned int uint;
 typedef uint32_t cl_mem_fence_flags;
+//#include <amdocl/cl_kernel.h>
 //kernel arg access qualifier and type qualifier
 typedef enum clk_arg_qualifier_t
 {
@@ -40,7 +41,6 @@ typedef enum clk_arg_qualifier_t
 
 } clk_arg_qualifier_t;
 
-//#include <amdocl/cl_kernel.h>
 } // end of namespace clk
 
 /// \brief Set user-specified values for required workgroup size

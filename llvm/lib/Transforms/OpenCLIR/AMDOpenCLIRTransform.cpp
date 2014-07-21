@@ -124,14 +124,15 @@ static void printOpenCLType(Type *Ty, raw_ostream &OS) {
 void OpenCLIRTransform::addGlobalId(Function *F) {
   IRBuilder<> Builder(F->getEntryBlock().begin());
   LLVMContext &Context = curModule->getContext();
-  Function *Func = curModule->getFunction("get_global_id");
+  Function *Func = curModule->getFunction("_Z13get_global_idj");
   Type *RetTy = Type::getInt32Ty(Context);
 
   if (!Func) {
     std::vector<Type *> Args;
     Args.push_back(RetTy);
     FunctionType *FuncTy = FunctionType::get(RetTy, Args, false);
-    Func = Function::Create(FuncTy, Function::ExternalLinkage, "get_global_id",
+    Func = Function::Create(FuncTy, Function::ExternalLinkage, 
+                            "_Z13get_global_idj",
                             curModule);
     SmallVector<AttributeWithIndex, 8> attrib;
     Attributes Attrs = Attributes::get(Context, Attributes::NoUnwind);
@@ -306,11 +307,29 @@ bool OpenCLIRTransform::parseMetaData(Module &M) {
   return true;
 }
 
+void setCallingConv(Module &M) {
+  for (Module::iterator I = M.begin(), E = M.end(); I != E; ++ I) {
+    if (I->getCallingConv() != CallingConv::SPIR_KERNEL) {
+      I->setCallingConv(CallingConv::SPIR_FUNC);
+      for (Value::use_iterator ui = I->use_begin(), ue = I->use_end();
+           ui != ue; ++ui) {
+        if (CallInst *Inst = dyn_cast<CallInst>(*ui)) {
+          Inst->setCallingConv(CallingConv::SPIR_FUNC);
+        }
+      }
+    }
+  }
+
+  return;
+}
+
 bool OpenCLIRTransform::runOnModule(Module &M) {
   curModule = &M;
 
   if (!parseMetaData(M))
     return false;
+
+  setCallingConv(M);
 
   llvm::PassManager SPIRPasses;
   const std::string OldTriple = M.getTargetTriple();

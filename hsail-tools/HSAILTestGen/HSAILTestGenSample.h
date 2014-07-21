@@ -39,8 +39,8 @@ private:
 
     //==========================================================================
 public:
-    Sample() : ctx(0) {}
-    Sample(Context* c, Inst buf, unsigned opcode) : ctx(c), inst(buf) { setOpcode(opcode); }
+    Sample() : ctx(0)  { }
+    Sample(Context* c, Inst buf, unsigned opcode) : inst(buf), ctx(c) { setOpcode(opcode); }
 
     Sample(const Sample& s) 
     {
@@ -88,7 +88,7 @@ public:
     Context* getContext()      const { assert(!isEmpty()); return ctx; }
     void     setOpcode(unsigned opc) { assert(!isEmpty()); set(PROP_OPCODE, opc); }
 
-    void     copyFrom(const Sample s);
+    void     copyFrom(const Sample s, bool compactOperands);
 
     //==========================================================================
 };

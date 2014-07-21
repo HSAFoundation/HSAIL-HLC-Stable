@@ -105,7 +105,7 @@ public:
   virtual void EmitFunctionEntryLabel();
 
   /// Emit ld_rarg or st_parg
-  void EmitLdStArg(const MachineInstr *MI, bool isLoad);
+  HSAIL_ASM::Inst EmitLdStArg(const MachineInstr *MI, bool isLoad);
 
   /// isBlockOnlyReachableByFallthough - Return true if the basic block has
   /// exactly one predecessor and the control transfer mechanism between
@@ -127,7 +127,7 @@ public:
 
 public:
 
-  void BrigEmitInstruction(const MachineInstr *MI);
+  HSAIL_ASM::Inst BrigEmitInstruction(const MachineInstr *MI);
   bool runOnMachineFunction(MachineFunction &F);
   bool isMacroFunc(const MachineInstr *MI);
   bool isIdentityCopy(const MachineInstr *MI) const;
@@ -178,18 +178,15 @@ protected:
   const char * getRegisterName(unsigned RegNo);
 
   void BrigEmitGlobalInit(HSAIL_ASM::DirectiveVariable, Constant *);
-  void BrigEmitOperand(const MachineInstr *MI, unsigned opNum, HSAIL_ASM::Inst inst, int Offset=0 );
-  void BrigEmitOperandLdStAddress(const MachineInstr *MI, unsigned opNum, HSAIL_ASM::Inst inst, int opOffset );
-  void BrigEmitOperandAddress(const MachineInstr *MI, unsigned opNum, HSAIL_ASM::Inst inst, int Offset );
+  void BrigEmitOperand(const MachineInstr *MI, unsigned opNum, HSAIL_ASM::Inst inst);
+  void BrigEmitOperandLdStAddress(const MachineInstr *MI, unsigned opNum);
+  void BrigEmitOperandAddress(const MachineInstr *MI, unsigned opNum);
   void BrigEmitVecArgDeclaration(const MachineInstr *MI);
-  void BrigEmitOperandImage(const MachineInstr *MI, unsigned& opNum, HSAIL_ASM::Inst inst, unsigned& operand);
-  void BrigEmitImageInst(const MachineInstr *MI, HSAIL_ASM::InstImage inst, int Offset );
+  void BrigEmitOperandImage(const MachineInstr *MI, unsigned opNum);
+  void BrigEmitImageInst(const MachineInstr *MI, HSAIL_ASM::InstImage inst);
 
-  HSAIL_ASM::OperandVector BrigEmitVecOperand(const MachineInstr *MI, unsigned& opStart, unsigned numRegs);
-  void BrigEmitOperandV4(const MachineInstr *MI, unsigned& opStart, HSAIL_ASM::Inst inst, unsigned& operand);
-  void BrigEmitOperandV3(const MachineInstr *MI, unsigned& opStart, HSAIL_ASM::Inst inst, unsigned& operand);
-  void BrigEmitOperandV2(const MachineInstr *MI, unsigned& opStart, HSAIL_ASM::Inst inst, unsigned& operand);
-
+  void BrigEmitVecOperand(const MachineInstr *MI, unsigned opStart, unsigned numRegs);
+  
   void BrigEmitQualifiers(const MachineInstr *MI, unsigned opNum, HSAIL_ASM::Inst inst);
 
   // Stream that captures DWARF data to the internal buffer
@@ -237,6 +234,8 @@ protected:
 
 private:
 
+  HSAIL_ASM::ItemList m_opndList;
+
   int mBuffer;
 
   typedef enum {
@@ -270,6 +269,8 @@ private:
   HSAIL_ASM::DirectiveVariable EmitLocalVariable(const GlobalVariable *GV, Brig::BrigSegment8_t segment);
 
   Brig::BrigAlignment8_t getBrigAlignment(unsigned align_value);
+
+  HSAIL_ASM::Inst EmitInstructionImpl(const MachineInstr *);
 };
 
 } // end namespace llvm

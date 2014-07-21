@@ -9,7 +9,8 @@
 #ifndef INCLUDED_HSAIL_TESTGEN_BACKEND_H
 #define INCLUDED_HSAIL_TESTGEN_BACKEND_H
 
-#include "HSAILTestGenUtilities.h"
+#include "HSAILTestGenBrigContext.h"
+#include "HSAILTestGenTestDesc.h"
 #include "HSAILItems.h"
 #include "Brig.h"
 
@@ -53,6 +54,9 @@ public:
     //       Backend may inspect it but MUST NOT modify it.
     virtual bool startTestGroup(Inst inst) { testIdx = 0; return true; }
 
+    // Update test description with backend-specific data
+    virtual void registerTest(TestDesc& desc)  {}
+
     // Called to generate data for the next test.
     // Return true if data for next test were generated; false if there are no more test data
     virtual bool genNextTestData() { return ++testIdx == 0; }
@@ -65,14 +69,11 @@ public:
     // context:  BRIG context used for test generation.
     //           backend may save this context internally, however, it cannot be used after
     //           endKernelBody is called.
-    // path:     path to the folder where tests will be saved, e.g. "d:\TEST\"
-    //           It is guaranteed that the path ends with a separator "/" or "\"
-    // testName: file name (without extension) which will be used for this test, e.g. "abs_000"
-    // ext:      file extension, e.g. ".brig"
+    // testName: test name used for identification purposes, e.g. "abs_000"
     // 
     // Return true on success and false if this test shall be skipped.
     //
-    virtual bool startTest(BrigContext* context, string path, string fileName, string extension) { return true; }
+    virtual bool startTest(BrigContext* context, string testName) { return true; }
 
     // Called to allow backend define test kernel arguments.
     // By default, no arguments are generated

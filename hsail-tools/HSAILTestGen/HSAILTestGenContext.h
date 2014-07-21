@@ -12,6 +12,7 @@
 #include "HSAILTestGenOptions.h"
 #include "HSAILTestGenProp.h"
 #include "HSAILTestGenSample.h"
+#include "HSAILTestGenBrigContext.h"
 #include "HSAILTestGenUtilities.h"
 
 #include "HSAILValidator.h"
@@ -25,6 +26,8 @@
 #include <sstream>
 
 using std::ostringstream;
+using HSAIL_ASM::isTermInst;
+using HSAIL_ASM::ItemList;
 
 namespace TESTGEN {
 
@@ -38,7 +41,6 @@ class Context : public BrigContext
     friend class Sample;
 
 private:
-    const string fileName;          // name of final brig file with test(s)
     DirectiveKernel testKernel;     // kernel for which test code is generated
     Operand operandTab[O_MAXID];    // operands used for testing. Created at first access
 
@@ -56,10 +58,10 @@ private:
 public:
 
     // Used for two different purposes.
-    // 1. If 'file' is not empty, create context for a set of instructions (added separately).
-    // 2. If 'file' is empty, create special 'playground' context for generation of temporary samples.
+    // 1. to create context for a set of instructions (added separately).
+    // 2. to create special 'playground' context for generation of temporary samples.
     //    This context and all generated code is never saved (i.e. thrown away when TestTGen exits).
-    Context(string file = "") : BrigContext(machineModel, profile, !enableComments), fileName(file)
+    Context() : BrigContext(machineModel, profile, !enableComments)
     {
         emitVersion();
         if (instSubset.isSet(SUBSET_GCN))   emitExtension("amd:gcn");
@@ -68,10 +70,8 @@ public:
     }
 
     // Used to create context for tests which include just one instruction specified by sample
-    Context(string file, const Sample s, bool isPositive) : BrigContext(machineModel, profile, !enableComments), fileName(file)
+    Context(const Sample s, bool isPositive) : BrigContext(machineModel, profile, !enableComments)
     {
-        assert(!file.empty());
-
         emitVersion();
 
         if (HSAIL_ASM::isGcnInst(s.getOpcode()))
@@ -87,11 +87,11 @@ public:
             emitExtension("IMAGE");
         }
 
-        genSymbol(operandId2SymId(s.get(PROP_S0)));
-        genSymbol(operandId2SymId(s.get(PROP_S1)));
-        genSymbol(operandId2SymId(s.get(PROP_S2)));
-        genSymbol(operandId2SymId(s.get(PROP_S3)));
-        genSymbol(operandId2SymId(s.get(PROP_S4)));
+        for (int i = 0; i < s.getInst().operands().size(); ++i)
+        {
+            unsigned propId = getSrcOperandId(i);
+            genSymbol(operandId2SymId(s.get(propId)));
+        }
     }
 
     //==========================================================================
@@ -108,42 +108,25 @@ public:
         endSbrBody(testKernel);
     }
 
-    void save(bool dumpContainer = false)
-    {
-        if (dumpContainer) dump();
-
-        assert(!fileName.empty());
-
-        if (HSAIL_ASM::BrigStreamer::save(getContainer(), fileName.c_str()))
-        {
-            ostringstream msg;
-            msg << "Failed to save " << fileName.c_str();
-            throw TestGenError(msg.str());
-        }
-    }
-
-    bool validate()
-    {
-        HSAIL_ASM::Validator vld(getContainer());
-        return vld.validate(HSAIL_ASM::Validator::VM_BrigNotLinked);
-    }
-
     //==========================================================================
 
 public:
     // Used to create positive tests
+    //
+    // NB: cloneSample is used for generation of final code 
+    //     so only copy non-null operands
     Sample cloneSample(const Sample s)
     {
         assert(!s.isEmpty());
 
         Sample copy = createSample(s.getFormat(), s.getOpcode());
-        copy.copyFrom(s);
+        copy.copyFrom(s, true); // Copy instruction and allocate array for non-null operands
 
-        copy.set(PROP_S0, s.get(PROP_S0));
-        copy.set(PROP_S1, s.get(PROP_S1));
-        copy.set(PROP_S2, s.get(PROP_S2));
-        copy.set(PROP_S3, s.get(PROP_S3));
-        copy.set(PROP_S4, s.get(PROP_S4));
+        for (int i = 0; i < copy.getInst().operands().size(); ++i)
+        {
+            unsigned propId = getSrcOperandId(i);
+            copy.set(propId, s.get(propId));
+        }
 
         finalizeSample(copy);
 
@@ -167,7 +150,13 @@ public:
 
     Sample createSample(unsigned format, unsigned opcode)
     {
-        return Sample(this, appendInst(getContainer(), format), opcode);
+        Inst inst = appendInst(getContainer(), format);
+
+        ItemList list;
+        for (int i = 0; i < 5; ++i) list.push_back(Operand()); //F
+        inst.operands() = list;
+
+        return Sample(this, inst, opcode);
     }
 
     //==========================================================================
@@ -179,7 +168,7 @@ private:
         using namespace Brig;
         unsigned opcode = sample.getOpcode();
 
-        if (opcode == BRIG_OPCODE_BRN || opcode == BRIG_OPCODE_RET)
+        if (isTermInst(opcode))
         {
             emitAuxLabel(); // Generate aux label to avoid "unreachable code" error
         }
@@ -264,17 +253,11 @@ private:
 
     void dump() //F
     {
-        for(Directive d = getContainer().directives().begin();
-            d != getContainer().directives().end();
-            d = d.next())
+        for(Code c = getContainer().code().begin();
+            c != getContainer().code().end();
+            c = c.next())
         {
-            //d.dump(std::cout);
-        }
-        for(Inst i = getContainer().insts().begin();
-            i != getContainer().insts().end();
-            i = i.next())
-        {
-            //i.dump(std::cout);
+            //
         }
         for(Operand o = getContainer().operands().begin();
             o != getContainer().operands().end();

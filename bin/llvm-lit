@@ -4,8 +4,8 @@ import os
 import sys
 
 # Variables configured at build time.
-llvm_source_root = "/home/amd/Prakash/praghave_msdnkv69_9870/praghave_msdnkv69_9870/drivers/opencl/compiler/llvm"
-llvm_obj_root = "/home/amd/Prakash/praghave_msdnkv69_9870/praghave_msdnkv69_9870/drivers/opencl/compiler/llvm/build"
+llvm_source_root = "/home/amd/Perforce/praghave_msdnkv69_2767/drivers/opencl/compiler/llvm"
+llvm_obj_root = "/home/amd/Perforce/praghave_msdnkv69_2767/drivers/opencl/compiler/llvm/build"
 
 # Make sure we can find the lit package.
 sys.path.insert(0, os.path.join(llvm_source_root, 'utils', 'lit'))

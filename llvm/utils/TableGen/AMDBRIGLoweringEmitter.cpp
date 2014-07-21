@@ -60,7 +60,7 @@ void BRIGLoweringEmitter::EmitPrintInstruction(raw_ostream &O) {
   bool isMC = AsmWriter->getValueAsBit("isMCAsmWriter");
   const char *MachineInstrClassName = isMC ? "MCInst" : "MachineInstr";
 
-  O << "  void BRIGAsmPrinter::BrigEmitInstruction(const MachineInstr *MI) {\n";
+  O << "  HSAIL_ASM::Inst BRIGAsmPrinter::BrigEmitInstruction(const MachineInstr *MI) {\n";
  
   std::vector<AsmWriterInst> Instructions;
 
@@ -202,8 +202,8 @@ void BRIGLoweringEmitter::EmitPrintInstruction(raw_ostream &O) {
     << "  unsigned Bits = OpInfo[MI->getOpcode()];\n"
     << "  assert(Bits != 0 && \"Cannot get the instruction mnemonic.\");\n";
   O << "  unsigned op_start = 0, operand = 0;\n";
-  O << " HSAIL_ASM::Inst inst = HSAIL_ASM::parseMnemo(AsmStrs+(Bits & "<< (1 << AsmStrBits)-1 <<")-1, brigantine);\n";
-  O << " switch(MI->getOpcode()) {\n\t";
+  O << "  HSAIL_ASM::Inst inst = HSAIL_ASM::parseMnemo(AsmStrs+(Bits & "<< (1 << AsmStrBits)-1 <<")-1, brigantine);\n";
+  O << "  switch(MI->getOpcode()) {\n";
 
 #if defined(AMD_OPENCL) || 1
   // needSpecialProcessing defined only under this macro
@@ -216,13 +216,13 @@ void BRIGLoweringEmitter::EmitPrintInstruction(raw_ostream &O) {
     unsigned hasRef = CGI->needSpecialProcessing;
 
     if (CGI->isImageInst) {
-      const std::string emission = "\t\tBrigEmitImageInst(MI, inst, 0);\n";
+      const std::string emission = "    BrigEmitImageInst(MI, inst);\n";
       BrigOperands[emission].push_back(i);
       continue;
     }
 
 	if (CGI->isCrossLaneInst) {
-      const std::string emission = "\n\t\tBrigEmitOperandV4(MI, op_start, inst, operand);\n\t\tBrigEmitOperand( MI, 4, inst, -3);\n";
+      const std::string emission = "    BrigEmitVecOperand(MI, 0, 4);    BrigEmitOperand( MI, 4, inst);\n";
       BrigOperands[emission].push_back(i);
       continue;
     }
@@ -265,18 +265,19 @@ void BRIGLoweringEmitter::EmitPrintInstruction(raw_ostream &O) {
     std::vector<unsigned>::const_iterator iit = it->second.begin();
     std::vector<unsigned>::const_iterator een = it->second.end();
     for(;iit != een; iit++) {
-      O << "  case " << *iit << " :\t// " << NumberedInstructions[*iit]->TheDef->getName() << "\n\t";
+      O << "  case " << *iit << " :\t// " << NumberedInstructions[*iit]->TheDef->getName() << "\n";
     }
-    O << it->first << "\n\t";
-    O << "\n\treturn;\n\t";
+    O << it->first;
+    O << "    return inst;\n\n";
   }
 
-  O << "}\n\t";
+  O << "  }\n";
 
-  O << "\n\tunsigned nOperands = MI->getNumOperands();\n";
-  O << "\n\tfor(unsigned opNum=0;opNum != nOperands; opNum++) {\n";
-  O << "\n\t\tBrigEmitOperand( MI, opNum, inst );\n\t";
-  O << "\n\t}\n";
+  O << "  unsigned nOperands = MI->getNumOperands();\n";
+  O << "  for(unsigned opNum=0;opNum != nOperands; opNum++) {\n";
+  O << "  BrigEmitOperand( MI, opNum, inst );\n\t";
+  O << "  }\n";
+  O << "  return inst;\n";
   
 
   O << "}\n";

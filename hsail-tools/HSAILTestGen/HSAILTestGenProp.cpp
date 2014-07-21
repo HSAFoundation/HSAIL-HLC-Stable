@@ -42,7 +42,9 @@ static const unsigned valMapDesc[] = // from HDL to TestGen
                             O_VEC4_R32_DST, O_VEC4_R64_DST,
                             0,
 
-    OPERAND_VAL_IMM,        O_IMM1_X, O_IMM8_X, O_IMM16_X, O_IMM32_X, O_IMM64_X, O_IMM128_X, O_WAVESIZE, 0,
+    OPERAND_VAL_IMM,        O_IMM8_X, O_IMM16_X, O_IMM32_X, O_IMM64_X, O_IMM128_X, O_WAVESIZE, 0,
+
+    OPERAND_VAL_CNST,       O_IMM8_X, O_IMM16_X, O_IMM32_X, O_IMM64_X, O_IMM128_X, 0,
 
     OPERAND_VAL_LAB,        O_LABELREF, 0,
 
@@ -51,7 +53,12 @@ static const unsigned valMapDesc[] = // from HDL to TestGen
                             O_ADDRESS_GLOBAL_ROIMG, O_ADDRESS_GLOBAL_WOIMG, O_ADDRESS_GLOBAL_RWIMG, O_ADDRESS_GLOBAL_SAMP, O_ADDRESS_GLOBAL_SIG32, O_ADDRESS_GLOBAL_SIG64,
                             O_ADDRESS_READONLY_ROIMG, O_ADDRESS_READONLY_RWIMG, O_ADDRESS_READONLY_SAMP, O_ADDRESS_READONLY_SIG32, O_ADDRESS_READONLY_SIG64, 0,
 
-    OPERAND_VAL_FUNC,       O_FUNCTIONREF, 0,
+    OPERAND_VAL_FUNC,       O_FUNCTIONREF, O_IFUNCTIONREF, 0,
+
+    OPERAND_VAL_IFUNC,      O_IFUNCTIONREF, 0,
+
+    OPERAND_VAL_KERNEL,     O_KERNELREF, 0,
+    OPERAND_VAL_SIGNATURE,  O_SIGNATUREREF, 0,
 
     OPERAND_VAL_ARGLIST,    0,
     OPERAND_VAL_JUMPTAB,    0,
@@ -104,6 +111,9 @@ unsigned operandId2SymId(unsigned operandId)
 
     case O_FBARRIERREF:             return SYM_FBARRIER;
     case O_FUNCTIONREF:             return SYM_FUNC;
+    case O_IFUNCTIONREF:            return SYM_IFUNC;
+    case O_KERNELREF:               return SYM_KERNEL;
+    case O_SIGNATUREREF:            return SYM_SIGNATURE;
     case O_LABELREF:                return SYM_LABEL;
 
     default:                        return SYM_NONE;
@@ -121,6 +131,9 @@ const SymDesc symDescTab[SYM_MAXID] =
     {},
 
     {SYM_FUNC,           "&TestFunc",      Brig::BRIG_TYPE_NONE,  Brig::BRIG_SEGMENT_NONE},
+    {SYM_IFUNC,          "&TestIndirFunc", Brig::BRIG_TYPE_NONE,  Brig::BRIG_SEGMENT_NONE},
+    {SYM_KERNEL,         "&TestKernel",    Brig::BRIG_TYPE_NONE,  Brig::BRIG_SEGMENT_NONE},
+    {SYM_SIGNATURE,      "&TestSignature", Brig::BRIG_TYPE_NONE,  Brig::BRIG_SEGMENT_NONE},
     {SYM_GLOBAL_VAR,     "&GlobalVar",     Brig::BRIG_TYPE_S32,   Brig::BRIG_SEGMENT_GLOBAL},
     {SYM_GROUP_VAR,      "&GroupVar",      Brig::BRIG_TYPE_S32,   Brig::BRIG_SEGMENT_GROUP},
     {SYM_PRIVATE_VAR,    "&PrivateVar",    Brig::BRIG_TYPE_S32,   Brig::BRIG_SEGMENT_PRIVATE},
@@ -208,7 +221,7 @@ string operand2str(unsigned operandId)
     case O_VEC2_R64_DST:  return "($d0, $d1)";
     case O_VEC4_R64_DST:  return "($d0, $d1, $d2, $d3)";
     
-    case O_IMM1_X:        return "IMM#b1";
+//    case O_IMM1_X:        return "IMM#b1";
     case O_IMM8_X:        return "IMM#b8";
     case O_IMM16_X:       return "IMM#b16";
     case O_IMM32_X:       return "IMM#b32";
@@ -224,6 +237,9 @@ string operand2str(unsigned operandId)
 
     case O_LABELREF:      
     case O_FUNCTIONREF:   
+    case O_IFUNCTIONREF:   
+    case O_KERNELREF:   
+    case O_SIGNATUREREF:
     case O_FBARRIERREF:   return getSymName(operandId2SymId(operandId));
 
 
@@ -268,7 +284,7 @@ string eqclass2str(unsigned id)
 
 string val2str(unsigned id, unsigned val)
 {
-    if (PROP_D0 <= id && id <= PROP_S4) // TestGen-specific
+    if (isOperandProp(id)) // TestGen-specific
     {
         return operand2str(val);
     }

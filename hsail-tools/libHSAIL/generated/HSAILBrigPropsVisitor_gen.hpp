@@ -46,7 +46,7 @@ void visitBrigProps(Inst inst)
 
     switch(inst.kind())
     {
-        case BRIG_INST_ADDR:
+        case BRIG_KIND_INST_ADDR:
         {
             InstAddr it = inst;
         
@@ -56,7 +56,7 @@ void visitBrigProps(Inst inst)
         }
         break;
 
-        case BRIG_INST_ATOMIC:
+        case BRIG_KIND_INST_ATOMIC:
         {
             InstAtomic it = inst;
         
@@ -70,7 +70,7 @@ void visitBrigProps(Inst inst)
         }
         break;
 
-        case BRIG_INST_BASIC:
+        case BRIG_KIND_INST_BASIC:
         {
             InstBasic it = inst;
         
@@ -79,7 +79,7 @@ void visitBrigProps(Inst inst)
         }
         break;
 
-        case BRIG_INST_BR:
+        case BRIG_KIND_INST_BR:
         {
             InstBr it = inst;
         
@@ -89,7 +89,7 @@ void visitBrigProps(Inst inst)
         }
         break;
 
-        case BRIG_INST_CMP:
+        case BRIG_KIND_INST_CMP:
         {
             InstCmp it = inst;
         
@@ -103,7 +103,7 @@ void visitBrigProps(Inst inst)
         }
         break;
 
-        case BRIG_INST_CVT:
+        case BRIG_KIND_INST_CVT:
         {
             InstCvt it = inst;
         
@@ -115,7 +115,7 @@ void visitBrigProps(Inst inst)
         }
         break;
 
-        case BRIG_INST_IMAGE:
+        case BRIG_KIND_INST_IMAGE:
         {
             InstImage it = inst;
         
@@ -128,7 +128,7 @@ void visitBrigProps(Inst inst)
         }
         break;
 
-        case BRIG_INST_LANE:
+        case BRIG_KIND_INST_LANE:
         {
             InstLane it = inst;
         
@@ -139,7 +139,7 @@ void visitBrigProps(Inst inst)
         }
         break;
 
-        case BRIG_INST_MEM:
+        case BRIG_KIND_INST_MEM:
         {
             InstMem it = inst;
         
@@ -153,19 +153,20 @@ void visitBrigProps(Inst inst)
         }
         break;
 
-        case BRIG_INST_MEM_FENCE:
+        case BRIG_KIND_INST_MEM_FENCE:
         {
             InstMemFence it = inst;
         
             visitProp(inst, PROP_OPCODE, it.opcode());
             visitProp(inst, PROP_TYPE, it.type());
-            visitProp(inst, PROP_SEGMENTS, it.segments());
             visitProp(inst, PROP_MEMORYORDER, it.memoryOrder());
-            visitProp(inst, PROP_MEMORYSCOPE, it.memoryScope());
+            visitProp(inst, PROP_GLOBALSEGMENTMEMORYSCOPE, it.globalSegmentMemoryScope());
+            visitProp(inst, PROP_GROUPSEGMENTMEMORYSCOPE, it.groupSegmentMemoryScope());
+            visitProp(inst, PROP_IMAGESEGMENTMEMORYSCOPE, it.imageSegmentMemoryScope());
         }
         break;
 
-        case BRIG_INST_MOD:
+        case BRIG_KIND_INST_MOD:
         {
             InstMod it = inst;
         
@@ -177,7 +178,7 @@ void visitBrigProps(Inst inst)
         }
         break;
 
-        case BRIG_INST_QUERY_IMAGE:
+        case BRIG_KIND_INST_QUERY_IMAGE:
         {
             InstQueryImage it = inst;
         
@@ -189,7 +190,7 @@ void visitBrigProps(Inst inst)
         }
         break;
 
-        case BRIG_INST_QUERY_SAMPLER:
+        case BRIG_KIND_INST_QUERY_SAMPLER:
         {
             InstQuerySampler it = inst;
         
@@ -199,7 +200,7 @@ void visitBrigProps(Inst inst)
         }
         break;
 
-        case BRIG_INST_QUEUE:
+        case BRIG_KIND_INST_QUEUE:
         {
             InstQueue it = inst;
         
@@ -210,7 +211,7 @@ void visitBrigProps(Inst inst)
         }
         break;
 
-        case BRIG_INST_SEG:
+        case BRIG_KIND_INST_SEG:
         {
             InstSeg it = inst;
         
@@ -220,7 +221,7 @@ void visitBrigProps(Inst inst)
         }
         break;
 
-        case BRIG_INST_SEG_CVT:
+        case BRIG_KIND_INST_SEG_CVT:
         {
             InstSegCvt it = inst;
         
@@ -232,7 +233,7 @@ void visitBrigProps(Inst inst)
         }
         break;
 
-        case BRIG_INST_SIGNAL:
+        case BRIG_KIND_INST_SIGNAL:
         {
             InstSignal it = inst;
         
@@ -244,7 +245,7 @@ void visitBrigProps(Inst inst)
         }
         break;
 
-        case BRIG_INST_SOURCE_TYPE:
+        case BRIG_KIND_INST_SOURCE_TYPE:
         {
             InstSourceType it = inst;
         

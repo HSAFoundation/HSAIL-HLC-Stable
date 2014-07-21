@@ -53,6 +53,8 @@ Alias f32x = f(32x2, 32x4);
 Alias f64x = f(64x2);
 
 Alias opaque = roimg, rwimg, woimg, samp, sig32, sig64;
+Alias img    = roimg, rwimg, woimg, samp;
+Alias sig    = sig32, sig64;
 
 Clone stype;   ExtPropName sourceType;  // src type
 Clone itype;   ExtPropName imageType;   // image type
@@ -128,11 +130,14 @@ BrigProp round =
     none,
     float   = (float_near_even, float_zero, float_plus_infinity, float_minus_infinity).near,
     int     = (integer_near_even, integer_zero, integer_plus_infinity, integer_minus_infinity, 
-               integer_near_even_sat, integer_zero_sat, integer_plus_infinity_sat, integer_minus_infinity_sat).zero;
+               integer_near_even_sat, integer_zero_sat, integer_plus_infinity_sat, integer_minus_infinity_sat,
+               integer_signalling_near_even, integer_signalling_zero, integer_signalling_plus_infinity, integer_signalling_minus_infinity,
+               integer_signalling_near_even_sat, integer_signalling_zero_sat, integer_signalling_plus_infinity_sat, integer_signalling_minus_infinity_sat).zero;
 
 Attr near, zero; // Default values
 
 PropAccessor roundEx;
+CustomCheck;
 
 // ============================================================================
 // FTZ Modifier
@@ -140,6 +145,7 @@ PropAccessor roundEx;
 BrigBitProp ftz;
 
 PropAccessor ftzEx;
+CustomCheck;
 
 // ============================================================================
 // Const Modifier
@@ -186,9 +192,9 @@ ExtPropName equivClass;
 
 BrigProp memord = 
     none,
-    acq = acquire,
-    rel = release,
-    ar  = acquire_release,
+    acq = sc_acquire,
+    rel = sc_release,
+    ar  = sc_acquire_release,
     rlx = relaxed;
 
 Alias any  = * / none;
@@ -215,34 +221,23 @@ Alias std = wv, wg, cmp, sys;
 BrigPrefix  MEMORY_SCOPE;
 ExtPropName memoryScope;
 
-// ============================================================================
-// Memory Fence
+Clone memscpglobal; ExtPropName globalSegmentMemoryScope;
 
-BrigProp memseg = 
-    none,
-    group,
-    global,
-    both,
-    image;
+Clone memscpgroup; ExtPropName groupSegmentMemoryScope;
 
-Alias any = * / none;
-
-BrigPrefix  MEMORY_FENCE;
-ExtPropName segments;
+Clone memscpimage; ExtPropName imageSegmentMemoryScope;
 
 // ============================================================================
 // Atomic Operations
 
 BrigProp atmop = 
-    generic     = (inc, dec,
-                   add, sub, 
-                   max, min,
+    generic     = (add, sub, 
                    and, or, xor, cas), 
+    atomic      = (wrapinc, wrapdec,
+                   max, min),                   
     special     = (exch, ld, st), 
     wait        = (wait_eq, wait_ne, wait_lt, wait_gte),
     waittimeout = (waittimeout_eq, waittimeout_ne, waittimeout_lt, waittimeout_gte);
-
-Alias any = *;
 
 BrigPrefix   ATOMIC;
 ExtPropName  atomicOperation;
@@ -332,9 +327,11 @@ Attr all, wavesize, 1; // Default values
 
 OperandProp operand = 
     null, 
-    jumptab, calltab,       // NB: no type
-    arglist,                // NB: no type
-    (lab, func).model,
+    jumptab, calltab, signature, // NB: no type
+    arglist,                     // NB: no type
+    lab, 
+    func, ifunc,
+    kernel,
     fbarrier.u32,
     addr.(seg,              // 1) address size must match _instruction_ segment size; 
                             // 2) if inst.segment=flat, address must be flat
@@ -347,14 +344,15 @@ OperandProp operand =
     sampler.samp,                                //F: should be removed as soon as image support is implemented
 
     (imm0T2, imm0T3).u32,
-    (reg, vec.2, vec.3, vec.4, imm).(b1, b32, b64, u32, u64, s32, s64, p2u, dtype, stype, ctype),
-    reg.(samp, sig32, sig64, model, itype);
+    (reg, vec.2, vec.3, vec.4, imm, cnst).(b1, b32, b64, u32, u64, s32, s64, p2u, dtype, stype, ctype),
+    reg.(samp, sig32, sig64, itype);
 
 Alias reg    = reg.dtype;
 Alias vec.2  = vec.2.dtype;
 Alias vec.3  = vec.3.dtype;
 Alias vec.4  = vec.4.dtype;
 Alias imm    = imm.dtype;
+Alias cnst   = cnst.dtype;
 
 Alias vector = vec.(2, 3, 4);
 
@@ -363,7 +361,7 @@ Alias image.stype = (roimage, rwimage, woimage).stype; //F: should be removed as
 
 Clone  d0, d1, s0, s1, s2, s3, s4;
 
-Attr dtype, stype, ctype, itype, model, p2u, seg, tseg,
+Attr dtype, stype, ctype, itype, p2u, seg, tseg,
      b1, b32, b64, u32, u64, s32, s64, samp, sig32, sig64;
 
 DependsOn type, stype, ctype, itype;
@@ -429,7 +427,6 @@ Inst sub(Mod, arithmetic, add)
 Req max
 {
     type  = (s, u)(32, 64), f, x;
-    ftz   = any;
     round = none;
 
     { type = (s, u)(32, 64) ? pack = none;      ftz = none }
@@ -450,7 +447,6 @@ Inst min(Mod, arithmetic, max)
 Req mul
 {
     type = (s, u)(32, 64), f, x;
-    ftz   = any;
 
     { type = (s, u)(32, 64); ? pack = none;      round = none;  ftz = none }
     { type = f               ? pack = none;      round = float; ftz = any  }
@@ -877,7 +873,7 @@ Inst mov(Basic, move, mov)
 Req lda
 { 
     type = u(32, 64);
-    segment = any;
+    segment = global, group, private, flat, kernarg, readonly;
 
     typesize = seg;
 
@@ -891,24 +887,6 @@ Req lda
 Inst lda(Addr, arithmetic, lda)
 
 // ============================================================================
-// LDC
-
-Req ldc
-{ 
-    type    = u(32, 64);
-
-    typesize = model;
-
-    d0 = reg;
-    s1 = (lab, func).model;
-    s2 = null;       
-    s3 = null;       
-    s4 = null;
-}
-
-Inst ldc(Basic, arithmetic, ldc)
-
-// ============================================================================
 // SHUFFLE
 
 Req shuffle
@@ -918,12 +896,8 @@ Req shuffle
     d0 = reg;       
     s1 = reg, imm;
     s2 = reg, imm;
-    s3 = imm;
+    s3 = cnst.b32;  // WS is not allowed
     s4 = null;
-
-    { type = x.32; ? s3 = imm.b32 }
-    { type = x.64; ? s3 = imm.b64 }
-    ;
 }
 
 Inst shuffle(Basic, arithmetic, shuffle)
@@ -949,13 +923,13 @@ Req pack
     type  = x;
     stype = (s, u)(32, 64), f;
 
-    { type = s(8, 16, 32)x ? stype = s32, s64 }
-    { type = s64x          ? stype = s64      }
-    { type = u(8, 16, 32)x ? stype = u32, u64 }
-    { type = u64x          ? stype = u64      }
-    { type = f16x          ? stype = f16      }
-    { type = f32x          ? stype = f32      }
-    { type = f64x          ? stype = f64      }
+    { type = s(8, 16, 32)x ? stype = s32 }
+    { type = s64x          ? stype = s64 }
+    { type = u(8, 16, 32)x ? stype = u32 }
+    { type = u64x          ? stype = u64 }
+    { type = f16x          ? stype = f16 }
+    { type = f32x          ? stype = f32 }
+    { type = f64x          ? stype = f64 }
     ;
 
     d0 = reg;       
@@ -970,20 +944,18 @@ Inst pack(Source.Type, arithmetic, pack)
 // ============================================================================
 // UNPACK
 
-//F s2 must be in the range [0, number of elements in the packed source type - 1]. 
-
 Req unpack
 { 
     type  = (s, u)(32, 64), f;
     stype = x;
 
-    { type = s32 ? stype = s(8, 16, 32)x     }
-    { type = s64 ? stype = s(8, 16, 32, 64)x }
-    { type = u32 ? stype = u(8, 16, 32)x     }
-    { type = u64 ? stype = u(8, 16, 32, 64)x }
-    { type = f16 ? stype = f16x              }
-    { type = f32 ? stype = f32x              }
-    { type = f64 ? stype = f64x              }
+    { type = s32 ? stype = s(8, 16, 32)x }
+    { type = s64 ? stype = s64x          }
+    { type = u32 ? stype = u(8, 16, 32)x }
+    { type = u64 ? stype = u64x          }
+    { type = f16 ? stype = f16x          }
+    { type = f32 ? stype = f32x          }
+    { type = f64 ? stype = f64x          }
     ;
 
     d0 = reg;       
@@ -1024,7 +996,7 @@ Req class
        
     d0 = reg;
     s1 = (reg, imm).stype;
-    s2 = (reg, imm).u32;
+    s2 = (reg, cnst).u32;
     s3 = null;
     s4 = null;
 }
@@ -1166,13 +1138,13 @@ Req segmentp
 { 
     type    = b1;
     stype   = u(32, 64);
-    segment = std;
+    segment = global, group, private;
     nonull  = any;
 
     stypesize = model;
 
     d0 = reg;
-    s1 = (reg, imm).stype;
+    s1 = (reg, cnst).stype; // WS is not allowed
     s2 = null;       
     s3 = null;       
     s4 = null;
@@ -1187,14 +1159,14 @@ Req f2s
 { 
     type    = u(32, 64);
     stype   = u(32, 64);
-    segment = std;
+    segment = global, group, private;
     nonull  = any;
 
     typesize  = seg;
     stypesize = model;
 
     d0 = reg;
-    s1 = (reg, imm).stype;
+    s1 = (reg, cnst).stype; // WS is not allowed
     s2 = null;       
     s3 = null;       
     s4 = null;
@@ -1204,14 +1176,14 @@ Req s2f
 { 
     type    = u(32, 64);
     stype   = u(32, 64);
-    segment = std;
+    segment = global, group, private;
     nonull  = any;
 
     typesize  = model;
     stypesize = seg;
 
     d0 = reg;
-    s1 = (reg, imm).stype;
+    s1 = (reg, cnst).stype; // WS is not allowed
     s2 = null;       
     s3 = null;       
     s4 = null;
@@ -1270,9 +1242,9 @@ Req cvt
     { type = (s, u)16 ? stype = b1, (s, u)(8,     32, 64), f }
     { type = (s, u)32 ? stype = b1, (s, u)(8, 16,     64), f }
     { type = (s, u)64 ? stype = b1, (s, u)(8, 16, 32    ), f }
-    { type = f16      ? stype = b1, s, u, f                  }        //{ type = f16      ? stype = * / f16      } //F Not clear if this should be allowed
-    { type = f32      ? stype = b1, s, u, f                  }        //{ type = f32      ? stype = * / f32      }
-    { type = f64      ? stype = b1, s, u, f                  }        //{ type = f64      ? stype = * / f64      }
+    { type = f16      ? stype = * / f16                      }
+    { type = f32      ? stype = * / f32                      }
+    { type = f64      ? stype = * / f64                      }
     ;
 
     { stype = b1, s, u; type = b1, s, u  ? round = none;  ftz = none }
@@ -1310,8 +1282,8 @@ Req ld
     { type = b128, opaque ? d0 = reg          }
     ;
 
-    { segment = global, readonly, kernarg, flat ? const = any  }
-    { segment = group, private, spill, arg      ? const = none }
+    { segment = global, flat                                  ? const = any  }
+    { segment = group, private, readonly, kernarg, spill, arg ? const = none }
     ;
 
     s1 = addr.tseg;
@@ -1334,8 +1306,9 @@ Req st
     eqclass = any;
     width   = none;
 
-    { type = u, s, f      ? s0 = (reg, vector, imm) }
-    { type = b128, opaque ? s0 = reg               }
+    { type = u, s, f   ? s0 = (reg, vector, imm) }
+    { type = b128, sig ? s0 = reg;               }
+    { type = img       ? s0 = reg; segment = arg } // img/samp types are only allowed if segment is arg
     ;
 
     s1 = addr.tseg;
@@ -1352,7 +1325,7 @@ Inst st(Mem, memory, st)
 Req atomic
 { 
     type    = (b, s, u)(32, 64);
-    atmop   = generic, exch, ld;
+    atmop   = generic, atomic, exch, ld;
     segment = global, group, flat;
     eqclass = any;
 
@@ -1361,7 +1334,7 @@ Req atomic
     { atmop = cas                ? type = (b   )(32, 64); memord = any; s2 = reg, imm; s3 = reg, imm }
     { atmop = and, or, xor, exch ? type = (b   )(32, 64); memord = any; s2 = reg, imm; s3 = null     }
     { atmop = add, sub, min, max ? type = (s, u)(32, 64); memord = any; s2 = reg, imm; s3 = null     }
-    { atmop = inc, dec           ? type = (u   )(32, 64); memord = any; s2 = reg, imm; s3 = null     }
+    { atmop = wrapinc, wrapdec   ? type = (u   )(32, 64); memord = any; s2 = reg, imm; s3 = null     }
     { atmop = ld                 ? type = (b   )(32, 64); memord = ld;  s2 = null;     s3 = null     }
     ;
 
@@ -1382,7 +1355,7 @@ Inst atomic(Atomic, atomic.memory, atomic)
 Req atomic.noret
 { 
     type    = (b, s, u)(32, 64);
-    atmop   = generic, st;
+    atmop   = generic, atomic, st;
     segment = global, group, flat;
     eqclass = any;
 
@@ -1391,7 +1364,7 @@ Req atomic.noret
     { atmop = cas                ? type = (b   )(32, 64); memord  = any; s2 = reg, imm }
     { atmop = and, or, xor       ? type = (b   )(32, 64); memord  = any; s2 = null     }
     { atmop = add, sub, min, max ? type = (s, u)(32, 64); memord  = any; s2 = null     }
-    { atmop = inc, dec           ? type = (u   )(32, 64); memord  = any; s2 = null     }
+    { atmop = wrapinc, wrapdec   ? type = (u   )(32, 64); memord  = any; s2 = null     }
     { atmop = st                 ? type = (b   )(32, 64); memord  = st;  s2 = null     }
     ;
 
@@ -1414,7 +1387,7 @@ Req signal
 {
     type    = (b, s, u)(32, 64);
     sigtype = sig32, sig64;
-    sigop   = any;
+    sigop   = generic, exch, ld, wait, waittimeout;
     memord  = any;
     typesize  = model;
 
@@ -1425,8 +1398,7 @@ Req signal
     { sigop = ld                 ? type = (b   )(32, 64); memord = ld;   s2 = null;     s3 = null           }
     { sigop = and, or, xor, exch ? type = (b   )(32, 64); memord = any;  s2 = reg, imm; s3 = null           }
     { sigop = cas                ? type = (b   )(32, 64); memord = any;  s2 = reg, imm; s3 = reg, imm       }
-    { sigop = add, sub, min, max ? type = (s, u)(32, 64); memord = any;  s2 = reg, imm; s3 = null           }
-    { sigop = inc, dec           ? type = (u   )(32, 64); memord = any;  s2 = reg, imm; s3 = null           }
+    { sigop = add, sub           ? type = (s, u)(32, 64); memord = any;  s2 = reg, imm; s3 = null           }
     { sigop = wait               ? type = (s   )(32, 64); memord = wait; s2 = reg, imm; s3 = null           }
     { sigop = waittimeout        ? type = (s   )(32, 64); memord = wait; s2 = reg, imm; s3 = (reg, imm).u64 }
     ;
@@ -1439,7 +1411,7 @@ Req signal.noret
 {
     type    = (b, s, u)(32, 64);
     sigtype = sig32, sig64;
-    sigop   = any;
+    sigop   = generic, st;
     memord  = any;
 
     typesize  = model;
@@ -1451,8 +1423,7 @@ Req signal.noret
     { sigop = st                 ? type = (b   )(32, 64); memord = st;   s2 = null     }
     { sigop = and, or, xor       ? type = (b   )(32, 64); memord = any;  s2 = null     }
     { sigop = cas                ? type = (b   )(32, 64); memord = any;  s2 = reg, imm }
-    { sigop = add, sub, min, max ? type = (s, u)(32, 64); memord = any;  s2 = null     }
-    { sigop = inc, dec           ? type = (u   )(32, 64); memord = any;  s2 = null     }
+    { sigop = add, sub           ? type = (s, u)(32, 64); memord = any;  s2 = null     }
     ;
 
     s1 = reg, imm;
@@ -1469,7 +1440,7 @@ Inst signalnoret(Signal, sync, signal.noret)
 Req rdimage
 { 
     type     = (s, u, f)32;
-    itype    = roimg, rwimg;
+    itype    = roimg;
     ctype    = (s, f)32;
     geometry = 1d, 2d, 3d, 1da, 2da, 2ddepth, 2dadepth;
     eqclass  = any;
@@ -1575,53 +1546,55 @@ Inst queryimage  (Query.Image,   image, queryimage)
 Inst querysampler(Query.Sampler, image, querysampler)
 
 // ============================================================================
+// BR
+
+Req br
+{ 
+    type     = none;
+    width    = all;
+
+    s0 = lab;
+    s1 = null;
+    s2 = null;
+    s3 = null;
+    s4 = null;
+}
+
+Inst br(Br, branch, br)
+
+// ============================================================================
 // CBR
 
 Req cbr
 { 
-    type     = none;
-  //width    = any;     // Moved below after all other checks are complete.
-                        // This is necessary to improve diagnostics because 
-                        // default 'width' value is assigned together
-                        // with 's0' operand. See Brigantine::setOperand
-    s0 = reg.b1;
-    s1 = (reg, lab).model;
-    s2 = null, jumptab;
+    type     = b1;
+    width    = any.1;
+
+    s0 = reg, imm;
+    s1 = lab;
+    s2 = null;
     s3 = null;
     s4 = null;
-
-    { s1 = reg.model ? s2 = null, jumptab }
-    { s1 = lab.model ? s2 = null          }
-    ;
-
-    width = any.1;
 }
 
 Inst cbr(Br, branch, cbr)
 
 // ============================================================================
-// BRN
+// SBR
 
-Req brn
+Req sbr
 { 
-    type     = none;
-  //width    = any;     // Checked below after all other checks are complete.
-                        // This is necessary to improve diagnostics because 
-                        // default 'width' value is assigned together
-                        // with 's0' operand. See Brigantine::setOperand
+    type     = u(32, 64);
+    width    = any.1;
 
-    s0 = (reg, lab).model;
-    s1 = null, jumptab;
+    s0 = reg, imm;
+    s1 = jumptab;
     s2 = null;
     s3 = null;
     s4 = null;
-
-    { s0 = reg.model ? width = any.1; s1 = null, jumptab }
-    { s0 = lab.model ? width = all;   s1 = null          }
-    ;
 }
 
-Inst brn(Br, branch, brn)
+Inst sbr(Br, branch, sbr)
 
 // ============================================================================
 // BARRIER
@@ -1709,12 +1682,20 @@ Req memfence
 { 
     type   = none;
     memord = acq, rel, ar;
-    memscp = wv, wg, cmp, sys, wi;
-    memseg = any;
+    memscpglobal = none, wv, wg, cmp, sys;
+    memscpgroup  = none, wv, wg;
+    memscpimage  = none, wi, wv, wg;
 
-    { memseg = global, both ? memord = ar, acq, rel; memscp = wv, wg, cmp, sys }
-    { memseg = group        ? memord = ar, acq, rel; memscp = wv, wg           }
-    { memseg = image        ? memord = ar;           memscp = wv, wg, wi       }
+    // If image scope is specified, no other scopes may be specified and order must be ar
+    { memscpimage = none       ?                                                      }
+    { memscpimage = wi, wv, wg ? memscpglobal = none; memscpgroup = none; memord = ar }
+    ;
+
+    // At least one scope must be specified
+    { memscpglobal = none; memscpgroup = none ? memscpimage  = wi, wv, wg       }
+    { memscpimage  = none; memscpgroup = none ? memscpglobal = wv, wg, cmp, sys }
+    { memscpglobal = none; memscpimage = none ? memscpgroup  = wv, wg           }
+    { memscpimage  = none, wi, wv, wg         ?                                 } //F Should allow empty conditions!
     ;
 
     s0 = null;
@@ -1803,24 +1784,71 @@ Inst activelaneshuffle(Lane, sync, activelaneshuffle)
 
 Req call
 { 
-    type     = none;
-  //width    = any;     // Checked below after all other checks are complete.
-                        // This is necessary to improve diagnostics because 
-                        // default 'width' value is assigned together
-                        // with 's0' operand. See Brigantine::setOperand
+    type  = none;
+    width = all;
 
     s0 = arglist;
-    s1 = (reg, func).model;
+    s1 = func;
     s2 = arglist;
-    s3 = null, calltab;
+    s3 = null;
     s4 = null;
-
-    { s1 = reg.model  ? width = any.1; s3 = null, calltab }
-    { s1 = func.model ? width = all;   s3 = null          }
-    ;
 }
 
 Inst call(Br, branch, call)
+
+// ============================================================================
+// SCALL
+
+Req scall
+{ 
+    type  = u(32, 64);
+    width = any.1;
+
+    s0 = arglist;
+    s1 = reg, imm;
+    s2 = arglist;
+    s3 = calltab;
+    s4 = null;
+}
+
+Inst scall(Br, branch, scall)
+
+// ============================================================================
+// ICALL
+
+Req icall
+{ 
+    type  = u(32, 64);
+    width = any.1;
+
+    typesize = model;
+
+    s0 = arglist;
+    s1 = reg;
+    s2 = arglist;
+    s3 = signature;
+    s4 = null;
+}
+
+Inst icall(Br, branch, icall)
+
+// ============================================================================
+// LDI
+
+Req ldi
+{ 
+    type     = u(32, 64);
+
+    typesize = model;
+
+    d0 = reg;
+    s1 = ifunc;
+    s2 = null;
+    s3 = null;
+    s4 = null;
+}
+
+Inst ldi(Basic, misc, ldi)
 
 // ============================================================================
 // RET
@@ -1862,7 +1890,7 @@ Inst alloca(Mem, misc, alloca)
 // ============================================================================
 // WORKITEMID, etc
 
-Req spec.reg
+Req basic.dst.u32
 { 
     type    = u32;
 
@@ -1873,9 +1901,31 @@ Req spec.reg
     s4 = null;
 }
 
-Req spec.reg.dim
+Req basic.dst.u32.u64
+{ 
+    type    = u(32, 64);
+
+    d0 = reg;
+    s1 = null;
+    s2 = null;
+    s3 = null;
+    s4 = null;
+}
+
+Req basic.dst.u32.dim
 { 
     type    = u32;
+
+    d0 = reg;
+    s1 = imm0T2.u32;
+    s2 = null;
+    s3 = null;
+    s4 = null;
+}
+
+Req basic.dst.u32.u64.dim
+{ 
+    type    = u(32, 64);
 
     d0 = reg;
     s1 = imm0T2.u32;
@@ -1888,7 +1938,7 @@ Req spec.except
 { 
     type    = u32;
 
-    s0 = imm;
+    s0 = cnst; // WS is not allowed
     s1 = null;
     s2 = null;
     s3 = null;
@@ -1930,24 +1980,29 @@ Req nop
     s4 = null;
 }
 
-Inst cuid             (Basic, misc, spec.reg)
-Inst dim              (Basic, misc, spec.reg)
-Inst getdetectexcept  (Basic, misc, spec.reg)
-Inst laneid           (Basic, misc, spec.reg)
-Inst maxcuid          (Basic, misc, spec.reg)
-Inst maxwaveid        (Basic, misc, spec.reg)
-Inst queueid          (Basic, misc, spec.reg)
-Inst waveid           (Basic, misc, spec.reg)
-Inst workitemflatabsid(Basic, misc, spec.reg) 
-Inst workitemflatid   (Basic, misc, spec.reg)
+Inst cuid             (Basic, misc, basic.dst.u32)
+Inst dim              (Basic, misc, basic.dst.u32)
+Inst getdetectexcept  (Basic, misc, basic.dst.u32)
+Inst laneid           (Basic, misc, basic.dst.u32)
+Inst maxcuid          (Basic, misc, basic.dst.u32)
+Inst maxwaveid        (Basic, misc, basic.dst.u32)
+Inst waveid           (Basic, misc, basic.dst.u32)
+Inst workitemflatid   (Basic, misc, basic.dst.u32)
+Inst queueid          (Basic, misc, basic.dst.u32)
+Inst agentcount       (Basic, misc, basic.dst.u32)
+Inst agentid          (Basic, misc, basic.dst.u32)
+Inst groupbaseptr     (Basic, misc, basic.dst.u32)
 
-Inst currentworkgroupsize(Basic, misc, spec.reg.dim) 
-Inst gridgroups          (Basic, misc, spec.reg.dim)
-Inst gridsize            (Basic, misc, spec.reg.dim)
-Inst workgroupid         (Basic, misc, spec.reg.dim)
-Inst workgroupsize       (Basic, misc, spec.reg.dim)
-Inst workitemabsid       (Basic, misc, spec.reg.dim)
-Inst workitemid          (Basic, misc, spec.reg.dim)
+Inst workitemflatabsid(Basic, misc, basic.dst.u32.u64) 
+
+Inst currentworkgroupsize(Basic, misc, basic.dst.u32.dim) 
+Inst gridgroups          (Basic, misc, basic.dst.u32.dim)
+Inst gridsize            (Basic, misc, basic.dst.u32.dim)
+Inst workgroupid         (Basic, misc, basic.dst.u32.dim)
+Inst workgroupsize       (Basic, misc, basic.dst.u32.dim)
+Inst workitemid          (Basic, misc, basic.dst.u32.dim)
+
+Inst workitemabsid       (Basic, misc, basic.dst.u32.u64.dim)
 
 Inst cleardetectexcept(Basic, misc, spec.except)
 Inst setdetectexcept  (Basic, misc, spec.except)
@@ -1962,12 +2017,11 @@ Inst nop(Basic, misc, nop)
 // ============================================================================
 // QUEUEPTR, NULLPTR
 
-Req gptr
+Req ptr.model
 { 
     type    = u(32, 64);
-    segment = flat, global;
 
-    typesize = seg;
+    typesize = model;
 
     s0 = reg;
     s1 = null;
@@ -1979,7 +2033,7 @@ Req gptr
 Req nullptr
 { 
     type    = u(32, 64);
-    segment = any;
+    segment = flat, global, readonly, group, private, kernarg;
 
     typesize = seg;
 
@@ -1990,9 +2044,9 @@ Req nullptr
     s4 = null;
 }
 
-Inst queueptr       (Seg, misc, gptr)
-Inst servicequeueptr(Seg, misc, gptr)
-Inst nullptr        (Seg, misc, nullptr)
+Inst queueptr       (Basic, misc, ptr.model)
+Inst kernargbaseptr (Basic, misc, ptr.model)
+Inst nullptr        (Seg,   misc, nullptr)
 
 // ============================================================================
 // User Mode Queue Operations 
@@ -2058,6 +2112,23 @@ Inst stqueuewriteindex (Queue, misc, stq )
 
 // ============================================================================
 
+Req ldk
+{ 
+    type    = u(32, 64);
+
+    typesize = model;
+
+    d0 = reg;
+    s1 = kernel;
+    s2 = null;
+    s3 = null;
+    s4 = null;
+}
+
+Inst ldk(Basic, misc, ldk)
+
+// ============================================================================
+
 Req debugtrap
 { 
     type    = u32;
@@ -2070,21 +2141,6 @@ Req debugtrap
 }
 
 Inst debugtrap(Basic, misc, debugtrap)
-
-// ============================================================================
-
-Req codeblockend
-{
-    type = none;
-
-    s0 = null;
-    s1 = null;
-    s2 = null;
-    s3 = null;
-    s4 = null;
-}
-
-Inst codeblockend(Basic, misc, codeblockend)
 
 // ============================================================================
 // ============================================================================
@@ -2280,7 +2336,7 @@ Inst gcnst(Mem, gcn.memory, gcn_st)
 Req gcn_atomic
 { 
     type    = (b, s, u)(32, 64);
-    atmop   = generic, exch, ld;
+    atmop   = generic, atomic, exch, ld;
     segment = gcn;
     memscp  = wv, wg, cmp, sys;
     eqclass = any;
@@ -2290,7 +2346,7 @@ Req gcn_atomic
     { atmop = cas                ? type = (b   )(32, 64); memord = any; s2 = reg, imm; s3 = reg, imm }
     { atmop = and, or, xor, exch ? type = (b   )(32, 64); memord = any; s2 = reg, imm; s3 = null     }
     { atmop = add, sub, min, max ? type = (s, u)(32, 64); memord = any; s2 = reg, imm; s3 = null     }
-    { atmop = inc, dec           ? type = (u   )(32, 64); memord = any; s2 = reg, imm; s3 = null     }
+    { atmop = wrapinc, wrapdec   ? type = (u   )(32, 64); memord = any; s2 = reg, imm; s3 = null     }
     { atmop = ld                 ? type = (b   )(32, 64); memord = ld;  s2 = null;     s3 = null     }
     ;
 
@@ -2307,7 +2363,7 @@ Inst gcnatomic(Atomic, gcn.atomic.memory, gcn_atomic)
 Req gcn_atomic_noret
 { 
     type    = (b, s, u)(32, 64);
-    atmop   = generic, st;
+    atmop   = generic, atomic, st;
     segment = gcn;
     memscp  = wv, wg, cmp, sys;
     eqclass = any;
@@ -2317,7 +2373,7 @@ Req gcn_atomic_noret
     { atmop = cas                ? type = (b   )(32, 64); memord = any; s2 = reg, imm }
     { atmop = and, or, xor       ? type = (b   )(32, 64); memord = any; s2 = null     }
     { atmop = add, sub, min, max ? type = (s, u)(32, 64); memord = any; s2 = null     }
-    { atmop = inc, dec           ? type = (u   )(32, 64); memord = any; s2 = null     }
+    { atmop = wrapinc, wrapdec   ? type = (u   )(32, 64); memord = any; s2 = null     }
     { atmop = st                 ? type = (b   )(32, 64); memord = st;  s2 = null     }
     ;
 
@@ -2438,4 +2494,6 @@ Inst gcnb4xchg (Basic, gcn.misc, gcn_b4xchg)
 Inst gcnb32xchg(Basic, gcn.misc, gcn_b4xchg)
 
 
-// FIXME: add all checks currently implemented in validator
+// ============================================================================
+//F: add all checks currently implemented in validator
+//F: verify that properties which require custom check are specified only once on each path

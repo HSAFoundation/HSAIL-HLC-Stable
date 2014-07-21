@@ -8,5 +8,5 @@ add_dependencies(LLVMHSAILInfo
   LLVMMC
   LLVMSupport
   LLVMTarget
+  HSAILCommonTableGen
   )
-add_dependencies(LLVMHSAILInfo HSAILCommonTableGen)

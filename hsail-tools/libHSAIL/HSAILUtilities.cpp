@@ -44,9 +44,9 @@
 #include "HSAILInstProps.h"
 
 #include <cassert>
-#include <string>
+#include <sstream>
 
-using std::string;
+using std::ostringstream;
 using HSAIL_PROPS::isTypeProp;
 
 namespace HSAIL_ASM {
@@ -66,15 +66,21 @@ namespace HSAIL_ASM {
 
 const char* validateProp(unsigned propId, unsigned val, unsigned* vals, unsigned length, unsigned model, unsigned profile)
 {
-     if (profile == Brig::BRIG_PROFILE_FULL) return 0;
+    using namespace Brig;
+
+    if (profile == BRIG_PROFILE_FULL) return 0;
 
     if (propId == HSAIL_PROPS::PROP_FTZ)
     {
         // ftz=0 is allowed only if instruction does not support ftz, i.e. list of possible values only include 0
+        // NB: if length=1, there is only one valid value x. If x!=val, we will fail elsewhere.
         if (val == 0 && length > 1) return "Base profile requires ftz modifier to be specified";
     }
     else if (propId == HSAIL_PROPS::PROP_ROUND)
     {
+        if (val == BRIG_ROUND_NONE && length == 1) return 0;
+        if (val == BRIG_ROUND_FLOAT_NEAR_EVEN || val == BRIG_ROUND_INTEGER_ZERO || val == BRIG_ROUND_INTEGER_ZERO_SAT) return 0;
+        return "Base profile only supports 'near', 'zeroi' and 'zeroi_sat' rounding modes";
     }
     return 0;
 }
@@ -93,21 +99,37 @@ const char* validateProp(unsigned propId, unsigned val, unsigned model, unsigned
         if (val == BRIG_TYPE_SIG64 && model != BRIG_MACHINE_LARGE)      return "sig64 type is not supported by the small machine model";
         if (val == BRIG_TYPE_SIG32 && model != BRIG_MACHINE_SMALL)      return "sig32 type is not supported by the large machine model";
     }
+    else if (propId == HSAIL_PROPS::PROP_IMAGESEGMENTMEMORYSCOPE)
+    {
+        if (val != BRIG_MEMORY_SCOPE_NONE && !imageExt) return "Image segment is only allowed if the IMAGE extension has been specified";
+    }
 
     return 0;
 }
 
+// Used by TestGen
 const char* validateProp(Inst inst, unsigned propId, unsigned model, unsigned profile, bool imageExt)
 {
-    return isTypeProp(propId)? validateProp(propId, getBrigProp(inst, propId), model, profile, imageExt) : 0;
+    if (propId == HSAIL_PROPS::PROP_IMAGESEGMENTMEMORYSCOPE || isTypeProp(propId))
+    {
+        return validateProp(propId, getBrigProp(inst, propId), model, profile, imageExt);
+    }
+    return 0;
 }
 
 bool hasImageExtProps(Inst inst)
 {
+    using namespace Brig;
+
     if (isImageInst(inst.opcode())       || 
         isImageExtType(getType(inst))    ||
         isImageExtType(getSrcType(inst)) ||
         isImageExtType(getImgType(inst))) return true;
+
+    if (InstMemFence i = inst)
+    {
+        if (i.imageSegmentMemoryScope() != BRIG_MEMORY_SCOPE_NONE) return true;
+    }
 
     for (unsigned i = 0; i < 5; ++i)
     {
@@ -126,12 +148,16 @@ bool hasImageExtProps(Inst inst)
 //============================================================================
 // Operations with directives
 
+bool isDirective(unsigned id)
+{ 
+    return Brig::BRIG_KIND_DIRECTIVE_BEGIN <= id && id < Brig::BRIG_KIND_DIRECTIVE_END;
+}
+
 SRef getName(Directive d)
 {
     if      (DirectiveExecutable   dn = d) return dn.name();
     else if (DirectiveVariable     dn = d) return dn.name();
     else if (DirectiveLabel        dn = d) return dn.name();
-    else if (DirectiveLabelTargets dn = d) return dn.name();
     else if (DirectiveSignature    dn = d) return dn.name();
     else if (DirectiveFbarrier     dn = d) return dn.name();
 
@@ -143,7 +169,6 @@ unsigned getDataType(Directive d)
 {
     assert(d);
     if      (DirectiveVariable     sym  = d) return sym.type();
-    else if (DirectiveVariableInit init = d) return sym.type();
 
     assert(false);
     return Brig::BRIG_TYPE_NONE;
@@ -153,7 +178,6 @@ unsigned getSegment(Directive d)
 {
     if (DirectiveVariable sym = d)     return sym.segment();
     else if (DirectiveFbarrier(d))     return Brig::BRIG_SEGMENT_GROUP;
-    else if (DirectiveLabelTargets(d)) return Brig::BRIG_SEGMENT_NONE;
 
     assert(false);
     return Brig::BRIG_SEGMENT_NONE;
@@ -161,32 +185,27 @@ unsigned getSegment(Directive d)
 
 unsigned getSymLinkage(Directive d)
 {
-    // TBD: Do signatures and fbarriers have static linkage? Assime it for now
-    // This is necessary to process signatures and fbarriers just like other symbols
+    if      (DirectiveVariable   ds = d) return ds.linkage();
+    else if (DirectiveExecutable ds = d) return ds.linkage();
+    else if (DirectiveFbarrier   ds = d) return ds.linkage();
 
-    if      (DirectiveVariable   ds = d) return ds.modifier().linkage();
-    else if (DirectiveExecutable ds = d) return ds.modifier().linkage();
-    else if (DirectiveSignature(d) || DirectiveFbarrier(d)) return Brig::BRIG_LINKAGE_STATIC; // this is to process signatures and fbarriers just like other symbols
-
-    assert(!DirectiveLabelTargets(d));
+    assert(false);
     return Brig::BRIG_LINKAGE_NONE;
 }
 
 bool isDecl(Directive d)
 {
-    if      (DirectiveVariable     ds = d) return ds.modifier().isDeclaration();
-    else if (DirectiveExecutable   ds = d) return ds.modifier().isDeclaration();
-    else if (DirectiveSignature    ds = d) return true;
-    else if (DirectiveFbarrier     ds = d) return false;
-    else if (DirectiveLabelTargets ds = d) return false;
-
-    assert(false);
-    return false;
+    return !isDef(d);
 }
 
 bool isDef(Directive d)
 {
-    return !isDecl(d);
+    if      (DirectiveVariable   ds = d) return ds.modifier().isDefinition();
+    else if (DirectiveFbarrier   ds = d) return ds.modifier().isDefinition();
+    else if (DirectiveExecutable ds = d) return ds.modifier().isDefinition();
+
+    assert(false);
+    return false;
 }
     
 DirectiveVariable getInputArg(DirectiveExecutable sbr, unsigned idx)
@@ -202,9 +221,102 @@ DirectiveVariable getInputArg(DirectiveExecutable sbr, unsigned idx)
     return arg;
 }
 
+unsigned getCtlDirOperandType(unsigned kind, unsigned idx)
+{
+    using namespace Brig;
+
+    switch(kind)
+    {
+    case BRIG_CONTROL_ENABLEBREAKEXCEPTIONS:
+    case BRIG_CONTROL_ENABLEDETECTEXCEPTIONS:       
+    case BRIG_CONTROL_MAXDYNAMICGROUPSIZE:
+    case BRIG_CONTROL_MAXFLATWORKGROUPSIZE:
+    case BRIG_CONTROL_REQUESTEDWORKGROUPSPERCU:
+    case BRIG_CONTROL_REQUIREDDIM:
+                                                    if (idx == 0) return BRIG_TYPE_U32;
+                                                    break;
+    case BRIG_CONTROL_MAXFLATGRIDSIZE:
+                                                    if (idx == 0) return BRIG_TYPE_U64;
+                                                    break;
+    case BRIG_CONTROL_REQUIREDGRIDSIZE:
+                                                    if (0 <= idx && idx <= 2) return BRIG_TYPE_U64;
+                                                    break;
+    case BRIG_CONTROL_REQUIREDWORKGROUPSIZE:
+                                                    if (0 <= idx && idx <= 2) return BRIG_TYPE_U32;
+                                                    break;
+
+    case BRIG_CONTROL_REQUIRENOPARTIALWORKGROUPS:   break;
+
+    default: 
+        assert(false);
+        break;
+    }
+    return BRIG_TYPE_NONE;
+}
+
+const char* validateCtlDirOperandBounds(unsigned kind, unsigned idx, uint64_t val)
+{
+    using namespace Brig;
+
+    switch(kind)
+    {
+    case BRIG_CONTROL_REQUIREDDIM:
+        if (val < 1 || val > 3) return "Operand value must be in the range [1..3]";
+        break;
+
+    case BRIG_CONTROL_MAXFLATGRIDSIZE:
+    case BRIG_CONTROL_MAXFLATWORKGROUPSIZE:
+    case BRIG_CONTROL_REQUESTEDWORKGROUPSPERCU:
+    case BRIG_CONTROL_REQUIREDGRIDSIZE:
+    case BRIG_CONTROL_REQUIREDWORKGROUPSIZE:
+        if (val == 0) return "Operand must be greater than 0";
+        break;
+
+    case BRIG_CONTROL_ENABLEBREAKEXCEPTIONS:
+    case BRIG_CONTROL_ENABLEDETECTEXCEPTIONS:       
+    case BRIG_CONTROL_MAXDYNAMICGROUPSIZE:
+    case BRIG_CONTROL_REQUIRENOPARTIALWORKGROUPS:
+        break;
+
+    default: 
+        assert(false);
+        break;
+    }
+
+    return 0;
+}
+
+bool allowCtlDirOperandWs(unsigned kind)
+{
+    using namespace Brig;
+
+    switch(kind)
+    {
+    case BRIG_CONTROL_REQUIREDGRIDSIZE:
+    case BRIG_CONTROL_REQUIREDWORKGROUPSIZE: 
+    case BRIG_CONTROL_MAXFLATWORKGROUPSIZE:
+    case BRIG_CONTROL_MAXFLATGRIDSIZE:
+        return true;
+
+    case BRIG_CONTROL_ENABLEBREAKEXCEPTIONS:
+    case BRIG_CONTROL_ENABLEDETECTEXCEPTIONS:       
+    case BRIG_CONTROL_MAXDYNAMICGROUPSIZE:
+    case BRIG_CONTROL_REQUESTEDWORKGROUPSPERCU:
+    case BRIG_CONTROL_REQUIREDDIM:
+    case BRIG_CONTROL_REQUIRENOPARTIALWORKGROUPS:
+        return false;
+
+    default: 
+        assert(false);
+        return false;
+    }
+}
+
 //============================================================================
 // Operations with instructions
     
+bool isInstruction(unsigned id){ return Brig::BRIG_KIND_INST_BEGIN <= id && id < Brig::BRIG_KIND_INST_END; }
+
 unsigned getType(Inst inst)    { return getBrigProp(inst, HSAIL_PROPS::PROP_TYPE,       true, Brig::BRIG_TYPE_NONE);    }
 unsigned getSrcType(Inst inst) { return getBrigProp(inst, HSAIL_PROPS::PROP_SOURCETYPE, true, Brig::BRIG_TYPE_NONE);    }
 unsigned getCrdType(Inst inst) { return getBrigProp(inst, HSAIL_PROPS::PROP_COORDTYPE,  true, Brig::BRIG_TYPE_NONE);    }
@@ -231,14 +343,48 @@ bool isImageInst(unsigned opcode)
     }
 }
 
+bool isCallInst(unsigned opcode)
+{
+    using namespace Brig;
+    return opcode == BRIG_OPCODE_CALL  ||
+           opcode == BRIG_OPCODE_SCALL ||
+           opcode == BRIG_OPCODE_ICALL;
+}
+
+bool isBranchInst(unsigned opcode)
+{
+    using namespace Brig;
+    return opcode == BRIG_OPCODE_BR  || 
+           opcode == BRIG_OPCODE_CBR || 
+           opcode == BRIG_OPCODE_SBR;
+}
+
+bool isTermInst(unsigned opcode) 
+{
+    using namespace Brig;
+    return opcode == BRIG_OPCODE_BR  || 
+           opcode == BRIG_OPCODE_SBR || 
+           opcode == BRIG_OPCODE_RET;
+}
+
 //============================================================================
 // Operations with operands
 
-unsigned getRegSize(SRef regName)
+bool isOperand(unsigned id)     
+{ 
+    return Brig::BRIG_KIND_OPERAND_BEGIN <= id && id < Brig::BRIG_KIND_OPERAND_END; 
+}
+
+bool isCodeRef(OperandCodeRef cr, unsigned targetKind)
+{
+    return cr && cr.ref() && cr.ref().kind() == targetKind;
+}
+
+unsigned getRegKind(SRef regName)
 {
     string name = regName;
 
-    if (name.empty()) return 0;
+    if (name.empty()) return (unsigned)-1;
 
     switch(name[1])
     {
@@ -252,28 +398,50 @@ unsigned getRegSize(SRef regName)
 
 unsigned getRegSize(OperandReg reg)
 {
-    assert(reg);
-    return getRegSize(reg.reg());
+  using namespace Brig;
+  switch(reg.regKind()) {
+    case BRIG_REGISTER_CONTROL          : return 1;
+    case BRIG_REGISTER_SINGLE           : return 32;
+    case BRIG_REGISTER_DOUBLE           : return 64;
+    case BRIG_REGISTER_QUAD             : return 128;
+    default : return (unsigned)-1;
+    }
 }
 
-unsigned getImmSize(OperandImmed imm)
-{
-    assert(imm);
-    return OperandImmed(imm).byteCount() * 8;
+string getRegName(OperandReg reg) 
+{ 
+    ostringstream s; 
+
+    const char* regKind = registerKind2str(reg.regKind());
+    s << regKind << reg.regNum();
+
+    return s.str();
 }
 
-bool isImmB1(OperandImmed imm)
+unsigned getImmSize(OperandData imm)
 {
     assert(imm);
-    return imm.byteCount() == 1 && (imm.bytes(0) == 0 || imm.bytes(0) == 1);
+    SRef bytes = imm.data();
+    return (unsigned)(bytes.length() * 8);
+}
+
+bool isImmB1(OperandData imm)
+{
+    assert(imm);
+    SRef bytes = imm.data();
+    return bytes.length() == 1 && (bytes[0] == 0 || bytes[0] == 1);
 }
 
 unsigned getAddrSize(OperandAddress addr, bool isLargeModel)
 {
     assert(addr);
-    if (addr.reg())    return getRegSize(addr.reg());
+
+    if (addr.reg())    return getRegBits(addr.reg().regKind());
     if (addr.symbol()) return getSegAddrSize(addr.symbol().segment(), isLargeModel);
-    if (addr.offsetHi() != 0) return 64;
+
+    // currently there are no limitations on offset size, even for small model and 32-bit addresses
+    // if (addr.offset().hi() != 0) return 64;
+
     return 0; // unknown, both 32 and 64 are possible
 }
 
@@ -410,6 +578,22 @@ bool isImageExtType(unsigned type)
         return false;
     }
 }
+
+bool isImageType(unsigned type) 
+{
+    using namespace Brig;
+    switch(type) 
+    {
+    case BRIG_TYPE_ROIMG: 
+    case BRIG_TYPE_WOIMG: 
+    case BRIG_TYPE_RWIMG: 
+        return true;
+
+    default:  
+        return false;
+    }
+}
+
 
 bool isFullProfileOnlyType(unsigned type)
 {
@@ -592,23 +776,6 @@ bool isValidVarType(unsigned type)
     return type != Brig::BRIG_TYPE_NONE && type != Brig::BRIG_TYPE_B1;
 }
 
-unsigned getBitSize(unsigned type)
-{
-    using namespace Brig;
-
-    unsigned const bType = convType2BitType(type);
-    switch(bType) {
-    case BRIG_TYPE_B1:
-    case BRIG_TYPE_B8:   return 8;
-    case BRIG_TYPE_B16:  return 16;
-    case BRIG_TYPE_B32:  return 32;
-    case BRIG_TYPE_B64:  return 64;
-    case BRIG_TYPE_B128: return 128;
-    default: assert(false);
-    }
-    return 0;
-}
-
 unsigned getBitType(unsigned size)
 {
     using namespace Brig;
@@ -654,14 +821,6 @@ unsigned getUnsignedType(unsigned size)
         assert(false);
         return BRIG_TYPE_NONE;
     }
-}
-
-unsigned getTypeSize(unsigned type)
-{
-    if (isOpaqueType(type)) return 64;
-    int result = brigtype_get_length(type);
-    assert(result);
-    return result;
 }
 
 unsigned expandSubwordType(unsigned type)
@@ -876,80 +1035,9 @@ unsigned getPackedDstDim(unsigned type, unsigned packing)
 //============================================================================
 // Operations with alignment
 
-const char* align2str(unsigned val)
-{
-    using namespace Brig;
-
-    switch(val) 
-    {
-    case BRIG_ALIGNMENT_1:       return "";
-    case BRIG_ALIGNMENT_2:       return "2";
-    case BRIG_ALIGNMENT_4:       return "4";
-    case BRIG_ALIGNMENT_8:       return "8";
-    case BRIG_ALIGNMENT_16:      return "16";
-    case BRIG_ALIGNMENT_32:      return "32";
-    case BRIG_ALIGNMENT_64:      return "64";
-    case BRIG_ALIGNMENT_128:     return "128";
-    case BRIG_ALIGNMENT_256:     return "256";
-    default : return NULL;
-    }
-}
-
-unsigned align2num(unsigned val)
-{
-    using namespace Brig;
-
-    switch(val) 
-    {
-    case BRIG_ALIGNMENT_1:       return 1;
-    case BRIG_ALIGNMENT_2:       return 2;
-    case BRIG_ALIGNMENT_4:       return 4;
-    case BRIG_ALIGNMENT_8:       return 8;
-    case BRIG_ALIGNMENT_16:      return 16;
-    case BRIG_ALIGNMENT_32:      return 32;
-    case BRIG_ALIGNMENT_64:      return 64;
-    case BRIG_ALIGNMENT_128:     return 128;
-    case BRIG_ALIGNMENT_256:     return 256;
-    default : assert(false);     return -1;
-    }
-}
-
-Brig::BrigAlignment num2align(unsigned val)
-{
-    using namespace Brig;
-
-    switch(val) 
-    {
-    case 1:   return BRIG_ALIGNMENT_1;
-    case 2:   return BRIG_ALIGNMENT_2;
-    case 4:   return BRIG_ALIGNMENT_4;
-    case 8:   return BRIG_ALIGNMENT_8;
-    case 16:  return BRIG_ALIGNMENT_16;
-    case 32:  return BRIG_ALIGNMENT_32;
-    case 64:  return BRIG_ALIGNMENT_64;
-    case 128: return BRIG_ALIGNMENT_128;
-    case 256: return BRIG_ALIGNMENT_256;
-    default:  return BRIG_ALIGNMENT_NONE;
-    }
-}
-
 Brig::BrigAlignment getNaturalAlignment(unsigned type)
 {
-    using namespace Brig;
-    assert(typeX2str(type));
-
-    switch(getTypeSize(type))
-    {
-    case 1:   return BRIG_ALIGNMENT_1;
-    case 8:   return BRIG_ALIGNMENT_1;
-    case 16:  return BRIG_ALIGNMENT_2;
-    case 32:  return BRIG_ALIGNMENT_4;
-    case 64:  return BRIG_ALIGNMENT_8;
-    case 128: return BRIG_ALIGNMENT_16;
-    default:  
-        assert(false);
-        return BRIG_ALIGNMENT_NONE;
-    }
+    return num2align(getBrigTypeNumBytes(type));
 }
 
 Brig::BrigAlignment getMaxAlignment()

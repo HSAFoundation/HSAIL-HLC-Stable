@@ -59,7 +59,8 @@ namespace HSAIL_ASM {
 
 class ValidatorImpl;
 
-class Validator {
+class Validator 
+{
     ValidatorImpl *impl;
 
     Validator(const Validator&); // non-copyable
@@ -71,8 +72,7 @@ public:
     Validator(BrigContainer &c);
     ~Validator();
 
-    enum ValidationMode { VM_BrigNotLinked, VM_BrigLinked };
-    bool validate(ValidationMode mode, bool disasmOnError = false) const;
+    bool validate(bool disasmOnError = false) const;
          
     std::string getErrorMsg(istream *is) const;
     int getErrorCode() const;

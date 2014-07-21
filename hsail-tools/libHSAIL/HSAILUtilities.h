@@ -45,6 +45,9 @@
 #include <iosfwd>
 #include <stdint.h>
 #include <cassert>
+#include <string>
+
+using std::string;
 
 namespace HSAIL_ASM
 {
@@ -56,9 +59,9 @@ class DirectiveVariable;
 class DirectiveExecutable;
 class BrigContainer;
 class OperandReg;
-class OperandVector;
 class OperandAddress;
-class OperandImmed;
+class OperandData;
+class OperandCodeRef;
 struct SRef;
 
 //============================================================================
@@ -75,28 +78,33 @@ bool hasImageExtProps(Inst inst);     // checks opcode, type and operands
 //============================================================================
 // Operations with directives
 
-SRef getName(Directive d);
+bool     isDirective(unsigned id);
+SRef     getName(Directive d);
 unsigned getDataType(Directive d);
 unsigned getSegment(Directive d);
 unsigned getSymLinkage(Directive d);
-bool isDecl(Directive d);
-bool isDef(Directive d);
+bool     isDecl(Directive d);
+bool     isDef(Directive d);
 DirectiveVariable getInputArg(DirectiveExecutable kernel, unsigned idx); 
-           
+unsigned getCtlDirOperandType(unsigned kind, unsigned idx);
+const char* validateCtlDirOperandBounds(unsigned kind, unsigned idx, uint64_t val);
+bool allowCtlDirOperandWs(unsigned kind);
+
 //============================================================================
 // Operations with instructions
 
-unsigned   getType(Inst i);
-unsigned   getSrcType(Inst inst);
-unsigned   getCrdType(Inst inst);
-unsigned   getSigType(Inst inst);
-unsigned   getImgType(Inst inst);
-unsigned   getSegment(Inst inst);
-unsigned   getPacking(Inst inst);
-unsigned   getEqClass(Inst inst);
+bool     isInstruction(unsigned id);
+unsigned getType(Inst i);
+unsigned getSrcType(Inst inst);
+unsigned getCrdType(Inst inst);
+unsigned getSigType(Inst inst);
+unsigned getImgType(Inst inst);
+unsigned getSegment(Inst inst);
+unsigned getPacking(Inst inst);
+unsigned getEqClass(Inst inst);
 
-unsigned   getDefWidth(Inst inst, unsigned machineModel, unsigned profile);
-unsigned   getDefRounding(Inst inst, unsigned machineModel, unsigned profile);
+unsigned getDefWidth(Inst inst, unsigned machineModel, unsigned profile);
+unsigned getDefRounding(Inst inst, unsigned machineModel, unsigned profile);
 
 // This function returns type of the specified operand based on values of instruction fields 
 // and machineModel (BRIG_MACHINE_SMALL or BRIG_MACHINE_LARGE). 
@@ -124,17 +132,28 @@ Inst appendInst(BrigContainer &container, unsigned instFormat);
 
 bool isImageInst(unsigned opcode);  // checks opcode only
 inline bool isGcnInst(unsigned opcode) { return (opcode & (1<<15))!=0; }
+bool isCallInst(unsigned opcode);
+bool isBranchInst(unsigned opcode);
+
+// True for instructions which unconditionally change control flow
+// so that next instruction is only reachable via a jump
+bool isTermInst(unsigned opcode);
 
 //============================================================================
 // Operations with operands
 
-unsigned   getRegSize(SRef opr);
-unsigned   getRegSize(OperandReg opr);
-unsigned   getImmSize(OperandImmed opr);
-bool       isImmB1(OperandImmed imm);
-unsigned   getAddrSize(OperandAddress addr, bool isLargeModel);
-unsigned   getSegAddrSize(unsigned segment, bool isLargeModel);
+bool     isOperand(unsigned id);
+bool     isCodeRef(OperandCodeRef cr, unsigned targetKind);
 
+unsigned getAddrSize(OperandAddress addr, bool isLargeModel);
+unsigned getSegAddrSize(unsigned segment, bool isLargeModel);
+
+unsigned getRegKind(SRef opr);
+unsigned getRegSize(OperandReg reg);
+string getRegName(OperandReg reg);
+
+unsigned getImmSize(OperandData opr);
+bool     isImmB1(OperandData imm);
 //============================================================================
 // Operations with types
 
@@ -148,6 +167,7 @@ bool       isFloatPackedType(unsigned type);
 bool       isBitType(unsigned type);
 bool       isOpaqueType(unsigned type);
 bool       isImageExtType(unsigned type);
+bool       isImageType(unsigned type);
 bool       isFullProfileOnlyType(unsigned type);
 
 unsigned   packedType2baseType(unsigned type);
@@ -163,10 +183,6 @@ unsigned   getBitType(unsigned size);
 unsigned   getSignedType(unsigned size);
 unsigned   getUnsignedType(unsigned size);
 
-unsigned   getBitSize(unsigned type);
-inline unsigned getByteSize(unsigned type) { return getBitSize(type) / 8; }
-unsigned   getTypeSize(unsigned type);
-
 //============================================================================
 // Operations with packing
 
@@ -181,9 +197,6 @@ unsigned   getPackedDstDim(unsigned type, unsigned packing);
 //============================================================================
 // Operations with alignment
 
-const char*         align2str(unsigned val);
-unsigned            align2num(unsigned val);
-Brig::BrigAlignment num2align(unsigned val);
 Brig::BrigAlignment getNaturalAlignment(unsigned type);
 Brig::BrigAlignment getMaxAlignment();
 bool                isValidAlignment(unsigned align, unsigned type);

@@ -80,7 +80,7 @@ private:
     Disassembler(const Disassembler&); // non-copyable
     const Disassembler &operator=(const Disassembler &);  // not assignable
 
-    class ValueListPrinter;
+    class ValuePrinter;
 
     //-------------------------------------------------------------------------
     // Public Disassembler API
@@ -104,6 +104,17 @@ public:
     std::string get(Directive d, unsigned model, unsigned profile);   // Disassemble one directive as string
     std::string get(Inst i,      unsigned model, unsigned profile);   // Disassemble one instruction as string
     std::string get(Operand i,   unsigned model, unsigned profile);   // Disassemble one operand as string
+    std::string get(Code c,      unsigned model, unsigned profile) {  // Disassemble one directive/instruction
+      if (Inst i = c) {
+        return get(i, model, profile);
+      }
+      else if (Directive d = c) {
+        return get(d, model, profile);
+      }
+      else {
+        return "";
+      }
+    }
 
     void log(std::ostream &s);                 // Request errors logging into stream s
     bool hasError() const { return hasErr; }   // Return error flag
@@ -113,55 +124,40 @@ public:
     // Directives
 private:
 
-    void printDirectiveFmt(Directive d) const;
+    void printDirectiveFmt(Code d) const;
     void printDirective(Directive d, bool dump = false) const;
 
     void printDirective(DirectiveVersion d) const;
-    void printDirective(DirectiveKernel d) const;
-    void printDirective(DirectiveFunction d) const;
+    void printDirective(DirectiveExecutable d) const;
     void printDirective(DirectiveLabel d) const;
     void printDirective(DirectiveComment d) const;
     void printDirective(DirectiveControl d) const;
     void printDirective(DirectiveLoc d) const;
     void printDirective(DirectiveExtension d) const;
     void printDirective(DirectivePragma d) const;
-    void printDirective(DirectiveSignature d) const;
-    void printDirective(DirectiveLabelTargets d) const;
-    void printDirective(DirectiveArgScopeStart d) const;
-    void printDirective(DirectiveArgScopeEnd d) const;
-    void printDirective(BlockStart d) const;
-    void printDirective(BlockEnd d) const;
-    void printDirective(BlockNumeric d) const;
-    void printDirective(BlockString d) const;
+    void printDirective(DirectiveArgBlockStart d) const;
+    void printDirective(DirectiveArgBlockEnd d) const;
 
     void printDirective(DirectiveVariable d) const;
-    void printDirective(DirectiveVariableInit d) const;
-    void printDirective(DirectiveLabelInit d) const;
-    void printDirective(DirectiveImageInit d, unsigned type) const;
-    void printDirective(DirectiveSamplerInit d, unsigned type) const;
-    void printDirective(DirectiveImageProperties d, unsigned type) const;
-    void printDirective(DirectiveSamplerProperties d, unsigned type) const;
     void printDirective(DirectiveFbarrier d) const;
+    void printMemFenceScope(unsigned segment, unsigned scope) const;
 
 
-    Directive printArgs(Directive arg, unsigned paramNum, Directive scoped) const;
+    void printArgs(Directive arg, unsigned paramNum) const;
     template <typename List>
     void printLabelList(List list) const;
 
-    void printBody(Inst inst, unsigned instNum, Directive start, Directive end, bool isDecl = false) const;
-    Directive printContextDir(Offset off, Directive start, Directive end) const;
+    void printBody(Code start, Code end, bool isDefinition = true) const;
 
-    void printSymDecl(DirectiveVariable d) const;
+    void printSymDecl(DirectiveVariable d, bool isArg = false) const;
     void printArgDecl(Directive d) const;
 
-    void printProtoType(DirectiveSignatureArgument type) const;
-
-    void printValueList(DataItem data, Brig::BrigType16_t type, unsigned maxElements) const;
+    void printValueList(SRef data, Brig::BrigType16_t type, uint64_t dim) const;
 
     void printStringLiteral(SRef s) const;
     void printComment(SRef s) const;
 
-    Directive next(Directive d) const;
+    Code next(Code d) const;
 
     //-------------------------------------------------------------------------
     // Initializers
@@ -195,6 +191,7 @@ private:
     void printNop() const;
 
     void printCallArgs(Inst i) const;
+    void printSbrArgs(Inst i) const;
     void printInstArgs(Inst i, int firstArg = 0, int lastArg = BRIG_OPERANDS_NUM) const;
     template<class T> void print_width(T inst) const;
     void print_v(Inst i) const;
@@ -205,25 +202,21 @@ private:
     //-------------------------------------------------------------------------
     // Operands
 
-    void printOperand(Inst i, unsigned operandIdx) const;
-    void printOperand(Operand opr, bool dump = false) const;
+    void printInstOperand(Inst i, unsigned operandIdx) const;
+    void printOperand(Operand opr, Brig::BrigType16_t type, bool dump = false) const;
 
-    void printOperand(OperandReg opr) const;
-    void printOperand(OperandVector opr) const;
-    void printOperand(OperandWavesize opr) const;
-    void printOperand(OperandAddress opr) const;
-    void printOperand(OperandLabelRef opr) const;
-    void printOperand(OperandLabelTargetsRef opr) const;
-    void printOperand(OperandLabelVariableRef opr) const;
-    void printOperand(OperandFunctionRef opr) const;
-    void printOperand(OperandArgumentList opr) const;
-    void printOperand(OperandFunctionList opr) const;
-    void printOperand(OperandSignatureRef opr) const;
-    void printOperand(OperandFbarrierRef opr) const;
+    void printOperandReg(OperandReg opr) const;
+    void printOperandCodeRef(OperandCodeRef opr) const;
+    void printOperandCodeList(OperandCodeList opr) const;
+    void printListOfOperands(ListRef<Operand> list, Brig::BrigType16_t type, bool singleLine = true) const;
+    void printOperandWavesize(OperandWavesize opr) const;
+    void printOperandAddress(OperandAddress opr) const;
+    void printOperandImageProperties(OperandImageProperties opr, Brig::BrigType16_t type) const;
+    void printOperandSamplerProperties(OperandSamplerProperties opr, Brig::BrigType16_t type) const;
+    void printOperandString(OperandString opr) const;
 
-    void printOperandVector(Inst inst, OperandVector opr, unsigned operandIdx) const;
-    void printOperandImmed(Inst inst, OperandImmed opr, unsigned operandIdx) const;
-    void printOperandImmed(OperandImmed imm, unsigned requiredType) const;
+    void printVector(OperandOperandList opr, Brig::BrigType16_t type) const;
+    void printImmed(OperandData opr, Brig::BrigType16_t type) const;
 
     SRef getSymbolName(Directive d) const;
 
@@ -257,17 +250,17 @@ private:
     const char* const2str(bool isConst) const;
     const char* nonull2str(bool isNoNull) const;
 
+    std::string decl2str_(bool isDecl) const;
     std::string attr2str_(Brig::BrigLinkage8_t attr) const;
+    std::string alloc2str_(unsigned alloc, unsigned segment) const;
+    std::string exec2str_(DirectiveExecutable d) const;
     const char* const2str_(bool isConst) const;
-    std::string      align2str_(unsigned val, unsigned type) const;
-    std::string      align2str(unsigned val) const;
-    std::string      equiv2str(unsigned val) const;
-    std::string      modifiers2str(AluModifier mod) const;
+    std::string align2str_(unsigned val, unsigned type) const;
+    std::string align2str(unsigned val) const;
+    std::string equiv2str(unsigned val) const;
+    std::string modifiers2str(AluModifier mod) const;
 
     bool hasType(Inst i) const;
-    bool isCall(Inst i) const;
-    bool isBranch(Inst i) const;
-    bool isGcnInst(Inst i) const;
 
     //-------------------------------------------------------------------------
     // Formatting
@@ -301,7 +294,7 @@ private:
         *stream << ')';
     }
 
-    class DisassembleOperandImmed;
+    class DisassembleImmed;
 
     template<typename T1>
     void print(T1 val1) const { *stream << val1; }
@@ -339,7 +332,7 @@ private:
         }
     }
 
-    void add2ValList(std::string &res, const char* valName, unsigned val) const 
+    void add2ValList(std::string &res, const char* valName, uint64_t val) const 
     {
         if (val == 0) return;
         std::ostringstream s;
@@ -362,9 +355,9 @@ private:
     void printBrig(Operand opr) const { printOperand(opr, true); }
 
     bool wantsExtraNewLineBefore(Directive d) const {
-        return (    (d.brig()->kind == Brig::BRIG_DIRECTIVE_LABEL)
-                 || (d.brig()->kind == Brig::BRIG_DIRECTIVE_KERNEL)
-                 || (d.brig()->kind == Brig::BRIG_DIRECTIVE_FUNCTION));
+        return (    (d.brig()->kind == Brig::BRIG_KIND_DIRECTIVE_LABEL)
+                 || (d.brig()->kind == Brig::BRIG_KIND_DIRECTIVE_KERNEL)
+                 || (d.brig()->kind == Brig::BRIG_KIND_DIRECTIVE_FUNCTION));
     }
 
     //-------------------------------------------------------------------------

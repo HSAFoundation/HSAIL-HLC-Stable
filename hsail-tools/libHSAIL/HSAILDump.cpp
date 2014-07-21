@@ -85,7 +85,7 @@ public:
         s << "\n"
             << KindTag<typename Item::Kind>::tag << "@" << item.brigOffset() << " "
             << Item::kindName() << "(" << item.brig()->kind << ") "
-            << "size=" << item.brig()->size;
+            << "byteCount=" << item.brig()->byteCount;
 
         const SourceInfo *si = item.srcInfo();
         if (si) {
@@ -156,7 +156,7 @@ private:
         s << " }";
     }
 
-    template <typename Item, typename T, size_t ValOffset>
+/*    template <typename Item, typename T, size_t ValOffset>
     void printTrailingRefs(TrailingRefs<Item,T,ValOffset> values) {
         s << "{ ";
         unsigned const size = values.size();
@@ -169,7 +169,7 @@ private:
             printItemRef(values[i]);
         }
         s << " }";
-    }
+    }*/
 
     void printValue(const StrRef& v) {
         s << "S@" << v.deref();
@@ -204,8 +204,19 @@ private:
     void printValue(const ItemRef<Item>& iref) {
         printItemRef(iref);
     }
+    template <typename Item>
+    void printValue(const ListRef<Item>& list) {
+        unsigned size = list.size();
+        s << KindTag<typename Item::Kind>::tag << "@" << "{";
+        for(unsigned i=0; i < size; ++i) {
+            if (i) s << ", ";
+            Item item = list[i];
+            s << item.brigOffset();
+        }
+        s << "}";
+    }
 
-    template <typename Item, typename T, size_t ValOffset>
+    /*template <typename Item, typename T, size_t ValOffset>
     void printValue(const TrailingValues<Item,T,ValOffset>& values) {
         printValueList(values.begin(),values.end());
     }
@@ -227,11 +238,10 @@ private:
 
     void printValue(const DirectiveSignatureArguments& ) {
         // TODO
-    }
+    }*/
 };
 
-template<> struct BrigDumper::KindTag<Directive> { static const char tag = 'D'; };
-template<> struct BrigDumper::KindTag<Inst> { static const char tag =      'I'; };
+template<> struct BrigDumper::KindTag<Code>    { static const char tag = 'C'; };
 template<> struct BrigDumper::KindTag<Operand> { static const char tag =   'O'; };
 
 
@@ -241,32 +251,21 @@ void dumpItem_t(std::ostream& out, Item item) {
     dispatchByItemKind(item,dumper);
 }
 
-void dumpItem(std::ostream& out, Inst item) { dumpItem_t(out,item); }
+void dumpItem(std::ostream& out, Code item) { dumpItem_t(out,item); }
 void dumpItem(std::ostream& out, Operand item) { dumpItem_t(out,item); }
-void dumpItem(std::ostream& out, Directive item) { dumpItem_t(out,item); }
 
 void dump(BrigContainer &c) {
     dump(c, std::cout);
 }
 
 void dump(BrigContainer &c, std::ostream& out) {
-    for(Directive d = c.directives().begin();
-        d != c.directives().end();
-        d = d.next())
-    {
-        dumpItem(out, d);
-    }
-    for(Inst i = c.insts().begin();
-        i != c.insts().end();
-        i = i.next())
+    for(Code i = c.code().begin(); i != c.code().end(); i = i.next())
     {
         dumpItem(out, i);
     }
-    for(Operand o = c.operands().begin();
-        o != c.operands().end();
-        o = o.next())
+    for(Operand i = c.operands().begin(); i != c.operands().end(); i = i.next())
     {
-        dumpItem(out, o);
+        dumpItem(out, i);
     }
 }
 

@@ -1709,28 +1709,6 @@ void AMDILTargetLowering::ReplaceNodeResults(SDNode *N,
   case ISD::BITCAST:
     Results.push_back(LowerBITCAST(SDValue(N, 0), DAG));
     break;
-
-#if 0
-  case ISD::EXTRACT_VECTOR_ELT: {
-    MVT VT = N->getValueType();
-    MVT ScalarVT = VT.getScalarType();
-
-    unsigned ScalarBitSize = ScalarVT.getSizeInBits();
-    ConstVal[0] = ScalarBitSize;
-    ConstVal[1] = 0;
-
-    // FIXME: No need to go through intrinsic.
-    // AMDIL_bit_extract_i32
-    // AMDIL_bit_extract_u32
-    unsigned Opc = IsSigned ? AMDILIntrinsic::AMDIL_bit_extract_i32
-                            : AMDILIntrinsic::AMDIL_bit_extract_u32;
-    return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, OVT,
-                       DAG.getTargetConstant(Opc, MVT::i32),
-                       DAG.getTargetConstant(ScalarBitSize),
-                       DAG.getTargetConstant(0),
-                       SDValue(N, 0));
-  }
-#endif
   default:
     N->dump();
     llvm_unreachable("ReplaceNodeResults not implemented for this instruction");
@@ -5885,26 +5863,28 @@ SDValue AMDILTargetLowering::PerformDAGCombine(SDNode *N,
       // unpack instructions emitted when handling extloads and
       // truncstores. Ideally we could recognize the pack / unpack pattern to
       // eliminate it.
-      if (!isTypeLegal(VT) &&
-          ISD::isNormalLoad(Value.getNode()) &&
-          usesAllNormalStores(Value.getNode())) {
+      if (!SN->isVolatile() &&
+          !isTypeLegal(VT) &&
+          ISD::isNormalLoad(Value.getNode())) {
         LoadSDNode *LoadVal = cast<LoadSDNode>(Value);
-        EVT MemVT = LoadVal->getMemoryVT();
-        EVT LoadVT = getEquivalentMemType(*DAG.getContext(), MemVT);
+        if (!LoadVal->isVolatile() && usesAllNormalStores(Value.getNode())) {
+          EVT MemVT = LoadVal->getMemoryVT();
+          EVT LoadVT = getEquivalentMemType(*DAG.getContext(), MemVT);
 
-        SDValue NewLoad = DAG.getLoad(ISD::UNINDEXED, ISD::NON_EXTLOAD,
-                                      LoadVT, LoadVal->getDebugLoc(),
-                                      LoadVal->getChain(),
-                                      LoadVal->getBasePtr(),
-                                      LoadVal->getOffset(),
-                                      LoadVT,
-                                      LoadVal->getMemOperand());
+          SDValue NewLoad = DAG.getLoad(ISD::UNINDEXED, ISD::NON_EXTLOAD,
+                                        LoadVT, LoadVal->getDebugLoc(),
+                                        LoadVal->getChain(),
+                                        LoadVal->getBasePtr(),
+                                        LoadVal->getOffset(),
+                                        LoadVT,
+                                        LoadVal->getMemOperand());
 
-        return DAG.getStore(SN->getChain(),
-                            SN->getDebugLoc(),
-                            NewLoad,
-                            SN->getBasePtr(),
-                            SN->getMemOperand());
+          return DAG.getStore(SN->getChain(),
+                              SN->getDebugLoc(),
+                              NewLoad,
+                              SN->getBasePtr(),
+                              SN->getMemOperand());
+        }
       }
     }
 

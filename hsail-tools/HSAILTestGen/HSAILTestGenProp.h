@@ -81,7 +81,7 @@ enum BrigOperandId
     O_VEC3_R64_DST,
     O_VEC4_R64_DST,
 
-    O_IMM1_X,
+//    O_IMM1_X,
     O_IMM8_X,
     O_IMM16_X,
     O_IMM32_X,
@@ -97,6 +97,9 @@ enum BrigOperandId
     
     O_LABELREF,
     O_FUNCTIONREF,
+    O_IFUNCTIONREF,
+    O_KERNELREF,
+    O_SIGNATUREREF,
     O_FBARRIERREF,
 
 //  O_ADDRESS_FLAT_REG,     
@@ -139,7 +142,7 @@ inline bool isImmOperandId(unsigned val)
 {
     switch(val)
     {
-    case O_IMM1_X:
+//    case O_IMM1_X:
     case O_IMM8_X:
     case O_IMM16_X:
     case O_IMM32_X:
@@ -190,6 +193,9 @@ enum SymId
     SYM_MINID = 0,
 
     SYM_FUNC,
+    SYM_IFUNC,
+    SYM_KERNEL,
+    SYM_SIGNATURE,
     SYM_GLOBAL_VAR,
     SYM_GROUP_VAR,
     SYM_PRIVATE_VAR,
@@ -357,7 +363,7 @@ protected:
             if (isOperandProp(propId) && !isSupportedOperand(*vals)) continue;
 
             //F: This is to avoid problems with disassembler (it fails with assert if some operands are 0)
-            if (PROP_D0 <= propId && propId <= PROP_S4 && *vals == O_NULL && !isPositive(*vals)) continue; 
+            if (isOperandProp(propId) && *vals == O_NULL && !isPositive(*vals)) continue; 
             Prop::appendNegative(*vals); // replace "0" with INVALID_VAL_XXX
         }
     }

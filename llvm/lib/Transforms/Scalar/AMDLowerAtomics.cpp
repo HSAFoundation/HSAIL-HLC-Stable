@@ -148,12 +148,19 @@ static AtomicOrdering MemoryOrderSpir2LLVM(Value * spirMemOrd) {
   }
 }
 
+// \todo 1.0p: fix order/scope etc translation using locally defined enums 
+// (and punush those responsible)
+// there should be a common enum for atomic order/scope. BRIG enum should
+// not be used at this point. Mapping into BRIG should happen in the HSAIL
+// backend.
+
 enum MemoryScope {
-  MEM_SCOPE_NONE = 0,
-  MEM_SCOPE_WAVEFRONT,
-  MEM_SCOPE_WORKGROUP,
-  MEM_SCOPE_COMPONENT,
-  MEM_SCOPE_SYSTEM
+  BRIG_MEMORY_SCOPE_NONE = 0,
+  BRIG_MEMORY_SCOPE_WORKITEM = 1,
+  BRIG_MEMORY_SCOPE_WAVEFRONT = 2,
+  BRIG_MEMORY_SCOPE_WORKGROUP = 3,
+  BRIG_MEMORY_SCOPE_COMPONENT = 4,
+  BRIG_MEMORY_SCOPE_SYSTEM = 5
 };
 
 static unsigned MemoryScopeOpenCL2LLVM(Value *openclMemScope) {
@@ -168,10 +175,10 @@ static unsigned MemoryScopeOpenCL2LLVM(Value *openclMemScope) {
   switch(memScope) {
     case memory_scope_work_item:
         llvm_unreachable("memory_scope_work_item not valid for atomic builtins");
-    case memory_scope_work_group: return MEM_SCOPE_WORKGROUP;
-    case memory_scope_device: return MEM_SCOPE_COMPONENT;
-    case memory_scope_all_svm_devices: return MEM_SCOPE_SYSTEM;
-    case memory_scope_sub_group: return MEM_SCOPE_WAVEFRONT;
+    case memory_scope_work_group: return BRIG_MEMORY_SCOPE_WORKGROUP;
+    case memory_scope_device: return BRIG_MEMORY_SCOPE_COMPONENT;
+    case memory_scope_all_svm_devices: return BRIG_MEMORY_SCOPE_SYSTEM;
+    case memory_scope_sub_group: return BRIG_MEMORY_SCOPE_WAVEFRONT;
     default: llvm_unreachable("unknown memory scope");
   }
 }
@@ -179,8 +186,8 @@ static unsigned MemoryScopeOpenCL2LLVM(Value *openclMemScope) {
 static unsigned getDefaultMemScope(Value *ptr) {
   unsigned addrSpace = dyn_cast<PointerType>(ptr->getType())->getAddressSpace();
   // for atomics on local pointers, memory scope is wg
-  if(addrSpace == 3) return MEM_SCOPE_WORKGROUP;
-  return MEM_SCOPE_COMPONENT;
+  if(addrSpace == 3) return BRIG_MEMORY_SCOPE_WORKGROUP;
+  return BRIG_MEMORY_SCOPE_COMPONENT;
 }
 
 static AtomicOrdering getMemoryOrder(CallInst *inst, unsigned memOrderPos) {
@@ -586,7 +593,7 @@ Value* LowerOCL1XAtomic(IRBuilder<> &Builder, Instruction* Inst) {
     }
     NI = Builder.CreateAtomicRMW(op, P, V, order, CrossThread);
     if(targetRequiresScope(*Inst->getParent()->getParent()->getParent()))
-      setMemScopeMD(NI, MEM_SCOPE_WORKGROUP);
+      setMemScopeMD(NI, BRIG_MEMORY_SCOPE_WORKGROUP);
     if (needCast) {
       NI = Builder.CreateBitCast(NI, Inst->getType());
     }
@@ -594,7 +601,7 @@ Value* LowerOCL1XAtomic(IRBuilder<> &Builder, Instruction* Inst) {
     NI = Builder.CreateAtomicCmpXchg(P, CS.getArgument(1), CS.getArgument(2),
         order, CrossThread);
     if(targetRequiresScope(*Inst->getParent()->getParent()->getParent()))
-      setMemScopeMD(NI, MEM_SCOPE_WORKGROUP);
+      setMemScopeMD(NI,  BRIG_MEMORY_SCOPE_WORKGROUP);
   } else {
     llvm_unreachable("Invalid atomic builtin");
   }

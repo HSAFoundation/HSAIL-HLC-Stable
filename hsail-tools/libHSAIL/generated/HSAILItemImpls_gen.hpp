@@ -38,164 +38,121 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS WITH THE
 // SOFTWARE.
+Brig::BrigAlignment num2align(uint64_t arg);
+unsigned align2num(unsigned arg);
+const char* align2str(unsigned arg);
+const char* allocation2str(unsigned arg);
 const char* atomicOperation2str(unsigned arg);
 const char* compareOperation2str(unsigned arg);
 const char* controlDirective2str(unsigned arg);
-int size_of_directive(unsigned arg);
-bool isBodyOnly(Directive d);
-bool isToplevelOnly(Directive d);
 const char* imageChannelOrder2str(unsigned arg);
 const char* imageChannelType2str(unsigned arg);
 const char* imageGeometry2str(unsigned arg);
 const char* imageQuery2str(unsigned arg);
-int size_of_inst(unsigned arg);
+const char* kinds2str(unsigned arg);
+int size_of_brig_record(unsigned arg);
+bool isBodyOnly(Directive d);
+bool isToplevelOnly(Directive d);
 const char* linkage2str(unsigned arg);
 const char* machineModel2str(unsigned arg);
 const char* memoryFenceSegments2str(unsigned arg);
 const char* memoryOrder2str(unsigned arg);
 const char* memoryScope2str(unsigned arg);
-int instNumDstOperands(Brig::BrigOpcode16_t arg);
+const char* memoryScope22str(unsigned arg);
 const char* opcode2str(unsigned arg);
+int instNumDstOperands(Brig::BrigOpcode16_t arg);
 bool instHasType(Brig::BrigOpcode16_t arg);
-int size_of_operand(unsigned arg);
 const char* pack2str(unsigned arg);
 const char* profile2str(unsigned arg);
+unsigned getRegBits(Brig::BrigRegisterKind16_t arg);
+const char* registerKind2str(unsigned arg);
 const char* round2str(unsigned arg);
 const char* samplerAddressing2str(unsigned arg);
 const char* samplerCoordNormalization2str(unsigned arg);
 const char* samplerFilter2str(unsigned arg);
 const char* samplerQuery2str(unsigned arg);
+const char* sectionIndex2str(unsigned arg);
 const char* segment2str(unsigned arg);
+unsigned getBrigTypeNumBits(unsigned arg);
 const char* typeX2str(unsigned arg);
-int brigtype_get_length(unsigned arg);
+unsigned getBrigTypeNumBytes(unsigned arg);
 const char* anyEnum2str( Brig::BrigAlignment arg );
+const char* anyEnum2str( Brig::BrigAllocation arg );
 const char* anyEnum2str( Brig::BrigAluModifierMask arg );
 const char* anyEnum2str( Brig::BrigAtomicOperation arg );
 const char* anyEnum2str( Brig::BrigCompareOperation arg );
 const char* anyEnum2str( Brig::BrigControlDirective arg );
-const char* anyEnum2str( Brig::BrigDirectiveKinds arg );
 const char* anyEnum2str( Brig::BrigImageChannelOrder arg );
 const char* anyEnum2str( Brig::BrigImageChannelType arg );
 const char* anyEnum2str( Brig::BrigImageGeometry arg );
 const char* anyEnum2str( Brig::BrigImageQuery arg );
-const char* anyEnum2str( Brig::BrigInstKinds arg );
+const char* anyEnum2str( Brig::BrigKinds arg );
 const char* anyEnum2str( Brig::BrigLinkage arg );
 const char* anyEnum2str( Brig::BrigMachineModel arg );
 const char* anyEnum2str( Brig::BrigMemoryFenceSegments arg );
 const char* anyEnum2str( Brig::BrigMemoryModifierMask arg );
 const char* anyEnum2str( Brig::BrigMemoryOrder arg );
 const char* anyEnum2str( Brig::BrigMemoryScope arg );
+const char* anyEnum2str( Brig::BrigMemoryScope2 arg );
 const char* anyEnum2str( Brig::BrigOpcode arg );
-const char* anyEnum2str( Brig::BrigOperandKinds arg );
 const char* anyEnum2str( Brig::BrigPack arg );
 const char* anyEnum2str( Brig::BrigProfile arg );
+const char* anyEnum2str( Brig::BrigRegisterKind arg );
 const char* anyEnum2str( Brig::BrigRound arg );
 const char* anyEnum2str( Brig::BrigSamplerAddressing arg );
 const char* anyEnum2str( Brig::BrigSamplerCoordNormalization arg );
 const char* anyEnum2str( Brig::BrigSamplerFilter arg );
 const char* anyEnum2str( Brig::BrigSamplerQuery arg );
+const char* anyEnum2str( Brig::BrigSectionIndex arg );
 const char* anyEnum2str( Brig::BrigSegCvtModifierMask arg );
 const char* anyEnum2str( Brig::BrigSegment arg );
 const char* anyEnum2str( Brig::BrigTypeX arg );
 const char* anyEnum2str( Brig::BrigWidth arg );
 inline ValRef<uint16_t> AluModifier::allBits() { return valRef(&brig()->allBits); }
-inline BFValRef<Brig::BrigRound8_t,0,4> AluModifier::round() { return bFValRef<Brig::BrigRound8_t,0,4>(&brig()->allBits); }
-inline BitValRef<4> AluModifier::ftz() { return bitValRef<4>(&brig()->allBits); }
-inline ValRef<uint16_t> Directive::size() { return valRef(&brig()->size); }
-inline EnumValRef<Brig::BrigDirectiveKinds,uint16_t> Directive::kind() { return enumValRef<Brig::BrigDirectiveKinds,uint16_t>(&brig()->kind); }
-inline ValRef<uint16_t> BlockNumeric::type() { return valRef(&brig()->type); }
-inline ValRef<uint32_t> BlockNumeric::elementCount() { return valRef(&brig()->elementCount); }
-inline DataItemRef BlockNumeric::data() { return dataItemRef(&brig()->data); }
-template<typename T> inline DataItemRefT<T> BlockNumeric::dataAs() { return DataItemRefT<T>(*this); }
-inline ValRef<uint32_t> BlockNumeric::dataAs() { return valRef(&brig()->data); }
-inline StrRef BlockString::string() { return strRef(&brig()->string); }
-inline ItemRef<Inst> DirectiveCode::code() { return itemRef<Inst>(&brig()->code); }
-inline StrRef BlockStart::name() { return strRef(&brig()->name); }
-inline StrRef DirectiveCallableBase::name() { return strRef(&brig()->name); }
-inline ValRef<uint16_t> DirectiveCallableBase::inArgCount() { return valRef(&brig()->inArgCount); }
-inline ValRef<uint16_t> DirectiveCallableBase::outArgCount() { return valRef(&brig()->outArgCount); }
-inline ItemRef<Directive> DirectiveExecutable::firstInArg() { return itemRef<Directive>(&brig()->firstInArg); }
-inline ItemRef<Directive> DirectiveExecutable::firstScopedDirective() { return itemRef<Directive>(&brig()->firstScopedDirective); }
-inline ItemRef<Directive> DirectiveExecutable::nextTopLevelDirective() { return itemRef<Directive>(&brig()->nextTopLevelDirective); }
-inline ValRef<uint32_t> DirectiveExecutable::instCount() { return valRef(&brig()->instCount); }
-inline ExecutableModifier DirectiveExecutable::modifier() { return subItem<ExecutableModifier>(&brig()->modifier); }
-inline ValRef<uint16_t> DirectiveSignature::inCount() { return valRef(&brig()->inArgCount); }
-inline ValRef<uint16_t> DirectiveSignature::outCount() { return valRef(&brig()->outArgCount); }
-inline DirectiveSignatureArguments DirectiveSignature::args() { return DirectiveSignatureArguments(*this); }
-inline DirectiveSignatureArgument DirectiveSignature::args(int index) { return subItem<DirectiveSignatureArgument>(&brig()->args[index]); }
+inline BFValRef<Brig::BrigRound8_t,0,5> AluModifier::round() { return bFValRef<Brig::BrigRound8_t,0,5>(&brig()->allBits); }
+inline BitValRef<5> AluModifier::ftz() { return bitValRef<5>(&brig()->allBits); }
+inline ValRef<uint16_t> Code::byteCount() { return valRef(&brig()->byteCount); }
+inline EnumValRef<Brig::BrigKinds,uint16_t> Code::kind() { return enumValRef<Brig::BrigKinds,uint16_t>(&brig()->kind); }
 inline StrRef DirectiveComment::name() { return strRef(&brig()->name); }
 inline EnumValRef<Brig::BrigControlDirective,uint16_t> DirectiveControl::control() { return enumValRef<Brig::BrigControlDirective,uint16_t>(&brig()->control); }
-inline ValRef<uint16_t> DirectiveControl::type() { return valRef(&brig()->type); }
-inline ValRef<uint16_t> DirectiveControl::elementCount() { return valRef(&brig()->valueCount); }
-inline ControlValues DirectiveControl::values() { return ControlValues(*this); }
-inline ItemRef<Operand> DirectiveControl::values(int index) { return itemRef<Operand>(&brig()->values[index]); }
+inline ListRef<Operand> DirectiveControl::operands() { return listRef<Operand>(&brig()->operands); }
+inline StrRef DirectiveExecutable::name() { return strRef(&brig()->name); }
+inline ValRef<uint16_t> DirectiveExecutable::outArgCount() { return valRef(&brig()->outArgCount); }
+inline ValRef<uint16_t> DirectiveExecutable::inArgCount() { return valRef(&brig()->inArgCount); }
+inline ItemRef<Code> DirectiveExecutable::firstInArg() { return itemRef<Code>(&brig()->firstInArg); }
+inline ItemRef<Code> DirectiveExecutable::firstCodeBlockEntry() { return itemRef<Code>(&brig()->firstCodeBlockEntry); }
+inline ItemRef<Code> DirectiveExecutable::nextModuleEntry() { return itemRef<Code>(&brig()->nextModuleEntry); }
+inline ValRef<uint32_t> DirectiveExecutable::codeBlockEntryCount() { return valRef(&brig()->codeBlockEntryCount); }
+inline ExecutableModifier DirectiveExecutable::modifier() { return subItem<ExecutableModifier>(&brig()->modifier); }
+inline EnumValRef<Brig::BrigLinkage,uint8_t> DirectiveExecutable::linkage() { return enumValRef<Brig::BrigLinkage,uint8_t>(&brig()->linkage); }
 inline StrRef DirectiveExtension::name() { return strRef(&brig()->name); }
 inline StrRef DirectiveFbarrier::name() { return strRef(&brig()->name); }
-inline ValRef<uint32_t> DirectiveImageProperties::width() { return valRef(&brig()->width); }
-inline ValRef<uint32_t> DirectiveImageProperties::height() { return valRef(&brig()->height); }
-inline ValRef<uint32_t> DirectiveImageProperties::depth() { return valRef(&brig()->depth); }
-inline ValRef<uint32_t> DirectiveImageProperties::array() { return valRef(&brig()->array); }
-inline EnumValRef<Brig::BrigImageGeometry,uint8_t> DirectiveImageProperties::geometry() { return enumValRef<Brig::BrigImageGeometry,uint8_t>(&brig()->geometry); }
-inline EnumValRef<Brig::BrigImageChannelOrder,uint8_t> DirectiveImageProperties::channelOrder() { return enumValRef<Brig::BrigImageChannelOrder,uint8_t>(&brig()->channelOrder); }
-inline EnumValRef<Brig::BrigImageChannelType,uint8_t> DirectiveImageProperties::channelType() { return enumValRef<Brig::BrigImageChannelType,uint8_t>(&brig()->channelType); }
+inline ExecutableModifier DirectiveFbarrier::modifier() { return subItem<ExecutableModifier>(&brig()->modifier); }
+inline EnumValRef<Brig::BrigLinkage,uint8_t> DirectiveFbarrier::linkage() { return enumValRef<Brig::BrigLinkage,uint8_t>(&brig()->linkage); }
 inline StrRef DirectiveLabel::name() { return strRef(&brig()->name); }
-inline ValRef<uint16_t> DirectiveLabelInit::elementCount() { return valRef(&brig()->labelCount); }
-inline LabelInitList DirectiveLabelInit::labels() { return LabelInitList(*this); }
-inline ItemRef<DirectiveLabel> DirectiveLabelInit::labels(int index) { return itemRef<DirectiveLabel>(&brig()->labels[index]); }
-inline StrRef DirectiveLabelTargets::name() { return strRef(&brig()->name); }
-inline ValRef<uint16_t> DirectiveLabelTargets::elementCount() { return valRef(&brig()->labelCount); }
-inline LabelTargetsList DirectiveLabelTargets::labels() { return LabelTargetsList(*this); }
-inline ItemRef<DirectiveLabel> DirectiveLabelTargets::labels(int index) { return itemRef<DirectiveLabel>(&brig()->labels[index]); }
 inline StrRef DirectiveLoc::filename() { return strRef(&brig()->filename); }
 inline ValRef<uint32_t> DirectiveLoc::line() { return valRef(&brig()->line); }
 inline ValRef<uint32_t> DirectiveLoc::column() { return valRef(&brig()->column); }
-inline ValRef<uint16_t> DirectiveOpaqueInit::imageCount() { return valRef(&brig()->imageCount); }
-inline ValRef<uint16_t> DirectiveOpaqueInit::elementCount() { return valRef(&brig()->imageCount); }
-inline OpaqueInitList DirectiveOpaqueInit::objects() { return OpaqueInitList(*this); }
-inline ItemRef<Directive> DirectiveOpaqueInit::objects(int index) { return itemRef<Directive>(&brig()->objects[index]); }
-inline ImageInitList DirectiveImageInit::images() { return ImageInitList(*this); }
-inline ItemRef<DirectiveImageProperties> DirectiveImageInit::images(int index) { return itemRef<DirectiveImageProperties>(&brig()->images[index]); }
-inline ValRef<uint16_t> DirectiveSamplerInit::samplerCount() { return valRef(&brig()->samplerCount); }
-inline SamplerInitList DirectiveSamplerInit::samplers() { return SamplerInitList(*this); }
-inline ItemRef<DirectiveSamplerProperties> DirectiveSamplerInit::samplers(int index) { return itemRef<DirectiveSamplerProperties>(&brig()->samplers[index]); }
-inline StrRef DirectivePragma::name() { return strRef(&brig()->name); }
-inline EnumValRef<Brig::BrigSamplerCoordNormalization,uint8_t> DirectiveSamplerProperties::coord() { return enumValRef<Brig::BrigSamplerCoordNormalization,uint8_t>(&brig()->coord); }
-inline EnumValRef<Brig::BrigSamplerFilter,uint8_t> DirectiveSamplerProperties::filter() { return enumValRef<Brig::BrigSamplerFilter,uint8_t>(&brig()->filter); }
-inline EnumValRef<Brig::BrigSamplerAddressing,uint8_t> DirectiveSamplerProperties::addressing() { return enumValRef<Brig::BrigSamplerAddressing,uint8_t>(&brig()->addressing); }
+inline ListRef<Operand> DirectivePragma::operands() { return listRef<Operand>(&brig()->operands); }
 inline StrRef DirectiveVariable::name() { return strRef(&brig()->name); }
-inline ItemRef<Directive> DirectiveVariable::init() { return itemRef<Directive>(&brig()->init); }
+inline ItemRef<Operand> DirectiveVariable::init() { return itemRef<Operand>(&brig()->init); }
 inline ValRef<uint16_t> DirectiveVariable::type() { return valRef(&brig()->type); }
 inline EnumValRef<Brig::BrigSegment,uint8_t> DirectiveVariable::segment() { return enumValRef<Brig::BrigSegment,uint8_t>(&brig()->segment); }
 inline EnumValRef<Brig::BrigAlignment,uint8_t> DirectiveVariable::align() { return enumValRef<Brig::BrigAlignment,uint8_t>(&brig()->align); }
-inline ValRef<uint32_t> DirectiveVariable::dimLo() { return valRef(&brig()->dimLo); }
-inline ValRef<uint64_t> DirectiveVariable::dim() { return reinterpretValRef<uint64_t>(&brig()->dimLo); }
-inline ValRef<uint32_t> DirectiveVariable::dimHi() { return valRef(&brig()->dimHi); }
-inline SymbolModifier DirectiveVariable::modifier() { return subItem<SymbolModifier>(&brig()->modifier); }
-inline DataItemRef DirectiveVariableInit::data() { return dataItemRef(&brig()->data); }
-template<typename T> inline DataItemRefT<T> DirectiveVariableInit::dataAs() { return DataItemRefT<T>(*this); }
-inline ValRef<uint32_t> DirectiveVariableInit::dataAs() { return valRef(&brig()->data); }
-inline ValRef<uint32_t> DirectiveVariableInit::elementCount() { return valRef(&brig()->elementCount); }
-inline ValRef<uint16_t> DirectiveVariableInit::type() { return valRef(&brig()->type); }
-inline EnumValRef<Brig::BrigVersion,uint32_t> DirectiveVersion::hsailMajor() { return enumValRef<Brig::BrigVersion,uint32_t>(&brig()->hsailMajor); }
-inline EnumValRef<Brig::BrigVersion,uint32_t> DirectiveVersion::hsailMinor() { return enumValRef<Brig::BrigVersion,uint32_t>(&brig()->hsailMinor); }
-inline EnumValRef<Brig::BrigVersion,uint32_t> DirectiveVersion::brigMajor() { return enumValRef<Brig::BrigVersion,uint32_t>(&brig()->brigMajor); }
-inline EnumValRef<Brig::BrigVersion,uint32_t> DirectiveVersion::brigMinor() { return enumValRef<Brig::BrigVersion,uint32_t>(&brig()->brigMinor); }
+inline UInt64 DirectiveVariable::dim() { return subItem<UInt64>(&brig()->dim); }
+inline VariableModifier DirectiveVariable::modifier() { return subItem<VariableModifier>(&brig()->modifier); }
+inline EnumValRef<Brig::BrigLinkage,uint8_t> DirectiveVariable::linkage() { return enumValRef<Brig::BrigLinkage,uint8_t>(&brig()->linkage); }
+inline EnumValRef<Brig::BrigAllocation,uint8_t> DirectiveVariable::allocation() { return enumValRef<Brig::BrigAllocation,uint8_t>(&brig()->allocation); }
+inline ValRef<uint32_t> DirectiveVersion::hsailMajor() { return valRef(&brig()->hsailMajor); }
+inline ValRef<uint32_t> DirectiveVersion::hsailMinor() { return valRef(&brig()->hsailMinor); }
+inline ValRef<uint32_t> DirectiveVersion::brigMajor() { return valRef(&brig()->brigMajor); }
+inline ValRef<uint32_t> DirectiveVersion::brigMinor() { return valRef(&brig()->brigMinor); }
 inline EnumValRef<Brig::BrigProfile,uint8_t> DirectiveVersion::profile() { return enumValRef<Brig::BrigProfile,uint8_t>(&brig()->profile); }
 inline EnumValRef<Brig::BrigMachineModel,uint8_t> DirectiveVersion::machineModel() { return enumValRef<Brig::BrigMachineModel,uint8_t>(&brig()->machineModel); }
-inline ValRef<uint16_t> DirectiveSignatureArgument::type() { return valRef(&brig()->type); }
-inline EnumValRef<Brig::BrigAlignment,uint8_t> DirectiveSignatureArgument::align() { return enumValRef<Brig::BrigAlignment,uint8_t>(&brig()->align); }
-inline SymbolModifier DirectiveSignatureArgument::modifier() { return subItem<SymbolModifier>(&brig()->modifier); }
-inline ValRef<uint32_t> DirectiveSignatureArgument::dimLo() { return valRef(&brig()->dimLo); }
-inline ValRef<uint64_t> DirectiveSignatureArgument::dim() { return reinterpretValRef<uint64_t>(&brig()->dimLo); }
-inline ValRef<uint32_t> DirectiveSignatureArgument::dimHi() { return valRef(&brig()->dimHi); }
-inline ValRef<uint8_t> ExecutableModifier::allBits() { return valRef(&brig()->allBits); }
-inline BFValRef<Brig::BrigLinkage8_t,0,2> ExecutableModifier::linkage() { return bFValRef<Brig::BrigLinkage8_t,0,2>(&brig()->allBits); }
-inline BitValRef<2> ExecutableModifier::isDeclaration() { return bitValRef<2>(&brig()->allBits); }
-inline ValRef<uint16_t> Inst::size() { return valRef(&brig()->size); }
-inline EnumValRef<Brig::BrigInstKinds,uint16_t> Inst::kind() { return enumValRef<Brig::BrigInstKinds,uint16_t>(&brig()->kind); }
 inline EnumValRef<Brig::BrigOpcode,uint16_t> Inst::opcode() { return enumValRef<Brig::BrigOpcode,uint16_t>(&brig()->opcode); }
 inline ValRef<uint16_t> Inst::type() { return valRef(&brig()->type); }
-inline ItemRef<Operand> Inst::operand(int index) { return itemRef<Operand>(&brig()->operands[index]); }
+inline ListRef<Operand> Inst::operands() { return listRef<Operand>(&brig()->operands); }
+inline Operand Inst::operand(int index) { return operands()[index]; }
 inline EnumValRef<Brig::BrigSegment,uint8_t> InstAddr::segment() { return enumValRef<Brig::BrigSegment,uint8_t>(&brig()->segment); }
 inline EnumValRef<Brig::BrigSegment,uint8_t> InstAtomic::segment() { return enumValRef<Brig::BrigSegment,uint8_t>(&brig()->segment); }
 inline EnumValRef<Brig::BrigMemoryOrder,uint8_t> InstAtomic::memoryOrder() { return enumValRef<Brig::BrigMemoryOrder,uint8_t>(&brig()->memoryOrder); }
@@ -220,63 +177,64 @@ inline EnumValRef<Brig::BrigAlignment,uint8_t> InstMem::align() { return enumVal
 inline ValRef<uint8_t> InstMem::equivClass() { return valRef(&brig()->equivClass); }
 inline EnumValRef<Brig::BrigWidth,uint8_t> InstMem::width() { return enumValRef<Brig::BrigWidth,uint8_t>(&brig()->width); }
 inline MemoryModifier InstMem::modifier() { return subItem<MemoryModifier>(&brig()->modifier); }
-inline EnumValRef<Brig::BrigMemoryFenceSegments,uint8_t> InstMemFence::segments() { return enumValRef<Brig::BrigMemoryFenceSegments,uint8_t>(&brig()->segments); }
 inline EnumValRef<Brig::BrigMemoryOrder,uint8_t> InstMemFence::memoryOrder() { return enumValRef<Brig::BrigMemoryOrder,uint8_t>(&brig()->memoryOrder); }
-inline EnumValRef<Brig::BrigMemoryScope,uint8_t> InstMemFence::memoryScope() { return enumValRef<Brig::BrigMemoryScope,uint8_t>(&brig()->memoryScope); }
+inline EnumValRef<Brig::BrigMemoryScope,uint8_t> InstMemFence::globalSegmentMemoryScope() { return enumValRef<Brig::BrigMemoryScope,uint8_t>(&brig()->globalSegmentMemoryScope); }
+inline EnumValRef<Brig::BrigMemoryScope,uint8_t> InstMemFence::groupSegmentMemoryScope() { return enumValRef<Brig::BrigMemoryScope,uint8_t>(&brig()->groupSegmentMemoryScope); }
+inline EnumValRef<Brig::BrigMemoryScope,uint8_t> InstMemFence::imageSegmentMemoryScope() { return enumValRef<Brig::BrigMemoryScope,uint8_t>(&brig()->imageSegmentMemoryScope); }
 inline AluModifier InstMod::modifier() { return subItem<AluModifier>(&brig()->modifier); }
 inline EnumValRef<Brig::BrigPack,uint8_t> InstMod::pack() { return enumValRef<Brig::BrigPack,uint8_t>(&brig()->pack); }
-inline ItemRef<Operand> InstQueryImage::operands(int index) { return itemRef<Operand>(&brig()->operands[index]); }
 inline ValRef<uint16_t> InstQueryImage::imageType() { return valRef(&brig()->imageType); }
 inline EnumValRef<Brig::BrigImageGeometry,uint8_t> InstQueryImage::geometry() { return enumValRef<Brig::BrigImageGeometry,uint8_t>(&brig()->geometry); }
 inline EnumValRef<Brig::BrigImageQuery,uint8_t> InstQueryImage::imageQuery() { return enumValRef<Brig::BrigImageQuery,uint8_t>(&brig()->imageQuery); }
-inline ItemRef<Operand> InstQuerySampler::operands(int index) { return itemRef<Operand>(&brig()->operands[index]); }
 inline EnumValRef<Brig::BrigSamplerQuery,uint8_t> InstQuerySampler::samplerQuery() { return enumValRef<Brig::BrigSamplerQuery,uint8_t>(&brig()->samplerQuery); }
-inline ItemRef<Operand> InstQueue::operands(int index) { return itemRef<Operand>(&brig()->operands[index]); }
 inline EnumValRef<Brig::BrigSegment,uint8_t> InstQueue::segment() { return enumValRef<Brig::BrigSegment,uint8_t>(&brig()->segment); }
 inline EnumValRef<Brig::BrigMemoryOrder,uint8_t> InstQueue::memoryOrder() { return enumValRef<Brig::BrigMemoryOrder,uint8_t>(&brig()->memoryOrder); }
 inline EnumValRef<Brig::BrigSegment,uint8_t> InstSeg::segment() { return enumValRef<Brig::BrigSegment,uint8_t>(&brig()->segment); }
-inline ItemRef<Operand> InstSegCvt::operands(int index) { return itemRef<Operand>(&brig()->operands[index]); }
 inline ValRef<uint16_t> InstSegCvt::sourceType() { return valRef(&brig()->sourceType); }
 inline EnumValRef<Brig::BrigSegment,uint8_t> InstSegCvt::segment() { return enumValRef<Brig::BrigSegment,uint8_t>(&brig()->segment); }
 inline SegCvtModifier InstSegCvt::modifier() { return subItem<SegCvtModifier>(&brig()->modifier); }
 inline ValRef<uint16_t> InstSignal::signalType() { return valRef(&brig()->signalType); }
 inline EnumValRef<Brig::BrigMemoryOrder,uint8_t> InstSignal::memoryOrder() { return enumValRef<Brig::BrigMemoryOrder,uint8_t>(&brig()->memoryOrder); }
 inline EnumValRef<Brig::BrigAtomicOperation,uint8_t> InstSignal::signalOperation() { return enumValRef<Brig::BrigAtomicOperation,uint8_t>(&brig()->signalOperation); }
-inline ItemRef<Operand> InstSourceType::operands(int index) { return itemRef<Operand>(&brig()->operands[index]); }
 inline ValRef<uint16_t> InstSourceType::sourceType() { return valRef(&brig()->sourceType); }
-inline ValRef<uint16_t> InstNone::size() { return valRef(&brig()->size); }
-inline EnumValRef<Brig::BrigInstKinds,uint16_t> InstNone::kind() { return enumValRef<Brig::BrigInstKinds,uint16_t>(&brig()->kind); }
+inline ValRef<uint8_t> ExecutableModifier::allBits() { return valRef(&brig()->allBits); }
+inline BitValRef<0> ExecutableModifier::isDefinition() { return bitValRef<0>(&brig()->allBits); }
 inline ValRef<uint8_t> MemoryModifier::allBits() { return valRef(&brig()->allBits); }
 inline BitValRef<0> MemoryModifier::isConst() { return bitValRef<0>(&brig()->allBits); }
-inline ValRef<uint16_t> Operand::size() { return valRef(&brig()->size); }
-inline EnumValRef<Brig::BrigOperandKinds,uint16_t> Operand::kind() { return enumValRef<Brig::BrigOperandKinds,uint16_t>(&brig()->kind); }
+inline ValRef<uint16_t> Operand::byteCount() { return valRef(&brig()->byteCount); }
+inline EnumValRef<Brig::BrigKinds,uint16_t> Operand::kind() { return enumValRef<Brig::BrigKinds,uint16_t>(&brig()->kind); }
 inline ItemRef<DirectiveVariable> OperandAddress::symbol() { return itemRef<DirectiveVariable>(&brig()->symbol); }
-inline StrRef OperandAddress::reg() { return strRef(&brig()->reg); }
-inline ValRef<uint32_t> OperandAddress::offsetLo() { return valRef(&brig()->offsetLo); }
-inline ValRef<uint64_t> OperandAddress::offset() { return reinterpretValRef<uint64_t>(&brig()->offsetLo); }
-inline ValRef<uint32_t> OperandAddress::offsetHi() { return valRef(&brig()->offsetHi); }
-inline ValRef<uint16_t> OperandImmed::byteCount() { return valRef(&brig()->byteCount); }
-inline ValRef<uint8_t> OperandImmed::bytes(int index) { return valRef(&brig()->bytes[index]); }
-inline ValRef<uint16_t> OperandList::elementCount() { return valRef(&brig()->elementCount); }
-inline RefList OperandList::elements() { return RefList(*this); }
-inline ItemRef<Directive> OperandList::elements(int index) { return itemRef<Directive>(&brig()->elements[index]); }
-inline ItemRef<Directive> OperandRef::ref() { return itemRef<Directive>(&brig()->ref); }
-inline ItemRef<DirectiveFbarrier> OperandFbarrierRef::fbar() { return itemRef<DirectiveFbarrier>(&brig()->ref); }
-inline ItemRef<DirectiveFunction> OperandFunctionRef::fn() { return itemRef<DirectiveFunction>(&brig()->ref); }
-inline ItemRef<DirectiveLabel> OperandLabelRef::label() { return itemRef<DirectiveLabel>(&brig()->label); }
-inline ItemRef<DirectiveLabelTargets> OperandLabelTargetsRef::targets() { return itemRef<DirectiveLabelTargets>(&brig()->targets); }
-inline ItemRef<DirectiveVariable> OperandLabelVariableRef::symbol() { return itemRef<DirectiveVariable>(&brig()->symbol); }
-inline ItemRef<DirectiveCallableBase> OperandSignatureRef::sig() { return itemRef<DirectiveCallableBase>(&brig()->ref); }
-inline StrRef OperandReg::reg() { return strRef(&brig()->reg); }
-inline ValRef<uint16_t> OperandVector::operandCount() { return valRef(&brig()->operandCount); }
-inline ValRef<uint16_t> OperandVector::elementCount() { return valRef(&brig()->operandCount); }
-inline VectorOperandList OperandVector::operand() { return VectorOperandList(*this); }
-inline ItemRef<Operand> OperandVector::operand(int index) { return itemRef<Operand>(&brig()->operands[index]); }
+inline ItemRef<OperandReg> OperandAddress::reg() { return itemRef<OperandReg>(&brig()->reg); }
+inline UInt64 OperandAddress::offset() { return subItem<UInt64>(&brig()->offset); }
+inline ListRef<Code> OperandCodeList::elements() { return listRef<Code>(&brig()->elements); }
+inline unsigned OperandCodeList::elementCount() { return elements().size(); }
+inline Code OperandCodeList::elements(int index) { return elements()[index]; }
+inline ItemRef<Code> OperandCodeRef::ref() { return itemRef<Code>(&brig()->ref); }
+inline StrRef OperandData::data() { return strRef(&brig()->data); }
+inline UInt64 OperandImageProperties::width() { return subItem<UInt64>(&brig()->width); }
+inline UInt64 OperandImageProperties::height() { return subItem<UInt64>(&brig()->height); }
+inline UInt64 OperandImageProperties::depth() { return subItem<UInt64>(&brig()->depth); }
+inline UInt64 OperandImageProperties::array() { return subItem<UInt64>(&brig()->array); }
+inline EnumValRef<Brig::BrigImageGeometry,uint8_t> OperandImageProperties::geometry() { return enumValRef<Brig::BrigImageGeometry,uint8_t>(&brig()->geometry); }
+inline EnumValRef<Brig::BrigImageChannelOrder,uint8_t> OperandImageProperties::channelOrder() { return enumValRef<Brig::BrigImageChannelOrder,uint8_t>(&brig()->channelOrder); }
+inline EnumValRef<Brig::BrigImageChannelType,uint8_t> OperandImageProperties::channelType() { return enumValRef<Brig::BrigImageChannelType,uint8_t>(&brig()->channelType); }
+inline ListRef<Operand> OperandOperandList::elements() { return listRef<Operand>(&brig()->elements); }
+inline unsigned OperandOperandList::elementCount() { return elements().size(); }
+inline Operand OperandOperandList::elements(int index) { return elements()[index]; }
+inline EnumValRef<Brig::BrigRegisterKind,uint16_t> OperandReg::regKind() { return enumValRef<Brig::BrigRegisterKind,uint16_t>(&brig()->regKind); }
+inline ValRef<uint16_t> OperandReg::regNum() { return valRef(&brig()->regNum); }
+inline EnumValRef<Brig::BrigSamplerCoordNormalization,uint8_t> OperandSamplerProperties::coord() { return enumValRef<Brig::BrigSamplerCoordNormalization,uint8_t>(&brig()->coord); }
+inline EnumValRef<Brig::BrigSamplerFilter,uint8_t> OperandSamplerProperties::filter() { return enumValRef<Brig::BrigSamplerFilter,uint8_t>(&brig()->filter); }
+inline EnumValRef<Brig::BrigSamplerAddressing,uint8_t> OperandSamplerProperties::addressing() { return enumValRef<Brig::BrigSamplerAddressing,uint8_t>(&brig()->addressing); }
+inline StrRef OperandString::string() { return strRef(&brig()->string); }
 inline ValRef<uint8_t> SegCvtModifier::allBits() { return valRef(&brig()->allBits); }
 inline BitValRef<0> SegCvtModifier::isNoNull() { return bitValRef<0>(&brig()->allBits); }
-inline ValRef<uint8_t> SymbolModifier::allBits() { return valRef(&brig()->allBits); }
-inline BFValRef<Brig::BrigLinkage8_t,0,2> SymbolModifier::linkage() { return bFValRef<Brig::BrigLinkage8_t,0,2>(&brig()->allBits); }
-inline BitValRef<2> SymbolModifier::isDeclaration() { return bitValRef<2>(&brig()->allBits); }
-inline BitValRef<3> SymbolModifier::isConst() { return bitValRef<3>(&brig()->allBits); }
-inline BitValRef<4> SymbolModifier::isArray() { return bitValRef<4>(&brig()->allBits); }
-inline BitValRef<5> SymbolModifier::isFlexArray() { return bitValRef<5>(&brig()->allBits); }
+inline ValRef<uint32_t> UInt64::lo() { return valRef(&brig()->lo); }
+inline ValRef<uint32_t> UInt64::hi() { return valRef(&brig()->hi); }
+inline UInt64& UInt64::operator=(uint64_t rhs) { lo() = (uint32_t)rhs; hi() = (uint32_t)(rhs >> 32); return *this; }
+inline UInt64::operator uint64_t() { return ((uint64_t)hi()) << 32 | lo(); }
+inline ValRef<uint8_t> VariableModifier::allBits() { return valRef(&brig()->allBits); }
+inline BitValRef<0> VariableModifier::isDefinition() { return bitValRef<0>(&brig()->allBits); }
+inline BitValRef<1> VariableModifier::isConst() { return bitValRef<1>(&brig()->allBits); }
+inline BitValRef<2> VariableModifier::isArray() { return bitValRef<2>(&brig()->allBits); }
+inline BitValRef<3> VariableModifier::isFlexArray() { return bitValRef<3>(&brig()->allBits); }

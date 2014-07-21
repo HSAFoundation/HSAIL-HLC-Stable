@@ -38,49 +38,53 @@ HSAIL_C_API brig_container_t brig_container_create_empty();
 /**
  * Create an BRIG cointainer with the specified used-owned data.
  *
- * @param string_data - pointer to string section data.
- * @param string_size - string section size in bytes.
- * @param directive_data - pointer to directive section data.
- * @param directive_size - directive section size in bytes.
- * @param inst_data - pointer to instruction section data.
- * @param inst_size - instruction section size in bytes.
- * @param operand_data - pointer to operand section data.
+ * @param data_bytes - pointer to data section.
+ * @param data_size - data section size in bytes.
+ * @param code_bytes - pointer to code section.
+ * @param code_size - code section size in bytes.
+ * @param operand_bytes - pointer to operand section.
  * @param operand_size - operand section size in bytes.
- * @param debug_data - pointer to debug section data. May be null.
+ * @param debug_bytes - pointer to debug section. May be null.
  * @param debug_size - string section size in bytes.
  *
  * @return - BRIG container handle.
  */
-HSAIL_C_API brig_container_t brig_container_create(
-                            const char *string_data, size_t string_size,
-                            const char *directive_data, size_t directive_size,
-                            const char *inst_data, size_t inst_size,
-                            const char *operand_data, size_t operand_size,
-                            const char* debug_data, size_t debug_size);
+HSAIL_C_API brig_container_t brig_container_create_view(
+                            const void *data_bytes,
+                            const void *code_bytes,
+                            const void *operand_bytes,
+                            const void *debug_bytes);
 
 /**
  * Create an BRIG cointainer with a copy of the specified data which
  * will be managed by this container.
  *
- * @param string_data - pointer to string section data.
- * @param string_size - string section size in bytes.
- * @param directive_data - pointer to directive section data.
- * @param directive_size - directive section size in bytes.
- * @param inst_data - pointer to instruction section data.
- * @param inst_size - instruction section size in bytes.
- * @param operand_data - pointer to operand section data.
+ * @param data_bytes - pointer to data section.
+ * @param data_size - data section size in bytes.
+ * @param code_bytes - pointer to code section.
+ * @param code_size - code section size in bytes.
+ * @param operand_bytes - pointer to operand section.
  * @param operand_size - operand section size in bytes.
- * @param debug_data - pointer to debug section data. May be null.
+ * @param debug_bytes - pointer to debug section. May be null.
  * @param debug_size - string section size in bytes.
  *
+ * @return - BRIG container handle. *
  * @return - BRIG container handle.
  */
 HSAIL_C_API brig_container_t brig_container_create_copy(
-                            const char *string_data, size_t string_size,
-                            const char *directive_data, size_t directive_size,
-                            const char *inst_data, size_t inst_size,
-                            const char *operand_data, size_t operand_size,
-                            const char* debug_data, size_t debug_size);
+                            const char *data_bytes,
+                            const char *code_bytes,
+                            const char *operand_bytes,
+                            const char* debug_bytes);
+
+/**
+ * Obtain the section count for a BRIG container.
+ *
+ * @param handle - BRIG container handle
+ * 
+ * @return - section count
+ */
+HSAIL_C_API unsigned brig_container_get_section_count(brig_container_t handle);
 
 /**
  * Obtain the data of a section of a BRIG container.
@@ -90,8 +94,7 @@ HSAIL_C_API brig_container_t brig_container_create_copy(
  * 
  * @return - pointer to BRIG section data.
  */
-HSAIL_C_API const char* brig_container_get_section_data(brig_container_t handle, int section_id);
-
+HSAIL_C_API const char* brig_container_get_section_bytes(brig_container_t handle, int section_id);
 
 /**
  * Obtain the size of a section of a BRIG container.
@@ -138,12 +141,12 @@ HSAIL_C_API int         brig_container_disassemble_to_file(brig_container_t hand
  * Load a BRIG container from an ELF memory buffer (.brig or .bif).
  *
  * @param handle - BRIG container handle.
- * @param elf_data - pointer to the ELF memory buffer.
+ * @param elf_bytes - pointer to the ELF memory buffer.
  * @param elf_length - length of the ELF data in bytes
  *
  * @return zero on success, or a non-zero error code on failure. Use brig_container_get_error_text() to receive further error info.
  */
-HSAIL_C_API int         brig_container_load_from_mem(brig_container_t handle, const char* elf_data, size_t elf_length);
+HSAIL_C_API int         brig_container_load_from_mem(brig_container_t handle, const char* elf_bytes, size_t elf_length);
 
 /**
  * Load a BRIG container from an ELF file (.brig or .bif).
@@ -173,6 +176,15 @@ HSAIL_C_API int         brig_container_save_to_file(brig_container_t handle, con
  * @return zero if the program is valid, or a non-zero error code otherwise. Use brig_container_get_error_text() to receive further info on invalid BRIG.
  */
 HSAIL_C_API int         brig_container_validate(brig_container_t handle);
+
+/**
+ * Obtain a pointer to BrigModule corresponding to this container (currently as void*)
+ *
+ * @param handle - BRIG container handle.
+ *
+ * @return - the pointer to BrigModule.
+ */
+HSAIL_C_API void* brig_container_get_brig_module(brig_container_t handle);
 
 /**
  * Obtain error message text.

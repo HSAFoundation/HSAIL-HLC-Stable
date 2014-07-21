@@ -52,7 +52,10 @@ enum
     PROP_EQUIVCLASS,          // type = uint8_t,                        acc = equivClass()
     PROP_FTZ,                 // type = bool,                           acc = modifier().ftz()
     PROP_GEOMETRY,            // type = BrigImageGeometry8_t,           acc = geometry()
+    PROP_GLOBALSEGMENTMEMORYSCOPE,// type = BrigMemoryScope8_t,             acc = globalSegmentMemoryScope()
+    PROP_GROUPSEGMENTMEMORYSCOPE,// type = BrigMemoryScope8_t,             acc = groupSegmentMemoryScope()
     PROP_IMAGEQUERY,          // type = BrigImageQuery8_t,              acc = imageQuery()
+    PROP_IMAGESEGMENTMEMORYSCOPE,// type = BrigMemoryScope8_t,             acc = imageSegmentMemoryScope()
     PROP_IMAGETYPE,           // type = BrigType16_t,                   acc = imageType()
     PROP_ISCONST,             // type = bool,                           acc = modifier().isConst()
     PROP_ISNONULL,            // type = bool,                           acc = modifier().isNoNull()
@@ -63,7 +66,6 @@ enum
     PROP_ROUND,               // type = BrigRound8_t,                   acc = modifier().round()
     PROP_SAMPLERQUERY,        // type = BrigSamplerQuery8_t,            acc = samplerQuery()
     PROP_SEGMENT,             // type = BrigSegment8_t,                 acc = segment()
-    PROP_SEGMENTS,            // type = BrigMemoryFenceSegments8_t,     acc = segments()
     PROP_SIGNALOPERATION,     // type = BrigAtomicOperation8_t,         acc = signalOperation()
     PROP_SIGNALTYPE,          // type = BrigType16_t,                   acc = signalType()
     PROP_SOURCETYPE,          // type = BrigType16_t,                   acc = sourceType()
@@ -73,7 +75,7 @@ enum
     EXT_PROP_MIN_ID
 };
 
-//enum BrigInstAddrProps // BRIG_INST_ADDR
+//enum BrigInstAddrProps // BRIG_KIND_INST_ADDR
 //{
 //    PROP_OPCODE,
 //    PROP_TYPE,
@@ -81,7 +83,7 @@ enum
 //};
 
 
-//enum BrigInstAtomicProps // BRIG_INST_ATOMIC
+//enum BrigInstAtomicProps // BRIG_KIND_INST_ATOMIC
 //{
 //    PROP_OPCODE,
 //    PROP_TYPE,
@@ -93,14 +95,14 @@ enum
 //};
 
 
-//enum BrigInstBasicProps // BRIG_INST_BASIC
+//enum BrigInstBasicProps // BRIG_KIND_INST_BASIC
 //{
 //    PROP_OPCODE,
 //    PROP_TYPE,
 //};
 
 
-//enum BrigInstBrProps // BRIG_INST_BR
+//enum BrigInstBrProps // BRIG_KIND_INST_BR
 //{
 //    PROP_OPCODE,
 //    PROP_TYPE,
@@ -108,7 +110,7 @@ enum
 //};
 
 
-//enum BrigInstCmpProps // BRIG_INST_CMP
+//enum BrigInstCmpProps // BRIG_KIND_INST_CMP
 //{
 //    PROP_OPCODE,
 //    PROP_TYPE,
@@ -120,7 +122,7 @@ enum
 //};
 
 
-//enum BrigInstCvtProps // BRIG_INST_CVT
+//enum BrigInstCvtProps // BRIG_KIND_INST_CVT
 //{
 //    PROP_OPCODE,
 //    PROP_TYPE,
@@ -130,7 +132,7 @@ enum
 //};
 
 
-//enum BrigInstImageProps // BRIG_INST_IMAGE
+//enum BrigInstImageProps // BRIG_KIND_INST_IMAGE
 //{
 //    PROP_OPCODE,
 //    PROP_TYPE,
@@ -141,7 +143,7 @@ enum
 //};
 
 
-//enum BrigInstLaneProps // BRIG_INST_LANE
+//enum BrigInstLaneProps // BRIG_KIND_INST_LANE
 //{
 //    PROP_OPCODE,
 //    PROP_TYPE,
@@ -150,7 +152,7 @@ enum
 //};
 
 
-//enum BrigInstMemProps // BRIG_INST_MEM
+//enum BrigInstMemProps // BRIG_KIND_INST_MEM
 //{
 //    PROP_OPCODE,
 //    PROP_TYPE,
@@ -162,17 +164,18 @@ enum
 //};
 
 
-//enum BrigInstMemFenceProps // BRIG_INST_MEM_FENCE
+//enum BrigInstMemFenceProps // BRIG_KIND_INST_MEM_FENCE
 //{
 //    PROP_OPCODE,
 //    PROP_TYPE,
-//    PROP_SEGMENTS,
 //    PROP_MEMORYORDER,
-//    PROP_MEMORYSCOPE,
+//    PROP_GLOBALSEGMENTMEMORYSCOPE,
+//    PROP_GROUPSEGMENTMEMORYSCOPE,
+//    PROP_IMAGESEGMENTMEMORYSCOPE,
 //};
 
 
-//enum BrigInstModProps // BRIG_INST_MOD
+//enum BrigInstModProps // BRIG_KIND_INST_MOD
 //{
 //    PROP_OPCODE,
 //    PROP_TYPE,
@@ -182,7 +185,7 @@ enum
 //};
 
 
-//enum BrigInstQueryImageProps // BRIG_INST_QUERY_IMAGE
+//enum BrigInstQueryImageProps // BRIG_KIND_INST_QUERY_IMAGE
 //{
 //    PROP_OPCODE,
 //    PROP_TYPE,
@@ -192,7 +195,7 @@ enum
 //};
 
 
-//enum BrigInstQuerySamplerProps // BRIG_INST_QUERY_SAMPLER
+//enum BrigInstQuerySamplerProps // BRIG_KIND_INST_QUERY_SAMPLER
 //{
 //    PROP_OPCODE,
 //    PROP_TYPE,
@@ -200,7 +203,7 @@ enum
 //};
 
 
-//enum BrigInstQueueProps // BRIG_INST_QUEUE
+//enum BrigInstQueueProps // BRIG_KIND_INST_QUEUE
 //{
 //    PROP_OPCODE,
 //    PROP_TYPE,
@@ -209,7 +212,7 @@ enum
 //};
 
 
-//enum BrigInstSegProps // BRIG_INST_SEG
+//enum BrigInstSegProps // BRIG_KIND_INST_SEG
 //{
 //    PROP_OPCODE,
 //    PROP_TYPE,
@@ -217,7 +220,7 @@ enum
 //};
 
 
-//enum BrigInstSegCvtProps // BRIG_INST_SEG_CVT
+//enum BrigInstSegCvtProps // BRIG_KIND_INST_SEG_CVT
 //{
 //    PROP_OPCODE,
 //    PROP_TYPE,
@@ -227,7 +230,7 @@ enum
 //};
 
 
-//enum BrigInstSignalProps // BRIG_INST_SIGNAL
+//enum BrigInstSignalProps // BRIG_KIND_INST_SIGNAL
 //{
 //    PROP_OPCODE,
 //    PROP_TYPE,
@@ -237,7 +240,7 @@ enum
 //};
 
 
-//enum BrigInstSourceTypeProps // BRIG_INST_SOURCE_TYPE
+//enum BrigInstSourceTypeProps // BRIG_KIND_INST_SOURCE_TYPE
 //{
 //    PROP_OPCODE,
 //    PROP_TYPE,

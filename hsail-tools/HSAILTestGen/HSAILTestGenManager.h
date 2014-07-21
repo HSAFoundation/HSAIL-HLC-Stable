@@ -13,113 +13,62 @@
 #include "HSAILTestGenContext.h"
 #include "HSAILTestGenPropDesc.h"
 #include "HSAILTestGenInstDesc.h"
+#include "HSAILTestGenTestDesc.h"
 #include "HSAILTestGenProvider.h"
 #include "HSAILTestGenBackend.h"
-#include "HSAILTestGenNavigator.h"
 
 #include <cassert>
-#include <iostream>
-#include <iomanip>
-#include <sstream>
-
-using std::ostringstream;
 
 namespace TESTGEN {
 
 //==============================================================================
 //==============================================================================
 //==============================================================================
-
-//F
-#define HSAIL_TEST_NAME "hsail_tests"
-#define POSITIVE_SUFF   "_p"
-#define NEGATIVE_SUFF   "_n"
-#define BRIG_EXT        ".brig"
-
-//==============================================================================
-//==============================================================================
-//==============================================================================
-// This class manages test generation, selects a format to save and interacts with backend 
+// This class manages test generation and interacts with backend 
 
 class TestGenManager
 {
 private:
-    const bool isPositive;          // test type: positive or negative
-    const string testPath;          // where to save .brig
-    std::string opName;             // opcode of instruction being processed
-    TestGenBackend *backend;        // backend 
-
-    Context* context;
-    unsigned testIdx;               // current test index (used for LUA tests only)
-    unsigned testCnt;               // total number of generated tests
-    unsigned failedCnt;             // total number of faile dests (used in selftest mode only)
-
-    TestGenNavigator navigator;     // a component used to categorize and filter out tests
+    const bool      isPositive;     // test type: positive or negative
+    TestGenBackend* backend;        // optional backend 
+    Context*        context;        // test context which includes brig container, symbols, etc
+    unsigned        testIdx;        // total number of generated tests
 
     //==========================================================================
 
 public:
-    TestGenManager(string path, bool testType) : testIdx(0), testCnt(0), failedCnt(0), isPositive(testType), testPath(path), navigator(path)
+    TestGenManager(bool testType) : isPositive(testType), testIdx(0)
     {
-        assert(!testPath.empty());
-
-        if (testPackage == PACKAGE_SINGLE)
-        {
-            context = new Context(getFullTestName());
-            context->defineTestKernel();
-        }
-
         backend = TestGenBackend::get(extension);
     }
 
-    ~TestGenManager()
+    virtual ~TestGenManager()
     {
-        if (testPackage == PACKAGE_SINGLE) 
-        {
-            saveContext(context);
-            delete context;
-        }
-
         TestGenBackend::dispose();
-
-        if (testCnt == 0 && (instSubset.isSet(SUBSET_STD) || instSubset.isSet(SUBSET_GCN) || instSubset.isSet(SUBSET_IMAGE)))
-        {
-            std::cerr << "Warning: no tests were generated, check \"filter\" option\n";
-        }
-
-        if (testPackage == PACKAGE_INTERNAL) // Report results of self-validation
-        {
-            const char* testType = (isPositive? "Positive" : "Negative");
-
-            if (failedCnt == 0) 
-            {
-                std::cerr << testType << " tests passed\n";
-            }
-            else 
-            {
-                std::cerr << "*** " << testType << " tests failed! (" << (testCnt - failedCnt) << " passed, " << failedCnt << " failed)\n";
-            }
-        }
     }
+
+    bool     isPositiveTest()   const { return isPositive; }
+    unsigned getGlobalTestIdx() const { return testIdx; }
 
     //==========================================================================
 
 public:
-    bool generate()
+    virtual bool generate()
     {
+        start();
+
         unsigned num;
         const unsigned* opcodes = PropDesc::getOpcodes(num);
         for (unsigned i = 0; i < num; ++i)
         {
             unsigned opcode = opcodes[i];
 
-            // filter out opcodes as specified by 'filter' option
-            if (!navigator.isOpcodeEnabled(opcode)) continue;
+            // filter out opcodes which should not be tested
+            if (!isOpcodeEnabled(opcode)) continue;
 
             // skip generation of tests for special opcodes
-            if (opcode == Brig::BRIG_OPCODE_CALL) continue;         //F: generalize
-            if (opcode == Brig::BRIG_OPCODE_CODEBLOCKEND) continue; //F: generalize
-            if (opcode == Brig::BRIG_OPCODE_NOP)  continue;         //F: generalize
+            if (HSAIL_ASM::isCallInst(opcode)) continue;    //F: generalize
+            if (opcode == Brig::BRIG_OPCODE_SBR) continue; //F
 
             if (InstDesc::isStdOpcode(opcode)   && !instSubset.isSet(SUBSET_STD))   continue;
             if (InstDesc::isGcnOpcode(opcode)   && !instSubset.isSet(SUBSET_GCN))   continue;
@@ -129,19 +78,47 @@ public:
             // using InstBasic and InstMod formats, only InstMod version is generated.
             if (instVariants & VARIANT_MOD)
             {
-                std::auto_ptr<TestGen> desc(TestGen::create(opcode));
+                std::unique_ptr<TestGen> desc(TestGen::create(opcode));
                 generateTests(*desc);
             }
 
             // Optional generation of InstBasic version for instructions encoded in InstMod format
-            if (InstDesc::getFormat(opcode) == Brig::BRIG_INST_MOD && (instVariants & VARIANT_BASIC))
+            if (InstDesc::getFormat(opcode) == Brig::BRIG_KIND_INST_MOD && (instVariants & VARIANT_BASIC))
             {
-                std::auto_ptr<TestGen> basicDesc(TestGen::create(opcode, true));
+                std::unique_ptr<TestGen> basicDesc(TestGen::create(opcode, true));
                 generateTests(*basicDesc); // for InstBasic format
             }
         }
 
-        return !isFailed();
+        finish();
+        return true;
+    }
+
+protected:
+    virtual bool isOpcodeEnabled(unsigned opcode) = 0;
+    virtual bool startTest(Inst inst) = 0;
+    virtual void testComplete(TestDesc& testDesc) = 0;
+    virtual string getTestName() = 0;
+
+    //==========================================================================
+private:
+    void start()
+    {
+        if (testPackage == PACKAGE_SINGLE)
+        {
+            context = new Context();
+            context->defineTestKernel();
+        }
+    }
+
+    void finish()
+    {
+        if (testPackage == PACKAGE_SINGLE) 
+        {
+            context->finalizeTestKernel();
+            registerTest(context);
+            delete context;
+        }
     }
 
     //==========================================================================
@@ -202,22 +179,23 @@ private:
 
         if (testPackage == PACKAGE_SINGLE)
         {
-            if (navigator.isTestEnabled(inst))
+            if (startTest(inst))
             {
                 createPositiveTest(test, start);
-                ++testCnt;
+                ++testIdx;
             }
         }
         else if (testPackage == PACKAGE_INTERNAL)
         {
-            if (navigator.isTestEnabled(inst)) 
+            if (startTest(inst)) 
             {
-                Context* ctx = new Context(getFullTestName(), positiveSample, true);
+                Context* ctx = new Context(positiveSample, true);
                 ctx->defineTestKernel();
-                ctx->cloneSample(positiveSample);
-                validateContext(ctx);
+                Sample res = ctx->cloneSample(positiveSample);
+                ctx->finalizeTestKernel();
+                registerTest(ctx, res.getInst());
                 delete ctx;
-                ++testCnt;
+                ++testIdx;
             }
         }
         else // testPackage == PACKAGE_SEPARATE
@@ -226,12 +204,12 @@ private:
 
             if (!backend->startTestGroup(inst)) return;
 
-            if (!initTestGroup(inst)) return;
+            if (!startTest(inst)) return;
 
             for (;;)
             {
-                Context* ctx = new Context(getFullTestName(), positiveSample, true);
-                if (backend->startTest(ctx, getTestPath(), getTestName(), BRIG_EXT))
+                Context* ctx = new Context(positiveSample, true);
+                if (backend->startTest(ctx, getTestName()))
                 {
                     ctx->defineTestKernel();
                     backend->defKernelArgs();
@@ -242,10 +220,11 @@ private:
                     Sample res = ctx->cloneSample(positiveSample);
                     backend->makeTest(res.getInst());
                     backend->endKernelBody();
+            
+                    ctx->finalizeTestKernel();
 
-                    saveContext(ctx);
-                    navigator.registerTest(inst.opcode(), testIdx++);
-                    ++testCnt;
+                    registerTest(ctx, res.getInst());
+                    ++testIdx;
                 }
                 
                 delete ctx;
@@ -254,22 +233,6 @@ private:
             }
             backend->endTestGroup();
         }
-    }
-
-    bool initTestGroup(Inst inst)
-    {
-        assert(testPackage == PACKAGE_SEPARATE);
-
-        if (!navigator.startTest(inst)) return false;
-
-        const char* instName = opcode2str(inst.opcode());
-        if (opName != instName)
-        {
-            testIdx = 0;
-            opName = instName;
-        }
-
-        return true;
     }
 
     //==========================================================================
@@ -282,7 +245,7 @@ private:
 
         Sample negativeSample = test.getNegativeSample();
 
-        if (navigator.isTestEnabled(negativeSample.getInst()))
+        if (startTest(negativeSample.getInst()))
         {
             if (testPackage == PACKAGE_SINGLE)
             {
@@ -290,11 +253,12 @@ private:
             }
             else if (testPackage == PACKAGE_INTERNAL)
             {
-                Context* ctx = new Context(getFullTestName(), negativeSample, false);
+                Context* ctx = new Context(negativeSample, false);
                 ctx->defineTestKernel();
-                Sample invalid = ctx->cloneSample(negativeSample, id, val);
-                assert(!PropDesc::isValidInst(invalid.getInst()));
-                validateContext(ctx);
+                Sample res = ctx->cloneSample(negativeSample, id, val);
+                assert(!PropDesc::isValidInst(res.getInst()));
+                ctx->finalizeTestKernel();
+                registerTest(ctx, res.getInst());
                 delete ctx;
             }
             else // testPackage == PACKAGE_SEPARATE
@@ -304,7 +268,7 @@ private:
                 assert(false);
             }
 
-            ++testCnt;
+            ++testIdx;
         }
     }
 
@@ -318,9 +282,9 @@ private:
         {
             string note;
             if (instVariants & VARIANT_BASIC) {
-                if (test.getFormat() == Brig::BRIG_INST_MOD)
+                if (test.getFormat() == Brig::BRIG_KIND_INST_MOD)
                     note = " (InstMod format)";
-                if (test.getFormat() == Brig::BRIG_INST_BASIC && test.isBasicVariant())
+                if (test.getFormat() == Brig::BRIG_KIND_INST_BASIC && test.isBasicVariant())
                     note = " (InstBasic format)";
             }
         
@@ -350,69 +314,20 @@ private:
     //==========================================================================
 private:
 
-    void saveContext(Context* ctx)
+    void registerTest(Context* ctx, Inst inst = Inst())
     {
-        assert(testPackage == PACKAGE_SEPARATE || testPackage == PACKAGE_SINGLE);
         assert(ctx);
 
-        ctx->finalizeTestKernel();
-        ctx->save();
+        TestDesc testDesc;
+
+        backend->registerTest(testDesc);
+        testDesc.setContainer(&ctx->getContainer());
+        testDesc.setInst(inst);
+
+        testComplete(testDesc);
     }
-
-    void validateContext(Context* ctx)
-    {
-        assert(testPackage == PACKAGE_INTERNAL);
-        assert(ctx);
-
-        ctx->finalizeTestKernel();
-
-        // validation must pass on positive tests and fail on negative tests
-        if (ctx->validate() != isPositive) 
-        {
-            failedCnt++;
-            ctx->save(); // Save failed tests
-        }
-    }
-
-    bool isFailed() { return failedCnt > 0; }
 
     //==========================================================================
-private:
-
-    string getFullTestName()
-    {
-        if (testPackage == PACKAGE_SINGLE)
-        {
-            return testPath + HSAIL_TEST_NAME + ((isPositive)? POSITIVE_SUFF : NEGATIVE_SUFF) + BRIG_EXT;
-        }
-        else if (testPackage == PACKAGE_INTERNAL)
-        {
-            ostringstream s;
-            s << testPath << HSAIL_TEST_NAME << ((isPositive)? POSITIVE_SUFF : NEGATIVE_SUFF) << "_" << std::setw(6) << std::setfill('0') << testCnt << BRIG_EXT;
-            return s.str();
-        }
-        else // testPackage == PACKAGE_SEPARATE
-        {
-            assert(testPackage == PACKAGE_SEPARATE);
-            return getTestPath() + getTestName() + BRIG_EXT;
-        }
-    }
-
-    string getTestPath()
-    {
-        assert(testPackage == PACKAGE_SEPARATE);
-
-        return navigator.getTestPath();
-    }
-
-    string getTestName()
-    {
-        assert(testPackage == PACKAGE_SEPARATE);
-
-        ostringstream s;
-        s << opName << "_" << std::setw(5) << std::setfill('0') << testIdx;
-        return s.str();
-    }
 };
 
 //==============================================================================

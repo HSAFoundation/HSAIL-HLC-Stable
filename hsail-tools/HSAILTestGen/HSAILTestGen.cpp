@@ -8,6 +8,7 @@
 
 #include "HSAILTestGenOptions.h"
 #include "HSAILTestGenManager.h"
+#include "HSAILTestGenNavigator.h"
 
 #include "HSAILValidatorBase.h"
 
@@ -17,17 +18,283 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/PathV2.h"
 
-#include <iostream>
+
 #include <string>
+#include <iostream>
+#include <iomanip>
+#include <sstream>
+#include <fstream>
+
+using std::ostringstream;
+using std::ofstream;
 
 using std::string;
 using HSAIL_ASM::PropValidator;
+using HSAIL_ASM::BrigContainer;
+using HSAIL_ASM::BrigStreamer;
+using HSAIL_ASM::opcode2str;
 
 //==============================================================================
 //==============================================================================
 //==============================================================================
 
-#define BRIG_TESTGEN_VERSION "2.1"
+#define BRIG_TESTGEN_VERSION "2.2"
+
+//==============================================================================
+//==============================================================================
+//==============================================================================
+
+namespace TESTGEN {
+
+//==============================================================================
+//==============================================================================
+//==============================================================================
+
+#define HSAIL_TEST_NAME "hsail_tests"
+#define POSITIVE_SUFF   "_p"
+#define NEGATIVE_SUFF   "_n"
+#define BRIG_FILE_EXT   ".brig"
+#define LUA_FILE_EXT    ".lua"
+#define HSAIL_TESTLIST  "testlist.txt"
+
+
+//==============================================================================
+//==============================================================================
+//==============================================================================
+
+class TestGenManagerImpl : public TestGenManager
+{
+private:
+    static const unsigned OPCODE_NONE = 0xFFFFFFFF;
+
+    //==========================================================================
+private:
+    TestGenNavigator navigator;         // a component used to categorize and filter out tests
+    const string     testPath;          // a path to an existing directory where tests are to be saved
+    unsigned         currentOpcode;     // opcode of test instruction being processed
+    unsigned         opTestIdx;         // index of the last test generated for the current opcode (there is a global index as well)
+    unsigned         failedTestIdx;     // total number of failed tests (used in selftest mode only)
+    ofstream         testTagsFs;        // stream used to log properties of each test
+
+    //==========================================================================
+public:
+
+    TestGenManagerImpl(string path, bool testType) : TestGenManager(testType), testPath(path), currentOpcode(OPCODE_NONE), opTestIdx(0), failedTestIdx(0) {}
+
+    bool generate()
+    {
+        TestGenManager::generate();
+        closeTestTagsStream();
+        printSummary();
+
+        return failedTestIdx == 0;
+    }
+
+    //==========================================================================
+protected:
+
+    bool isOpcodeEnabled(unsigned opcode)
+    { 
+        return navigator.isOpcodeEnabled(opcode); 
+    }
+
+    bool startTest(Inst inst)           
+    { 
+        if (navigator.startTest(inst))
+        {
+            if (testPackage == PACKAGE_SEPARATE)
+            {
+                createPath(getTestPath());
+                if (currentOpcode != inst.opcode())
+                {
+                    currentOpcode = inst.opcode();
+                    opTestIdx = 0;
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
+    void testComplete(TestDesc& testDesc) 
+    {
+        if (testPackage == PACKAGE_SINGLE)
+        {
+            saveTest(testDesc.getContainer());
+        }
+        else if (testPackage == PACKAGE_SEPARATE)
+        {
+            saveTest(testDesc.getContainer());
+            saveTags(navigator.getTestTags(opTestIdx, dumpTestProps));
+            saveScript(testDesc.getScript());
+            ++opTestIdx;
+        }
+        else if (testPackage == PACKAGE_INTERNAL)
+        {
+            if (validateTest(*testDesc.getContainer()) != isPositiveTest())
+            {
+                saveTest(testDesc.getContainer());  // Save failed tests only
+                failedTestIdx++;
+            }
+        }
+    }
+
+    //==========================================================================
+private:
+
+    void saveTest(BrigContainer* container, bool dumpContainer = false)
+    {
+        //F if (dumpContainer) dump();
+
+        string fileName = getFullTestName();
+        if (BrigStreamer::save(*container, fileName.c_str()))
+        {
+            ostringstream msg;
+            msg << "Failed to save " << fileName.c_str();
+            throw TestGenError(msg.str());
+        }
+    }
+
+    bool validateTest(BrigContainer& c)
+    {
+        HSAIL_ASM::Validator vld(c);
+        return vld.validate();
+    }
+
+    void saveScript(string script)
+    {
+        ofstream os;
+        string LUApath = getTestPath() + getTestName() + LUA_FILE_EXT;
+        os.open(LUApath.c_str());
+        if (os.bad()) throw TestGenError("Failed to create " + LUApath);
+        os << script;
+        os.close();
+    }
+
+    //==========================================================================
+
+    void openTestTagsStream()
+    {
+        assert(!testTagsFs.is_open());
+        string testlist = string(testPath) + HSAIL_TESTLIST;
+        testTagsFs.open(testlist.c_str());
+        if (testTagsFs.bad()) {
+            throw TestGenError("Failed to create " + testlist);
+        }
+    }
+
+    void closeTestTagsStream()
+    {
+        if (!testTagsFs.bad() && testTagsFs.is_open()) {
+            testTagsFs.close();
+        }
+    }
+
+    void saveTags(string tags)
+    {
+        if (!testTagsFs.is_open()) openTestTagsStream();
+        if (!testTagsFs.bad()) testTagsFs << tags;            
+    }
+
+    void createPath(string path)
+    {
+        bool existed = false;
+        llvm::error_code ec;
+
+        if (llvm::sys::fs::exists(path))
+        {
+            ec = llvm::sys::fs::is_directory(path, existed);
+            if (ec != llvm::errc::success || !existed) {
+                throw TestGenError(path + " must be a directory");
+            }
+        }
+
+        existed = false;
+        ec = llvm::sys::fs::create_directories(path, existed);
+        if (ec != llvm::errc::success)
+        {
+            throw TestGenError(string("Failed to create ") + path);
+        }
+    }
+
+    //==========================================================================
+private:
+
+    char getPathDelimiter() { return llvm::sys::path::is_separator('\\')? '\\' : '/'; }
+
+    string getTestPath()
+    {
+        assert(testPackage == PACKAGE_SEPARATE);
+
+        char delim = getPathDelimiter();
+        string relPath = navigator.getRelTestPath() + "/";
+        if (delim != '/') std::replace(relPath.begin(), relPath.end(), '/', delim);
+        return testPath + relPath;
+    }
+
+protected:
+    string getFullTestName()
+    {
+        if (testPackage == PACKAGE_SINGLE)
+        {
+            return testPath + HSAIL_TEST_NAME + ((isPositiveTest())? POSITIVE_SUFF : NEGATIVE_SUFF) + BRIG_FILE_EXT;
+        }
+        else if (testPackage == PACKAGE_INTERNAL)
+        {
+            ostringstream s;
+            s << testPath 
+              << HSAIL_TEST_NAME 
+              << ((isPositiveTest())? POSITIVE_SUFF : NEGATIVE_SUFF) 
+              << "_" 
+              << std::setw(6) 
+              << std::setfill('0') 
+              << getGlobalTestIdx() 
+              << BRIG_FILE_EXT;
+            return s.str();
+        }
+        else // testPackage == PACKAGE_SEPARATE
+        {
+            assert(testPackage == PACKAGE_SEPARATE);
+            return getTestPath() + getTestName() + BRIG_FILE_EXT;
+        }
+    }
+
+    string getTestName()
+    {
+        assert(testPackage == PACKAGE_SEPARATE);
+
+        ostringstream s;
+        s << opcode2str(currentOpcode) << "_" << std::setw(5) << std::setfill('0') << opTestIdx;
+        return s.str();
+    }
+
+private:
+    void printSummary()
+    {
+        if (getGlobalTestIdx() == 0 && (instSubset.isSet(SUBSET_STD) || instSubset.isSet(SUBSET_GCN) || instSubset.isSet(SUBSET_IMAGE)))
+        {
+            std::cerr << "Warning: no tests were generated, check \"filter\" option\n";
+        }
+
+        if (testPackage == PACKAGE_INTERNAL) // Report results of self-validation
+        {
+            const char* testType = (isPositiveTest()? "Positive" : "Negative");
+
+            if (failedTestIdx == 0) 
+            {
+                std::cerr << testType << " tests passed\n";
+            }
+            else 
+            {
+                std::cerr << "*** " << testType << " tests failed! (" 
+                          << (getGlobalTestIdx() - failedTestIdx) << " passed, " 
+                          << failedTestIdx << " failed)\n";
+            }
+        }
+    }
+};
+
+}; // namespace TESTGEN 
 
 //==============================================================================
 //==============================================================================
@@ -106,11 +373,11 @@ int genTests(string path)
 
         if (testType == TYPE_POSITIVE || testType == TYPE_ALL)
         {
-            ok &= TestGenManager(path, true).generate();
+            ok &= TestGenManagerImpl(path, true).generate();
         }
         if (testType == TYPE_NEGATIVE || testType == TYPE_ALL)
         {
-            ok &= TestGenManager(path, false).generate();
+            ok &= TestGenManagerImpl(path, false).generate();
         }
 
         res = ok? 0 : 101;

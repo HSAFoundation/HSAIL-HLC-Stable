@@ -47,13 +47,11 @@
 namespace HSAIL_ASM
 {
 
-class Inst;
+class Code;
 class Operand;
-class Directive;
 class BrigContainer;
 
-void dumpItem(std::ostream&, Directive);
-void dumpItem(std::ostream&, Inst);
+void dumpItem(std::ostream&, Code);
 void dumpItem(std::ostream&, Operand);
 
 void dump(BrigContainer &c, std::ostream& out);

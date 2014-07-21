@@ -1,8 +1,8 @@
 #!/bin/bash
-PATH=$HOME/Prakash/BenTest/bin:$PATH
+PATH=$HOME/Prakash/BenTest/bin/D1:$PATH
 #echo "path  $PATH"
 #echo "`which llc`"
-for  oclf in pa_lo*.cl
+for  oclf in *.cl
 do
 #oclf="atomic_fetch_add.cl"
 fname=`echo "$oclf" | cut -d'.' -f1`
@@ -12,15 +12,16 @@ echo " Compiling $fname "
 #aoc2 -march=hsail-64 -getSec $fname.obj .llvmir
 clc2 -cl-std=CL2.0 $oclf
 cp $fname.bc results-conformance/$fname.fe.bc
+llvm-dis  -o results-conformance/$fname.fe.ll results-conformance/$fname.fe.bc
 echo "FE complete"
 #llvm-as  -o results-conformance/$fname.bc results-conformance/$fname.fe.ll
 #cp results-conformance/$fname.bc results-conformance/$fname.linked.bc
-llvm-link  -prelink-opt -o results-conformance/$fname.linked.bc results-conformance/$fname.fe.bc  -l $HOME/Prakash/BenTest/bin/builtins-hsail.bc
+llvm-link  -prelink-opt -o results-conformance/$fname.linked.bc results-conformance/$fname.fe.bc  -l $HOME/Prakash/BenTest/bin/D1/builtins-hsail.bc
 echo "llvm-link completed!"
-#llvm-dis  -o results-conformance/$fname.linked.ll results-conformance/$fname.linked.bc
+llvm-dis  -o results-conformance/$fname.linked.ll results-conformance/$fname.linked.bc
 opt  -O3 -gpu -whole -verify results-conformance/$fname.linked.bc -o results-conformance/$fname.opt.bc
 echo "opt complete!"
-#llvm-dis  -o results-conformance/$fname.opt.ll results-conformance/$fname.opt.bc
+llvm-dis  -o results-conformance/$fname.opt.ll results-conformance/$fname.opt.bc
 llc  -O2 -march=hsail-64 -o results-conformance/$fname.brig  results-conformance/$fname.opt.bc
 echo "llc complete"
 hsailasm  -disassemble -o results-conformance/$fname.hsail  results-conformance/$fname.brig

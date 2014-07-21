@@ -165,7 +165,9 @@ bool isParametrizedRetAtomicOp(int opcode);
 bool hasParametrizedAtomicNoRetVersion(const llvm::MachineInstr *MI, llvm::SDNode *Node);
 
 llvm::SDValue generateFenceIntrinsic(llvm::SDValue Chain, llvm::DebugLoc dl,
-        unsigned memSeg, llvm::SDValue brigMemoryOrder,
-        llvm::SDValue brigMemoryScope, llvm::SelectionDAG &CurDAG);
+        unsigned memSeg,
+        unsigned brigMemoryOrder,
+        unsigned brigMemoryScope,
+        llvm::SelectionDAG &CurDAG);
 
 #endif // HSAILUTILITYFUNCTIONS_H_

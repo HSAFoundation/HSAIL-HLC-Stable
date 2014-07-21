@@ -182,25 +182,6 @@ private:
   /// Helper function that prints the actual metadata and should only
   /// be called by printMetaData.
   void printKernelArgs(raw_ostream &O, bool IsWrapper);
-//#if 0
-  void printCopyStructPrivate(const StructType *ST,
-                              raw_ostream &O,
-                              size_t StackSize,
-                              uint32_t Buffer,
-                              uint32_t mLitIdx,
-                              uint32_t &counter);
-
-  virtual void printConstantToRegMapping(AMDILAsmPrinter *RegNames,
-                                         unsigned &LII,
-                                         raw_ostream &O,
-                                         uint32_t &Counter,
-                                         uint32_t Buffer,
-                                         uint32_t N,
-                                         const char *Lit = NULL,
-                                         uint32_t FCall = 0,
-                                         bool IsImage = false,
-                                         bool IsHWCB = false);
-//#endif
   void updatePtrArg(llvm::Function::const_arg_iterator Ip,
                     int NumWriteImages,
                     int Raw_uav_buffer,

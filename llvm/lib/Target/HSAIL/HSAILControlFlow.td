@@ -32,14 +32,14 @@ let isTerminator = 1, isReturn = 1, isBarrier = 1, hasCtrlDep = 1,
 let isBranch = 1, isTerminator = 1, hasCtrlDep = 1, needSpecialProcessing = 1  in {
   let isBarrier = 1 in {
     def branch : HSAILInst<(outs), (ins target:$disp),
-             "brn\t$disp",
+             "br\t$disp",
              [(br bb:$disp)]>;
   }
   def branch_cond : HSAILInst<(outs), (ins CR:$cond, target:$disp),
-                "cbr\t$cond, $disp",
+                "cbr_b1\t$cond, $disp",
                 [(brcond (i1 CR:$cond), (bb:$disp))]>;
   def branch_ind : HSAILInst<(outs), (ins GPR32:$disp),
-                "brn\t$disp ", 
+                "br\t$disp ", 
         [(brind GPR32:$disp)]>;
 }
 

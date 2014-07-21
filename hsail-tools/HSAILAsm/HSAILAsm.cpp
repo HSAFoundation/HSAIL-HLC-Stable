@@ -44,6 +44,9 @@
 //
 //===----------------------------------------------------------------------===//
 #include "llvm/Support/CommandLine.h"
+#ifdef DEBUG
+#undef DEBUG
+#endif
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Signals.h"
@@ -160,7 +163,7 @@ static string getOutputFileName() {
 static int ValidateContainer(BrigContainer &c, std::istream *is) {
     if (!DisableValidator) {
         Validator vld(c);
-        if (!vld.validate(ValidateLinkedCode ? Validator::VM_BrigLinked : Validator::VM_BrigNotLinked, DumpFormatError)) {
+        if (!vld.validate(DumpFormatError)) {
             std::cerr << vld.getErrorMsg(is) << '\n';
             return vld.getErrorCode();
         }
@@ -200,8 +203,10 @@ static void DumpDebugInfoToFile( BrigContainer & c )
     std::ofstream ofs( (const char*)(DebugInfoFilename.c_str()), std::ofstream::binary );
     if ( ! ofs.is_open() || ofs.bad() )
         std::cout << "Could not create output debug info file " << DebugInfoFilename << ", not dumping debug info\n";
-    else
-        c.ExtractDebugInformationToStream( ofs );
+    else {
+      SRef data = c.debugInfo().payload();
+      ofs.write(data.begin, data.length());
+    }
 }
 
 
@@ -241,7 +246,7 @@ static int AssembleInput() {
         ssVersion << ", HSAIL version ";
         ssVersion << Brig::BRIG_VERSION_HSAIL_MAJOR << ':' << Brig::BRIG_VERSION_HSAIL_MINOR;
 
-        std::auto_ptr<BrigDebug::BrigDwarfGenerator> pBdig(
+        std::unique_ptr<BrigDebug::BrigDwarfGenerator> pBdig(
             BrigDebug::BrigDwarfGenerator::Create( ssVersion.str(),
                                                    GetCurrentWorkingDirectory(),
                                                    InputFilename ) );
@@ -254,9 +259,9 @@ static int AssembleInput() {
 
     DEBUG(HSAIL_ASM::dump(c));
 
-    if (!DisableOperandOptimizer) {
+    /*if (!DisableOperandOptimizer) {
         c.optimizeOperands();
-    }
+    }*/
     if (Elf64FileFormat) {
         return BifFileFormat
           ?  Bif64Streamer::save(c, getOutputFileName().c_str())
@@ -284,8 +289,12 @@ static int DisassembleInput() {
 
     if ( DebugInfoFilename.size() > 0 )
         DumpDebugInfoToFile( c );
-
-    return disasm.run(getOutputFileName().c_str());
+    std::string ofn = getOutputFileName();
+    if (ofn == "-") {
+        return disasm.run(std::cout);
+    } else {
+        return disasm.run(ofn.c_str());
+    }
 }
 
 static int Repeat(int (*func)()) {

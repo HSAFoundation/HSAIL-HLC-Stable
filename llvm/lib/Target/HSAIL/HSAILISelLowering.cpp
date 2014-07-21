@@ -1687,11 +1687,9 @@ HSAILTargetLowering::LowerATOMIC_STORE(SDValue Op, SelectionDAG &DAG) const {
   MemSDNode *Mn = dyn_cast<MemSDNode>(Node);
 
   if (Mn->getOrdering() != SequentiallyConsistent) return Op;
-  SDValue brigMemoryOrder = DAG.getConstant(Brig::BRIG_MEMORY_ORDER_ACQUIRE,
-          MVT::getIntegerVT(32));
-  unsigned brigMemScopeVal = Mn->getAddressSpace() == HSAILAS::GROUP_ADDRESS ?
+  unsigned brigMemoryOrder = Brig::BRIG_MEMORY_ORDER_SC_ACQUIRE;
+  unsigned brigMemoryScope = Mn->getAddressSpace() == HSAILAS::GROUP_ADDRESS ?
       Brig::BRIG_MEMORY_SCOPE_WORKGROUP : Mn->getMemoryScope();
-  SDValue brigMemoryScope = DAG.getConstant(brigMemScopeVal, MVT::getIntegerVT(32));
 
   SDValue ResNode = DAG.getAtomic(ISD::ATOMIC_STORE, dl,
                                   cast<AtomicSDNode>(Node)->getMemoryVT(),
@@ -1700,7 +1698,7 @@ HSAILTargetLowering::LowerATOMIC_STORE(SDValue Op, SelectionDAG &DAG) const {
                                   cast<AtomicSDNode>(Node)->getMemOperand(),
                                   Release,
                                   cast<AtomicSDNode>(Node)->getSynchScope(),
-                                  brigMemScopeVal);
+                                  brigMemoryScope);
   return generateFenceIntrinsic(ResNode, dl, Mn->getAddressSpace(),
           brigMemoryOrder, brigMemoryScope, DAG);
 }
@@ -1715,11 +1713,9 @@ HSAILTargetLowering::LowerATOMIC_LOAD(SDValue Op, SelectionDAG &DAG) const {
   MemSDNode *Mn = dyn_cast<MemSDNode>(Node);
 
   if (Mn->getOrdering() != SequentiallyConsistent) return Op;
-  SDValue brigMemoryOrder = DAG.getConstant(Brig::BRIG_MEMORY_ORDER_RELEASE,
-              MVT::getIntegerVT(32));
-  unsigned brigMemScopeVal = Mn->getAddressSpace() == HSAILAS::GROUP_ADDRESS ?
+  unsigned brigMemoryOrder = Brig::BRIG_MEMORY_ORDER_SC_RELEASE;
+  unsigned brigMemoryScope = Mn->getAddressSpace() == HSAILAS::GROUP_ADDRESS ?
       Brig::BRIG_MEMORY_SCOPE_WORKGROUP : Mn->getMemoryScope();
-  SDValue brigMemoryScope = DAG.getConstant(brigMemScopeVal, MVT::getIntegerVT(32));
 
   SDValue Chain = generateFenceIntrinsic(Op.getOperand(0), dl,
           Mn->getAddressSpace(), brigMemoryOrder, brigMemoryScope, DAG);
@@ -1728,7 +1724,7 @@ HSAILTargetLowering::LowerATOMIC_LOAD(SDValue Op, SelectionDAG &DAG) const {
           cast<AtomicSDNode>(Node)->getMemoryVT(), Op.getValueType(), Chain,
           Node->getOperand(1), cast<AtomicSDNode>(Node)->getMemOperand(),
           Acquire, cast<AtomicSDNode>(Node)->getSynchScope(),
-          brigMemScopeVal);
+          brigMemoryScope);
 }
 
 SDValue

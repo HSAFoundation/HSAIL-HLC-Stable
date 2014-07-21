@@ -71,6 +71,36 @@ inline bool isOperandProp(unsigned propId)
     }
 }
 
+inline unsigned getOperandIdx(unsigned propId)
+{
+    switch(propId)
+    {
+    case PROP_D0:
+    case PROP_S0:   return 0;                 
+    case PROP_D1:
+    case PROP_S1:   return 1;
+    case PROP_S2:   return 2;
+    case PROP_S3:   return 3;
+    case PROP_S4:   return 4;
+    default: 
+        return (unsigned)-1;
+    }
+}
+
+inline unsigned getSrcOperandId(unsigned idx)
+{
+    switch(idx)
+    {
+    case 0: return PROP_S0;
+    case 1: return PROP_S1;
+    case 2: return PROP_S2;
+    case 3: return PROP_S3;
+    case 4: return PROP_S4;
+    default: 
+        return PROP_NONE;
+    }
+}
+
 //==============================================================================
 // Ids of property attributes
 
@@ -84,7 +114,6 @@ enum
     OPERAND_ATTR_CTYPE,
     OPERAND_ATTR_STYPE,
     OPERAND_ATTR_ITYPE,
-    OPERAND_ATTR_MODEL,
     OPERAND_ATTR_B1,
     OPERAND_ATTR_B32,
     OPERAND_ATTR_B64,
@@ -133,12 +162,16 @@ enum
     OPERAND_VAL_VEC_4,
 
     OPERAND_VAL_IMM,
+    OPERAND_VAL_CNST,
     OPERAND_VAL_LAB,
     OPERAND_VAL_ADDR,
     OPERAND_VAL_FUNC,
+    OPERAND_VAL_IFUNC,
+    OPERAND_VAL_KERNEL,
     OPERAND_VAL_ARGLIST,
     OPERAND_VAL_JUMPTAB,
     OPERAND_VAL_CALLTAB,
+    OPERAND_VAL_SIGNATURE,
     OPERAND_VAL_FBARRIER,
 
     OPERAND_VAL_ROIMAGE,

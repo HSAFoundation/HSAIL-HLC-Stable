@@ -70,6 +70,8 @@ RetType dispatchByType_gen(unsigned type, Visitor& v) {
     case BRIG_TYPE_S8X16                : return v.template visit< BrigType<BRIG_TYPE_S8X16> >();
     case BRIG_TYPE_S8X4                 : return v.template visit< BrigType<BRIG_TYPE_S8X4> >();
     case BRIG_TYPE_S8X8                 : return v.template visit< BrigType<BRIG_TYPE_S8X8> >();
+    case BRIG_TYPE_SIG32                : return v.template visit< BrigType<BRIG_TYPE_SIG32> >();
+    case BRIG_TYPE_SIG64                : return v.template visit< BrigType<BRIG_TYPE_SIG64> >();
     case BRIG_TYPE_U16                  : return v.template visit< BrigType<BRIG_TYPE_U16> >();
     case BRIG_TYPE_U16X2                : return v.template visit< BrigType<BRIG_TYPE_U16X2> >();
     case BRIG_TYPE_U16X4                : return v.template visit< BrigType<BRIG_TYPE_U16X4> >();

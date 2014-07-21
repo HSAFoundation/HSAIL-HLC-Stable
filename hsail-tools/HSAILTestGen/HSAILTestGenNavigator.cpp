@@ -1,4 +1,4 @@
-//===-- HSAILTestGenFilter.cpp - HSAIL Test Generator Navigator -----------===//
+//===-- HSAILTestGenNavigator.cpp - HSAIL Test Generator Navigator -----------===//
 //
 //===----------------------------------------------------------------------===//
 //
@@ -6,14 +6,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Support/PathV2.h"
+#include "HSAILTestGenFilter.h"
 
-#include "HSAILItems.h"
 #include "HSAILValidatorBase.h"
 #include "HSAILTestGenOptions.h"
 #include "HSAILTestGenNavigator.h"
+#include "HSAILTestGenUtilities.h"
 #include "HSAILUtilities.h"
 #include "HSAILItems.h"
 #include "Brig.h"
@@ -21,13 +19,11 @@
 #include <algorithm>
 #include <cctype>
 #include <sstream>
-#include <fstream>
 #include <iomanip> 
 
 using std::string;
 using std::vector;
 using std::ostringstream;
-using std::ofstream;
 
 using HSAIL_ASM::Inst;
 using HSAIL_ASM::InstBasic;
@@ -49,8 +45,8 @@ using HSAIL_ASM::InstQueue;
 using HSAIL_ASM::InstQueryImage;
 using HSAIL_ASM::InstQuerySampler;
 
+using HSAIL_ASM::Operand;
 using HSAIL_ASM::OperandReg;
-using HSAIL_ASM::OperandImmed;
 
 using HSAIL_ASM::PropValidator;
 
@@ -68,11 +64,9 @@ namespace TESTGEN {
 //=============================================================================
 //=============================================================================
 
-static const char* HSAIL_TESTLIST = "testlist.txt";
-
 enum Category
 {
-    C_ARITHMETIC = 0, // Arithmetic
+    C_ARITHMETIC = 0,
     C_MOVE,
     C_ATOMIC_MEMORY,
     C_MEMORY,
@@ -130,100 +124,6 @@ struct CategoryDesc
 #undef CATEGORIES
 
 //=============================================================================
-// Test Filtering
-//=============================================================================
-//
-// Currently, each element of a filter may have one of the following formats:
-//
-//  -------------------------------------------------------------------------------------
-//   Format          Meaning                                            Encoded as
-//  -------------------------------------------------------------------------------------
-//   "prop=value"    this string must present in test description       "prop=value"
-//   "prop!=value"   "prop=value" must not present in test description  " prop=value"
-//   "value"         equivalent to "opcode=value"                       "opcode=value"
-//  -------------------------------------------------------------------------------------
-//
-
-#define OPCODE_PREF ("opcode=")
-
-static string normalize(string s) 
-{ 
-    s.erase(std::remove(s.begin(), s.end(), ' '), s.end());
-    
-    if (s.find_first_of("=!") == string::npos) s = OPCODE_PREF + s;
-    
-    // Handling of negative conditions
-    std::string::size_type pos = s.find("!=");
-    if (pos != string::npos) {
-        s = s.erase(pos, 1);    // erase '!'
-        s = " " + s;
-    }
-
-    return s;
-}
-
-static bool eqChIgnoreCase(char c1, char c2) { return std::tolower(c1) == std::tolower(c2); }
-
-static bool eqStrIgnoreCase(string s1, string s2) 
-{ 
-    return s1.length() == s2.length() && std::equal(s1.begin(), s1.end(), s2.begin(), eqChIgnoreCase); 
-}
-
-static bool isOpcodeProp(string s)
-{
-    const std::string::size_type len = strlen(OPCODE_PREF);
-    return s.length() > len && eqStrIgnoreCase(s.substr(0, len), OPCODE_PREF);
-}
-
-//==========================================================================
-
-class FilterComparator
-{
-private:
-    unsigned index;
-    const vector<string> &filter;
-
-public:
-    FilterComparator(const vector<string> &f) : index(0), filter(f) {}
-
-    bool isEmpty()     const { return index == filter.size(); }
-    bool isPositive()  const { return filter[index].length() == 0 || filter[index][0] != ' '; }
-    string getFilter() const { return isPositive()? filter[index] : filter[index].substr(1); }
-    void next()              { ++index; }
-
-    bool operator()(const string& val) const { return eqStrIgnoreCase(val, getFilter()); }
-};
-
-//==========================================================================
-
-class TestGenFilter
-{
-private:
-    std::vector<std::string> filter;
-    std::string opcode;
-
-public:
-    TestGenFilter()
-    {
-        std::transform(testFilter.begin(), testFilter.end(), back_inserter(filter), normalize);
-        std::vector<std::string>::iterator result = find_if(filter.begin(), filter.end(), isOpcodeProp);
-        if (result != filter.end()) opcode = *result;
-    }
-
-public:
-    bool isTestEnabled(const std::vector<std::string> &testProps)
-    {
-        for (FilterComparator c(filter); !c.isEmpty(); c.next()) 
-        {
-            bool found = (find_if(testProps.begin(), testProps.end(), c) != testProps.end());
-            if (found != c.isPositive()) return false; // ok == (found for positive) || (not found for negative)
-        }
-        return true;
-    }
-    bool isOpcodeEnabled(const std::string s) const { return opcode.empty() || eqStrIgnoreCase(s, opcode); }
-};
-
-//=============================================================================
 //=============================================================================
 //=============================================================================
 
@@ -232,31 +132,37 @@ public:
 
 class TestGenNavigatorImpl
 {
+    //==========================================================================
 private:
-    string rootPath;
-    string fullPath;
-    string relPath;
-    string testCategories;
-    CategoryDesc* instCategoryTab;
-    vector<string> testProps;
-    TestGenFilter filter;
-    const char* lastOpcode;
-    ofstream osfs;
+    static const unsigned OPCODE_NONE = 0xFFFFFFFF;
+
+    //==========================================================================
+private:
+    CategoryDesc*  instCategoryTab; // mapping of opcodes to category (sorted by opcode)
+    TestGenFilter  filter;          // test filtering component
+
+    //==========================================================================
+private:
+    Inst           testInst;        // test instruction generated for the current test
+    vector<string> testProps;       // properties of the current test
+    unsigned       prevOpcode;      // opcode of the previously generated test (if any)
 
     //==========================================================================
 public:
-    TestGenNavigatorImpl(string path) : rootPath(path), instCategoryTab(0), lastOpcode(0) {}
-    ~TestGenNavigatorImpl() { closeStream(); delete[] instCategoryTab; }
+    TestGenNavigatorImpl() : instCategoryTab(0), prevOpcode(OPCODE_NONE) {}
+    ~TestGenNavigatorImpl() { delete[] instCategoryTab; }
 
     //==========================================================================
 public:
     bool isOpcodeEnabled(unsigned opcode)
     { 
-        return filter.isOpcodeEnabled(makeProp(PROP_OPCODE, opcode));
+        return filter.isOpcodeEnabled(opcode);
     }
-
-    bool isTestEnabled(Inst inst)
+    
+    bool startTest(Inst inst)
     { 
+        clean();
+        testInst = inst;
         registerTestProps(inst); 
         if (!filter.isTestEnabled(testProps)) return false;
         if (hasPackedOperand(inst)  && (dataType & DATA_TYPE_PACKED) == 0)  return false;
@@ -264,36 +170,36 @@ public:
         return true;
     }
 
-    bool startTest(Inst inst)
+    string getTestTags(unsigned testIdx, bool isFullDesc = true)
     { 
-        if (isTestEnabled(inst))
+        ostringstream s;
+
+        if (isFullDesc)              // dump full test description
         {
-            const char* instName = val2str(PROP_OPCODE, inst.opcode());
-            assert(instName);
-
-            unsigned baseCategoryId = getBaseCategoryId(inst);
-            testCategories = getCategoryTags(inst, baseCategoryId);
-
-            relPath = getCategoryName(inst, baseCategoryId, '/') + "/" + instName;
-            fullPath = rootPath 
-                     + getCategoryName(inst, baseCategoryId, getPathDelimiter()[0]) 
-                     + getPathDelimiter() 
-                     + instName;
-
-            createPath(fullPath);
-            return true;
+            unsigned baseCategoryId = getBaseCategoryId(testInst);
+            string relPath = getCategoryName(testInst, baseCategoryId, '/') + "/" + getInstName();
+            s << relPath << ":" << std::setw(5) << std::setfill('0') << testIdx << " all";
+            for (unsigned i = 0; i < testProps.size(); ++i) 
+            {
+                s << ',' << testProps[i];
+            }
+            s << getCategoryTags(testInst, baseCategoryId) << "\n";
         }
-        return false;
-    }
-    
-    void registerTest(unsigned opcode, unsigned idx)  
-    { 
-        writeTestInfo(opcode, idx);
+        else                            // dump only list of opcodes
+        {
+            if (prevOpcode == OPCODE_NONE || prevOpcode != getOpcode()) 
+            {
+                prevOpcode = getOpcode();
+                s << opcode2str(getOpcode()) << "\n";
+            }
+        }
+
+        return s.str();
     }
 
-    string getTestPath()
+    string getRelTestPath()
     {
-        return fullPath + getPathDelimiter();
+        return getCategoryName(testInst, getBaseCategoryId(testInst), '/') + "/" + getInstName();
     }
 
     static const char* val2str(unsigned propId, unsigned propVal) { return PropValidator::val2str(propId, propVal); }
@@ -305,6 +211,10 @@ private:
     {
         return isPackedType(getType(inst)) || isPackedType(getSrcType(inst));
     }
+
+    void clean()              { testInst = Inst(); }
+    const char* getInstName() { return val2str(PROP_OPCODE, testInst.opcode()); }
+    unsigned getOpcode()      { return testInst.opcode(); }
 
     //==========================================================================
 private:
@@ -377,7 +287,7 @@ private:
 
     void registerOperandProps(Inst inst)
     {
-        for (int i = 0; i < 5; ++i)
+        for (int i = 0; i < inst.operands().size(); ++i)
         {
             registerOperandProps(i, inst.operand(i));
         }
@@ -405,77 +315,6 @@ private:
     void initBaseCategoryTab();
     unsigned getBaseCategoryId(Inst inst);
     unsigned getBaseCategoriesNum() { return sizeof(baseCategories) / sizeof(CategoryDesc); }
-
-    //==========================================================================
-    //==========================================================================
-    //==========================================================================
-private:
-
-    void openStream()
-    {
-        assert(!osfs.is_open());
-        string testlist = string(rootPath) + HSAIL_TESTLIST;
-        osfs.open(testlist.c_str());
-        if (osfs.bad()) {
-            throw TestGenError("Failed to create " + testlist);
-        }
-    }
-
-    void closeStream()
-    {
-        if (!osfs.bad() && osfs.is_open()) {
-            osfs.close();
-        }
-    }
-
-    void writeTestInfo(unsigned opcode, unsigned testIdx)
-    {
-        if (!osfs.is_open()) openStream();
-
-        if (!osfs.bad()) 
-        {
-            if (dumpTestProps)              // dump full test description
-            {
-                ostringstream s;
-                s << ":" << std::setw(5) << std::setfill('0') << testIdx;
-                osfs << relPath << s.str() << " all";
-                for (unsigned i = 0; i < testProps.size(); ++i) {
-                    osfs << ',' << testProps[i];
-                }
-                osfs << testCategories << "\n";
-            }
-            else                            // dump only list of opcodes
-            {
-                const char* opcName = opcode2str(opcode);
-                assert(opcName);
-                if (lastOpcode == 0 || strcmp(opcName, lastOpcode) != 0) {
-                    lastOpcode = opcName;
-                    osfs << opcName << "\n";
-                }
-            }
-        }
-    }
-
-    void createPath(string path)
-    {
-        bool existed = false;
-        llvm::error_code ec;
-
-        if (llvm::sys::fs::exists(path))
-        {
-            ec = llvm::sys::fs::is_directory(path, existed);
-            if (ec != llvm::errc::success || !existed) {
-                throw TestGenError(path + " must be a directory");
-            }
-        }
-
-        existed = false;
-        ec = llvm::sys::fs::create_directories(path, existed);
-        if (ec != llvm::errc::success)
-        {
-            throw TestGenError(std::string("Failed to create ") + path);
-        }
-    }
 
     //==========================================================================
     //==========================================================================
@@ -537,7 +376,7 @@ private:
         assert(category < C_MAXID);
         string res = ',' + getCategoryName(inst, category, ',');
 
-        if (isOperandCategory(inst, BRIG_OPERAND_WAVESIZE)) res += ",wavesize";
+        if (isOperandCategory(inst, BRIG_KIND_OPERAND_WAVESIZE)) res += ",wavesize";
 
         if (isEquivCategory(inst)) res += ",equiv";
 
@@ -598,7 +437,7 @@ private:
 
     static bool isOperandCategory(Inst inst, unsigned kind)
     {
-        for (unsigned idx = 0; idx < 5 && inst.operand(idx); ++idx)
+        for (int idx = 0; idx < inst.operands().size(); ++idx)
         {
             if (inst.operand(idx).brig()->kind == kind) return true;
         }
@@ -617,17 +456,17 @@ private:
 
     static string getVectorCategory(Inst inst)
     {
-        for (unsigned idx = 0; idx < 5 && inst.operand(idx); ++idx)
+        for (int idx = 0; idx < inst.operands().size(); ++idx)
         {
             unsigned kind = inst.operand(idx).brig()->kind;
-            if (kind == Brig::BRIG_OPERAND_VECTOR) return "/vector";
+            if (kind == Brig::BRIG_KIND_OPERAND_OPERAND_LIST) return "/vector";
         }
         return "";
     }
 
     static string getBranchCategory(Inst inst)
     {
-        for (unsigned idx = 0; idx < 5 && inst.operand(idx); ++idx)
+        for (int idx = 0; idx < inst.operands().size(); ++idx)
         {
             if (OperandReg reg = inst.operand(idx)) {
                 if (getRegSize(reg) != 1) return "/indirect";
@@ -635,9 +474,12 @@ private:
         }
         return "/direct";
     }
-
-    const char* getPathDelimiter() { return llvm::sys::path::is_separator('\\')? "\\" : "/"; }
+    //==========================================================================
 };
+
+//==========================================================================
+//==========================================================================
+//==========================================================================
 
 void TestGenNavigatorImpl::initBaseCategoryTab()
 {
@@ -656,12 +498,15 @@ unsigned TestGenNavigatorImpl::getBaseCategoryId(Inst inst)
     unsigned size = getBaseCategoriesNum();
     CategoryDesc* res = std::lower_bound(instCategoryTab, instCategoryTab + size, sample);
 
-    if (res >= instCategoryTab + size || res->instOpcode != inst.opcode()) {
+    if (res >= instCategoryTab + size || res->instOpcode != inst.opcode()) 
+    {
         ostringstream s;
         const char* name = HSAIL_ASM::opcode2str(inst.opcode());
         s << "Internal error: cannot get category for opcode " << inst.opcode() << " (" << (name? name : "UNKNOWN") << ')';
         throw TestGenError(s.str());
-    } else if (res->categoryId >= C_MAXID) {
+    } 
+    else if (res->categoryId >= C_MAXID) 
+    {
         ostringstream s;
         const char* name = HSAIL_ASM::opcode2str(inst.opcode());
         s << "Internal error: invalid category id for opcode " << inst.opcode() << " (" << (name? name : "UNKNOWN") << ')';
@@ -675,9 +520,9 @@ unsigned TestGenNavigatorImpl::getBaseCategoryId(Inst inst)
 // Interface definition
 //=============================================================================
 
-TestGenNavigator::TestGenNavigator(string path)
+TestGenNavigator::TestGenNavigator()
 {
-    impl = new TestGenNavigatorImpl(path);
+    impl = new TestGenNavigatorImpl();
 }
 
 TestGenNavigator::~TestGenNavigator()
@@ -690,24 +535,19 @@ bool TestGenNavigator::isOpcodeEnabled(unsigned opcode) const
     return impl->isOpcodeEnabled(opcode);
 }
 
-bool TestGenNavigator::isTestEnabled(Inst inst)
-{
-    return impl->isTestEnabled(inst);
-}
-
 bool TestGenNavigator::startTest(Inst inst)
 {
     return impl->startTest(inst);
 }
 
-void TestGenNavigator::registerTest(unsigned opcode, unsigned idx)
+string TestGenNavigator::getTestTags(unsigned testIdx, bool isFullDesc /*=true*/)
 {
-    impl->registerTest(opcode, idx);
+    return impl->getTestTags(testIdx, isFullDesc);
 }
 
-string TestGenNavigator::getTestPath()
+string TestGenNavigator::getRelTestPath()
 {
-    return impl->getTestPath();
+    return impl->getRelTestPath();
 }
 
 //=============================================================================

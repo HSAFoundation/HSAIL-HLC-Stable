@@ -22,17 +22,15 @@ struct Api {
     {
     }
 
-    Api(const char *string_data, size_t string_size,
-          const char *directive_data, size_t directive_size,
-          const char *inst_data, size_t inst_size,
-          const char *operand_data, size_t operand_size,
-          const char* debug_data, size_t debug_size)
+    Api(const void *data_bytes,
+        const void *code_bytes,
+        const void *operand_bytes,
+        const void * debug_bytes)
     : container(
-            (char*)string_data, string_size,
-            (char*)directive_data, directive_size,
-            (char*)inst_data, inst_size,
-            (char*)operand_data, operand_size,
-            (char*)debug_data, debug_size)
+            data_bytes,
+            code_bytes,
+            operand_bytes,
+            debug_bytes)
     , errorText()
     {
     }
@@ -52,7 +50,7 @@ static int assemble(brig_container_t handle, std::istream& is)
         return 1;
     }
     Validator v(((Api*)handle)->container);
-    if (!v.validate(Validator::VM_BrigLinked, true)) {
+    if (!v.validate(true)) {
         std::stringstream ss;
         ss << v.getErrorMsg(&is) << "\n";
         int rc = v.getErrorCode();
@@ -71,36 +69,44 @@ HSAIL_C_API brig_container_t brig_container_create_empty()
     return (brig_container_t)new Api();
 }
 
-HSAIL_C_API brig_container_t brig_container_create(const char *string_data, size_t string_size,
-                            const char *directive_data, size_t directive_size,
-                            const char *inst_data, size_t inst_size,
-                            const char *operand_data, size_t operand_size,
-                            const char* debug_data, size_t debug_size)
+HSAIL_C_API brig_container_t brig_container_create_view(
+    const void *data_bytes,
+    const void *code_bytes,
+    const void *operand_bytes,
+    const void* debug_bytes)
 {
     return (brig_container_t)new Api(
-            string_data, string_size,
-            directive_data, directive_size,
-            inst_data, inst_size,
-            operand_data, operand_size,
-            debug_data, debug_size);
+            data_bytes,   
+            code_bytes,   
+            operand_bytes,
+            debug_bytes);
 }
 
-HSAIL_C_API brig_container_t brig_container_create_copy(const char *string_data, size_t string_size,
-                            const char *directive_data, size_t directive_size,
-                            const char *inst_data, size_t inst_size,
-                            const char *operand_data, size_t operand_size,
-                            const char* debug_data, size_t debug_size)
+HSAIL_C_API brig_container_t brig_container_create_copy(
+                            const char *data_bytes,
+                            const char *code_bytes,
+                            const char *operand_bytes,
+                            const char* debug_bytes)
 {
   Api *api = new Api;
-  api->container.strings().setData(string_data, string_size);
-  api->container.directives().setData(directive_data, directive_size);
-  api->container.code().setData(inst_data, inst_size);
-  api->container.operands().setData(operand_data, operand_size);
-  api->container.debugChunks().setData(debug_data, debug_size);
+  api->container.strings().setData(data_bytes);
+  api->container.code().setData(code_bytes);
+  api->container.operands().setData(operand_bytes);
+  api->container.debugInfo().setData(debug_bytes);
   return (brig_container_t)api;
 }
 
-HSAIL_C_API const char* brig_container_get_section_data(brig_container_t handle, int section_id)
+HSAIL_C_API void* brig_container_get_brig_module(brig_container_t handle)
+{
+    return (void*)(((Api*)handle)->container.getBrigModule());
+}
+
+HSAIL_C_API unsigned brig_container_get_section_count(brig_container_t handle)
+{
+    return (unsigned)(((Api*)handle)->container.getNumSections());
+}
+
+HSAIL_C_API const char* brig_container_get_section_bytes(brig_container_t handle, int section_id)
 {
     return ((Api*)handle)->container.sectionById(section_id).data().begin;
 }
@@ -168,7 +174,7 @@ HSAIL_C_API int brig_container_validate(brig_container_t handle)
 {
     std::stringstream ss;
     Validator v(((Api*)handle)->container);
-    if (!v.validate(Validator::VM_BrigLinked, true)) {
+    if (!v.validate(true)) {
         ss << v.getErrorMsg(0) << "\n";
         int rc = v.getErrorCode();
         ((Api*)handle)->errorText = ss.str();

@@ -426,6 +426,15 @@ mdef {
   ECHO;
   return llvm::AMDILMDParser::token::MD_INT;
 }
+
+<MD_STATE>;queue {
+  MATCH(MD_STATE/;queue);
+  SAVE_STR_TOKEN;
+  ENTER_STATE(MD_ARG);
+  ECHO;
+  return llvm::AMDILMDParser::token::MD_QUEUE;
+}
+
 <MD_STATE>;printf_fmt {
   MATCH(MD_STATE/;printf_fmt);
   SAVE_STR_TOKEN;

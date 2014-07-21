@@ -471,7 +471,7 @@ static unsigned getTextWidth(unsigned type)
     if (type == Brig::BRIG_TYPE_F32) return 16;
     if (type == Brig::BRIG_TYPE_F64) return 24;
 
-    switch (getTypeSize(type))
+    switch (getBrigTypeNumBits(type))
     {
     case 8:  return 4;
     case 16: return 6;
@@ -618,7 +618,7 @@ string Val::dumpPacked() const
 
     unsigned etype = getElementType();
     unsigned dim   = getPackedTypeDim(getType());
-    unsigned width = getTypeSize(getType()) / dim;
+    unsigned width = getBrigTypeNumBits(getType()) / dim;
 
     if      (isSignedType(etype))   s << "_s";
     else if (isUnsignedType(etype)) s << "_u";

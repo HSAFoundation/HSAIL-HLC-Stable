@@ -17,18 +17,21 @@ set(LLVM_REQUIRES_EH ON)
 #set(AMD_LLVM_INTERNAL ON)
 
 add_definitions(-DAMD_OPENCL)
-add_definitions(-DAMD_HSAIL)
 add_definitions(-DWITH_TARGET_HSAIL)
-add_definitions(-DENABLE_ENUM_0_PRIVATE)
 add_definitions(-DANDROID)
 add_definitions(-DBUILD_HSA_TARGET)
-add_definitions(-DOPENCL_MAJOR=1)
+add_definitions(-DOPENCL_MAJOR=2)
+
 
 #set (USEDLIBS libhsail.a)
 
-include_directories(/home/amd/Prakash/praghave_msdnkv69_9870/praghave_msdnkv69_9870/drivers/opencl/compiler/hsail-tools)
-include_directories(/home/amd/Prakash/praghave_msdnkv69_9870/praghave_msdnkv69_9870/drivers/opencl/compiler/hsail-tools/libBRIGDwarf/)
-include_directories(/home/amd/Prakash/praghave_msdnkv69_9870/praghave_msdnkv69_9870/drivers/opencl/compiler/hsail-tools/libHSAIL/generated)
+include_directories(/home/amd/Perforce/praghave_msdnkv69_2767/drivers/opencl/compiler/hsail-tools)
+include_directories(/home/amd/Perforce/praghave_msdnkv69_2767/drivers/opencl/compiler/hsail-tools/libBRIGDwarf)
+include_directories(/home/amd/Perforce/praghave_msdnkv69_2767/drivers/opencl/compiler/hsail-tools/libHSAIL/generated)
+
+#include_directories(/home/amd/Prakash/HSAIL-Tools-private/libHSAIL)
+#include_directories(/home/amd/Prakash/HSAIL-Tools-private/libHSAIL/libBRIGDwarf)
+#include_directories(/home/amd/Prakash/HSAIL-Tools-private/libHSAIL/libHSAIL/generated)
 
 set(PACKAGE_VERSION "${LLVM_VERSION_MAJOR}.${LLVM_VERSION_MINOR}svn")
 
@@ -389,6 +392,8 @@ include_directories( ${LLVM_BINARY_DIR}/include ${LLVM_MAIN_INCLUDE_DIR})
 if( ${CMAKE_SYSTEM_NAME} MATCHES SunOS )
    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -include llvm/Support/Solaris.h")
 endif( ${CMAKE_SYSTEM_NAME} MATCHES SunOS )
+#SRP
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 include(AddLLVM)
 include(TableGen)

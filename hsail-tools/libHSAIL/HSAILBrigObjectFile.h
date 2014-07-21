@@ -49,7 +49,7 @@
 /// factored out when necessary.
 
 #include <iosfwd> // only forward dependencies from stdio
-#include <memory> // auto_ptr
+#include <memory> // unique_ptr
 
 #include "HSAILBrigContainer.h"
 
@@ -120,25 +120,25 @@ struct BrigIO {
 
     // factory methods for the adapters
 
-    static std::auto_ptr<ReadAdapter> fileReadingAdapter(
+    static std::unique_ptr<ReadAdapter> fileReadingAdapter(
                     const char*                 fileName,
                     std::ostream&               errs = defaultErrs());
 
-    static std::auto_ptr<WriteAdapter> fileWritingAdapter(
+    static std::unique_ptr<WriteAdapter> fileWritingAdapter(
                     const char*                 fileName,
                     std::ostream&               errs = defaultErrs());
 
-    static std::auto_ptr<ReadAdapter> memoryReadingAdapter(
+    static std::unique_ptr<ReadAdapter> memoryReadingAdapter(
                     const char                 *buf, 
                     size_t                      size,
                     std::ostream&               errs = defaultErrs());
 
-    static std::auto_ptr<WriteAdapter> memoryWritingAdapter(
+    static std::unique_ptr<WriteAdapter> memoryWritingAdapter(
                     char                       *buf, 
                     size_t                      size,
                     std::ostream&               errs = defaultErrs());
 
-    static std::auto_ptr<ReadAdapter>  istreamReadingAdapter(
+    static std::unique_ptr<ReadAdapter>  istreamReadingAdapter(
                     std::istream&               is, 
                     std::ostream&               errs = defaultErrs());
 
@@ -157,14 +157,14 @@ struct BrigIO {
 
     static int save(BrigContainer&               src,
                     int                          fmt,
-                    std::auto_ptr<WriteAdapter>  dst)
+                    std::unique_ptr<WriteAdapter>  dst)
     {
         return !dst.get() || save(src, fmt, *dst);
     }
 
     static int load(BrigContainer&               dst,
                     int                          fmt,
-                    std::auto_ptr<ReadAdapter>   src)
+                    std::unique_ptr<ReadAdapter>   src)
     {
         return !src.get() || load(dst, fmt, *src);
     }

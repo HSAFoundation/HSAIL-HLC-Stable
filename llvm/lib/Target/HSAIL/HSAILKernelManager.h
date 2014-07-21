@@ -76,6 +76,7 @@
 #include "libHSAIL/HSAILItemBase.h"
 #include "libHSAIL/HSAILItems.h"
 
+
 namespace llvm {
 class HSAILSubtarget;
 class HSAILMachineFunctionInfo;
@@ -88,6 +89,7 @@ class MachineFunction;
 class MachineInstr;
 class ConstantFP;
 class HSAILPrintfInfo;
+
 
 class HSAILKernelManager {
 public:
@@ -113,11 +115,7 @@ public:
   /// and calculation of the local/group/global id's.
   void printHeader(const std::string &name);
 
-  /// Prints out the metadata for the specific function depending if it is a
-  /// kernel or not.
-  void printMetaData(OSTREAM_TYPE &O, uint32_t id, bool isKernel = false);
-
-  void brigEmitMetaData(HSAIL_ASM::BrigContainer& bc, uint32_t id, bool isKernel = false);
+  void brigEmitMetaData(HSAIL_ASM::Brigantine& brig, uint32_t id, bool isKernel = false);
 
   /// Set bool value on whether to consider the function a kernel or a normal
   /// function.
@@ -133,10 +131,6 @@ public:
   uint32_t getUAVID(const Value *value);
 
 private:
-
-  /// Helper function that prints the actual metadata and should only be called
-  /// by printMetaData.
-  void printKernelArgs(OSTREAM_TYPE &O);
 
   void updatePtrArg(llvm::Function::const_arg_iterator Ip,
                     int raw_uav_buffer,

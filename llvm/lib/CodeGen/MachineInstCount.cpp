@@ -14,7 +14,6 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "machineinstcount"
-#include <stdio.h>
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/StringExtras.h"
@@ -33,6 +32,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Target/TargetInstrInfo.h"
+#include "stdio.h"
 
 #include <map>
 using namespace llvm;

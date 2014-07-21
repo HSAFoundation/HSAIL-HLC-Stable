@@ -1,5 +1,5 @@
-ASM_DEPTH = $(COMPONENT_DEPTH)/..
-include $(ASM_DEPTH)/asmdefs
+HT_DEPTH = $(COMPONENT_DEPTH)/..
+include $(HT_DEPTH)/htdefs
 
 MYPERL=$(DK_ROOT)/perl/5.16.1/bin/perl -I "$(DK_ROOT)/perl/5.16.1/lib"
 
@@ -12,7 +12,7 @@ LIB_TARGET = LIBHSAIL
 
 vpath %.cpp $(COMPONENT_DEPTH)
 
-CPPFLAGS += -Wno-reorder -Wno-deprecated
+CPPFLAGS += -Wno-deprecated
 
 ifdef ATI_OS_LINUX
     GCXXOPTS := $(filter-out -fno-exceptions,$(GCXXOPTS))
@@ -58,4 +58,4 @@ $(BUILD_DIR)/generate-stamp: $(GENINPUTS)
 
 $(GENFILES): $(BUILD_DIR)/generate-stamp
 
-include $(ASM_DEPTH)/asmrules
+include $(HT_DEPTH)/htrules

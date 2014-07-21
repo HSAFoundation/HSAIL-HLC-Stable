@@ -46,7 +46,10 @@ template<class T> static unsigned getCoordType(T inst) { assert(inst); return in
 template<class T> static unsigned getEquivClass(T inst) { assert(inst); return inst.equivClass(); }
 template<class T> static unsigned getFtz(T inst) { assert(inst); return inst.modifier().ftz(); }
 template<class T> static unsigned getGeometry(T inst) { assert(inst); return inst.geometry(); }
+template<class T> static unsigned getGlobalSegmentMemoryScope(T inst) { assert(inst); return inst.globalSegmentMemoryScope(); }
+template<class T> static unsigned getGroupSegmentMemoryScope(T inst) { assert(inst); return inst.groupSegmentMemoryScope(); }
 template<class T> static unsigned getImageQuery(T inst) { assert(inst); return inst.imageQuery(); }
+template<class T> static unsigned getImageSegmentMemoryScope(T inst) { assert(inst); return inst.imageSegmentMemoryScope(); }
 template<class T> static unsigned getImageType(T inst) { assert(inst); return inst.imageType(); }
 template<class T> static unsigned getIsConst(T inst) { assert(inst); return inst.modifier().isConst(); }
 template<class T> static unsigned getIsNoNull(T inst) { assert(inst); return inst.modifier().isNoNull(); }
@@ -57,7 +60,6 @@ template<class T> static unsigned getPack(T inst) { assert(inst); return inst.pa
 template<class T> static unsigned getRound(T inst) { assert(inst); return inst.modifier().round(); }
 template<class T> static unsigned getSamplerQuery(T inst) { assert(inst); return inst.samplerQuery(); }
 template<class T> static unsigned getSegment(T inst) { assert(inst); return inst.segment(); }
-template<class T> static unsigned getSegments(T inst) { assert(inst); return inst.segments(); }
 template<class T> static unsigned getSignalOperation(T inst) { assert(inst); return inst.signalOperation(); }
 template<class T> static unsigned getSignalType(T inst) { assert(inst); return inst.signalType(); }
 template<class T> static unsigned getSourceType(T inst) { assert(inst); return inst.sourceType(); }

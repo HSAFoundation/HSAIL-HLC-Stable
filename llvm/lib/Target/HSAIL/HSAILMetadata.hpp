@@ -17,7 +17,8 @@ typedef enum argTypeEnum {
   ARG_TYPE_VALUE     = 4,
   ARG_TYPE_POINTER   = 5,
   ARG_TYPE_SEMAPHORE = 6,
-  ARG_TYPE_LAST      = 7
+  ARG_TYPE_QUEUE     = 7, // enum for device enqueue
+  ARG_TYPE_LAST      = 8
 } ArgType;
 
 // Enumerations of the valid data types for pass by value and

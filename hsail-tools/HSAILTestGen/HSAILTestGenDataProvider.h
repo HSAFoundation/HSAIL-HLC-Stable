@@ -2,7 +2,6 @@
 #define INCLUDED_HSAIL_TESTGEN_DATA_PROVIDER_H
 
 #include "HSAILTestGenVal.h"
-#include "HSAILTestGenUtilities.h"
 
 #include <vector>
 using std::vector;
@@ -116,7 +115,7 @@ private:
     unsigned dim;               // Number of values: 1 for scalars; 2-4 for vectors
 
 public:
-    TestDataWrapper() : dim(0), td(0) {}
+    TestDataWrapper() : td(0), dim(0) {}
     bool hasData() const { return td != 0; } 
     void setData(OperandTestData* td) { this->td = td; }
     void registerData(TestDataGenerator* gen, unsigned dim)
@@ -154,7 +153,7 @@ private:
 // - generation of all combinations of values for all operands
 // NOTES:
 // - type of test values and their standard/custom values are described 
-//   in file HSAILTestGenLuaTestData.h
+//   in file HSAILTestGenTestData.h
 
 class TestDataProvider
 {

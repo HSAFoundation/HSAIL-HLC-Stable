@@ -1,9 +1,8 @@
-OPENCL_DEPTH = ../../../..
-ASM_DEPTH = ../..
+HT_DEPTH = ../..
 
-include $(ASM_DEPTH)/asmdefs
+include $(HT_DEPTH)/htdefs
 
 BUILD_MAKEFILE = Makefile.hsailtestgen
-BUILD_SUBDIRS = lnx lnx64a w8 w864a wNow wNow64a wNxt wNxt64a
+BUILD_SUBDIRS = $(DEFAULT_TARGETS)
 
-include $(ASM_DEPTH)/asmrules
+include $(HT_DEPTH)/htrules

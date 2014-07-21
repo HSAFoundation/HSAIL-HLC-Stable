@@ -1,5 +1,5 @@
 #include "HSAILTestGenDataProvider.h"
-
+#include "HSAILTestGenUtilities.h"
 #include "HSAILTestGenOptions.h"
 
 #include <limits>
@@ -74,7 +74,7 @@ private:
 
     //==========================================================================
 public:
-    OperandTestDataImpl(unsigned sz, const T *vs, OperandTestDataImpl<T>* base = 0) : values(0), size(sz)
+    OperandTestDataImpl(unsigned sz, const T *vs, OperandTestDataImpl<T>* base = 0) : size(sz), values(0)
     {
         assert(sz > 0 && vs);
 
@@ -616,7 +616,7 @@ void TestDataProvider::clean()                { OperandTestDataFactory::clean();
 //=============================================================================
 // Description of test values
 
-#include "HSAILTestGenLuaTestData.h"
+#include "HSAILTestGenTestData.h"
 
 //==============================================================================
 //==============================================================================

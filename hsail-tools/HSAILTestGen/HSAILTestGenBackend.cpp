@@ -7,18 +7,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "HSAILTestGenBackend.h"
-#include "HSAILTestGenLuaBackend.h"
-
-#include "llvm/Support/raw_ostream.h"
-
-#include <iosfwd>
-#include <sstream>
-#include <iostream>
-#include <iomanip>
+#include "HSAILTestGenBackendLua.h"
+#include "HSAILTestGenUtilities.h"
 
 using std::string;
-using std::ostringstream;
-using std::setbase;
 
 namespace TESTGEN {
 
@@ -40,7 +32,7 @@ TestGenBackend* TestGenBackend::get(string name)
         }
         else if (name == "LUA" || name == "lua")
         {
-            backend = new LuaTestGen();
+            backend = new LuaBackend();
         }
         else
         {

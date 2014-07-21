@@ -179,12 +179,8 @@ def int_HSAIL_class_f64 : GCCBuiltin<"__hsail_class_f64">, ClassIntr;
 // Intrinsics for OpenCL synchronization built-ins (OCL 1.2 6.12.8)
 def int_HSAIL_barrier         : GCCBuiltin<"__hsail_barrier">, Intrinsic<[], [], []>;
 def int_HSAIL_wavebarrier         : GCCBuiltin<"__hsail_wavebarrier">, Intrinsic<[], [], []>;
-def int_HSAIL_memfence        : GCCBuiltin<"__hsail_memfence">, Intrinsic<[], [], []>;
-def int_HSAIL_memfence_global : GCCBuiltin<"__hsail_memfence_global">, Intrinsic<[], [], []>;
-def int_HSAIL_memfence_group  : GCCBuiltin<"__hsail_memfence_group">, Intrinsic<[], [], []>;
-
-def int_HSAIL_atomic_memfence : GCCBuiltin<"__atomic_memfence">,
-    Intrinsic<[], [llvm_i32_ty, llvm_i32_ty, llvm_i32_ty], []>;
+def int_HSAIL_memfence : GCCBuiltin<"__hsail_memfence">,
+    Intrinsic<[], [llvm_i32_ty, llvm_i32_ty, llvm_i32_ty, llvm_i32_ty], []>;
 
 // Instrinsics for explicit conversions
 // float to int

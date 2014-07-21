@@ -135,6 +135,10 @@ def imm31 : PatLeaf<(imm), [{
     return N->getZExtValue() == 31;
 }]>;
 
+def imm32 : PatLeaf<(imm), [{
+    return N->getZExtValue() == 32;
+}]>;
+
 def imm63 : PatLeaf<(imm), [{
     return N->getZExtValue() == 63;
 }]>;
@@ -684,4 +688,8 @@ def RotateBit32_ri : HSAILInst<(outs GPR32:$dst), (ins GPR32:$src1, i32imm:$src2
 
 def : Pat<(or (shl (i32 GPR32:$src1), (and (i32 GPR32:$src2), imm31)),
               (srl (i32 GPR32:$src1), (and (ineg (i32 GPR32:$src2)), imm31))),
+          (media_bitalign_rrr GPR32:$src1, GPR32:$src1, (neg_s32 GPR32:$src2))>;
+
+def : Pat<(or (shl (i32 GPR32:$src1), (i32 GPR32:$src2)),
+              (srl (i32 GPR32:$src1), (sub imm32, (and (i32 GPR32:$src2), imm31)))),
           (media_bitalign_rrr GPR32:$src1, GPR32:$src1, (neg_s32 GPR32:$src2))>;

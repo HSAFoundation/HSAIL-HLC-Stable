@@ -60,11 +60,11 @@ struct Guard {
 
 
 #include "Brig.h"
+#include "HSAILItems.h"
 #include "HSAILTypeUtilities.h"
 #include "HSAILUtilities.h"
 #include "HSAILSRef.h"
 #include "HSAILFloats.h"
-#include "HSAILConvertors.h"
 
 #include <memory>
 #include <vector>
@@ -131,6 +131,15 @@ public:
 namespace HSAIL_ASM
 {
 
+enum ELitKinds 
+{
+    ELitDecimal,
+    ELitDecimalWithSuffix,
+    ELitHex,
+    ELitOctal,
+    ELitC99
+};
+
 enum ETokens
 {
     EEmpty,
@@ -164,7 +173,12 @@ enum ETokens
     EKWLoc,
     EKWConst,
     EKWAlign,
+    EKWAlloc,
+    EAllocKind,
     EKWExtension,
+    ELinkage,
+    EKWDecl,
+    EKWIndirect,
 
     EKWImageWidth,
     EKWImageHeight,
@@ -173,6 +187,8 @@ enum ETokens
     EKWImageChannelOrder,
     EKWImageGeometry,
     EKWImageArray,
+
+    EMemoryScope,
 
     ESamplerFirstProp,
     EKWSamplerAddressing = ESamplerFirstProp,
@@ -189,8 +205,6 @@ enum ETokens
     EKWBlockStr,
     EKWBlockEnd,
 
-    EKWFBar,
-    EKWLabelTargets,
     EKWSignature,
     EKWWidthAll,
     EKWFbarrier,
@@ -200,18 +214,11 @@ enum ETokens
     EKWSamp,
 
     // constants
-    EDecimalNumber,
-    EOctalNumber,
-    EHexNumber,
-    EHlfHexNumber,
-    ESglHexNumber,
-    EDblHexNumber,
-    EHlfNumber,
-    ESglNumber,
-    EDblNumber,
-    EHlfC99Number,
-    ESglC99Number,
-    EDblC99Number,
+
+    EIntLiteral,
+    EF16Literal,
+    EF32Literal,
+    EF64Literal,
     EPackedLiteral,
     EStringLiteral,
     EEmbeddedText,
@@ -222,10 +229,11 @@ enum ETokens
     EIDLocal,
     ERegister,
 
-    EAttribute,
     ESegment,
 
     // other
+    ESLComment,
+    EMLCommentStart,
     EId,
     EWaveSizeMacro,
     EControl,
@@ -256,7 +264,6 @@ enum ETokens
     EInstSkip, // TBD remove
 
     EInstruction,
-    EInstruction_Vx,
 
     // modifiers
     EModifiers,
@@ -287,6 +294,7 @@ enum ETokens
 
 enum EScanContext {
     EDefaultContext,
+    EMemoryScopeContext,
     EImageOrderContext,
     EInstModifierContext,
     EInstModifierInstAtomicContext,   
@@ -299,8 +307,6 @@ class Scanner : public StreamScannerBase
 public:
     explicit Scanner(std::istream& is, bool disableComments=true);
 
-    typedef std::list<SRef> CommentList;
-
     class Token {
         friend class Scanner;
         Scanner       *m_scanner;
@@ -309,11 +315,6 @@ public:
         SRef           m_text;
         int            m_brigId;
         ETokens        m_kind;
-
-        CommentList    m_comments;
-
-        void    clear();
-        void    appendComment(const char *begin, const char *end);
 
     public:
         SRef    text()   const { return m_text; } 
@@ -338,17 +339,6 @@ public:
 
     void readSingleStringLiteral(std::string& outString);
 
-    template <typename DstBrigType,
-              template<typename, typename> class Convertor>
-    typename DstBrigType::CType readIntValue();
-
-    template <typename DstBrigType,
-              template<typename, typename> class Convertor>
-    typename DstBrigType::CType readValue();
-
-    bool hasComments() const { return m_comments.get()!=NULL && !m_comments->empty(); }
-    SRef grabComment();
-
     void syntaxError(const std::string& message, const SrcLoc& srcLoc) const {
         throw SyntaxError(message, srcLoc);
     }
@@ -366,11 +356,16 @@ public:
     static EScanContext getTokenContext(ETokens token);
 
     unsigned eatToken(ETokens token, const char* message=NULL) {
-        CToken& t = scan(getTokenContext(token));
-        if (t.kind()!=token) {
-            throwTokenExpected(token, message, t.srcLoc());
+        try {
+            CToken& t = scan(getTokenContext(token));
+            if (t.kind()!=token) {
+                throwTokenExpected(token, message, t.srcLoc());
+            }
+            return t.brigId();
+        } catch (const SyntaxError& e) {
+            throwTokenExpected(token, message, e.where());
+            return EEmpty;
         }
-        return t.brigId();
     }
 
     Optional<unsigned> tryEatToken(ETokens token) {
@@ -382,6 +377,12 @@ public:
         return res;
     }
 
+    uint64_t readIntLiteral();
+    f16_t    readF16Literal();
+    f32_t    readF32Literal();
+    f64_t    readF64Literal();
+    bool         continueMLComment();
+
 private:
     Scanner& operator=(const Scanner&);
 
@@ -391,7 +392,7 @@ private:
 
     int                        m_lineNum;
     std::streamoff             m_lineStart;
-    std::auto_ptr<CommentList> m_comments;
+    bool                       m_disableComments;
 
     class istringstreamalert;
     class Variant;
@@ -403,13 +404,12 @@ private:
     ETokens      scanDefault(EScanContext ctx, Token &t);
     ETokens      scanModifier(EScanContext ctx, Token &t);
     Variant      readValueVariant();
-    void         newComment(const char *init=NULL);
-    void         appendComment(const char *begin, const char *end);
     void         nextLine(const char *atPos);
     void         skipWhitespaces(Token& t);
     const char*  skipOneLinearComment(const char* from, Token& t);
     const char*  skipMultilineComment(const char* from, Token& t);
     void         scanEmbeddedText(Token &t);
+//    bool         continueMLComment(Token &t);
 
     SrcLoc       srcLoc(const char* pos) const;
 
@@ -420,90 +420,6 @@ private:
 
 inline SrcLoc Scanner::Token::srcLoc() const { 
     return m_scanner->srcLoc(*this);
-}
-
-class Scanner::Variant
-{
-    union {
-        int64_t  m_int64;
-        uint64_t m_uint64;
-        uint16_t m_f16x;
-        uint32_t m_f32x;
-        uint64_t m_f64x;
-    };
-    enum EKind {
-        EInvalid,
-        EInt64,
-        EUInt64,
-        EF16,
-        EF32,
-        EF64
-    } m_kind;
-
-public:
-    Variant() : m_kind(EInvalid) {}
-    explicit Variant(int64_t  i64)  : m_int64(i64), m_kind(EInt64) {}
-    explicit Variant(uint64_t u64)  : m_uint64(u64), m_kind(EUInt64) {}
-    explicit Variant(f16_t    f16)  : m_f16x(f16.rawBits()), m_kind(EF16) {}
-    explicit Variant(f32_t    f32)  : m_f32x(f32.rawBits()), m_kind(EF32) {}
-    explicit Variant(f64_t    f64)  : m_f64x(f64.rawBits()), m_kind(EF64) {}
-
-    bool isInteger() const {
-        return m_kind == EInt64 || m_kind == EUInt64;
-    }
-
-    template <typename DstBrigType,
-              template<typename, typename> class Convertor>
-    typename DstBrigType::CType convertInt() const {
-        switch(m_kind) {
-        case EInt64:  return ::HSAIL_ASM::convert<DstBrigType, BrigType<Brig::BRIG_TYPE_S64>, Convertor>(m_int64);
-        case EUInt64: return ::HSAIL_ASM::convert<DstBrigType, BrigType<Brig::BRIG_TYPE_U64>, Convertor>(m_uint64);
-        default: assert(false);
-        }
-        return typename DstBrigType::CType();
-    }
-
-    template <typename DstBrigType,
-              template<typename, typename> class Convertor>
-    typename DstBrigType::CType convert() const {
-        switch(m_kind) {
-        case EInt64:
-        case EUInt64: return convertInt<DstBrigType,Convertor>();
-        case EF16:    return ::HSAIL_ASM::convert<DstBrigType, BrigType<Brig::BRIG_TYPE_F16>, Convertor>(f16_t::fromRawBits(m_f16x));
-        case EF32:    return ::HSAIL_ASM::convert<DstBrigType, BrigType<Brig::BRIG_TYPE_F32>, Convertor>(f32_t::fromRawBits(m_f32x));
-        case EF64:    return ::HSAIL_ASM::convert<DstBrigType, BrigType<Brig::BRIG_TYPE_F64>, Convertor>(f64_t::fromRawBits(m_f64x));
-        default: assert(false);
-        }
-        return typename DstBrigType::CType();;
-    }
-};
-
-template <typename DstBrigType,
-          template<typename, typename> class Convertor>
-typename DstBrigType::CType Scanner::readIntValue() {
-    try {
-        Variant const v = readValueVariant();
-        if (!v.isInteger()) {
-            syntaxError("integer constant expected");
-        }
-        return v.convertInt<DstBrigType,Convertor>();
-    } catch (const ConversionError& e) {
-        syntaxError(e.what()); // translate it to syntax error
-    }
-    return typename DstBrigType::CType();
-}
-
-// more generic version
-template <typename DstBrigType,
-          template<typename, typename> class Convertor>
-typename DstBrigType::CType Scanner::readValue() {
-    try {
-        Variant const v = readValueVariant();
-        return v.convert<DstBrigType,Convertor>();
-    } catch (const ConversionError& e) {
-        syntaxError(e.what()); // translate it to syntax error
-    }
-    return typename DstBrigType::CType();
 }
 
 } // end namespace

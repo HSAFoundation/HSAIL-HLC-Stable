@@ -60,5 +60,6 @@ OpaqueType llvm::GetOpaqueType(const Type *T)
     .Case("struct._sema_t", Sema)
     .Case("opencl.reserve_id_t",ReserveId)
     .Case("opencl.clk_event_t", CLKEventT)
+    .Case("opencl.queue_t", QueueT)
     .Default(UnknownOpaque);
 }

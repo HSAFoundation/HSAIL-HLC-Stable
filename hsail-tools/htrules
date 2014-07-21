@@ -1,0 +1,8 @@
+ifdef GONE_TO_BUILD_DIR
+ifdef ATI_OS_LINUX
+*$(OBJ_EXT): $(HT_DEPTH)/htdefs $(HT_DEPTH)/htrules
+endif
+endif
+
+HT_PARENT_RULES ?= $(OPENCL_DEPTH)/openclrules
+include $(HT_PARENT_RULES)

@@ -83,7 +83,8 @@ namespace llvm
     ARG_TYPE_VALUE = 4,
     ARG_TYPE_POINTER = 5,
     ARG_TYPE_SEMAPHORE = 6,
-    ARG_TYPE_LAST = 7
+    ARG_TYPE_QUEUE = 7,
+    ARG_TYPE_LAST = 8
   } ArgType;
 
   // Enumerations of the valid data types for pass by value and
@@ -187,6 +188,14 @@ namespace llvm
         unsigned restrict_;
         unsigned pipe_;
       } pointer;
+      struct { // Struct for queue arguments
+        DataType data;
+        unsigned numElements;
+        unsigned ID;
+        unsigned cbNum;
+        unsigned cbOffset;
+        MemoryType memory;
+      } queue;
     } arg;
     std::string reflectStr;
     bool isConst;

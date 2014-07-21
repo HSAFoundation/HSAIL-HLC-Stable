@@ -5,14 +5,16 @@
 
 #include <sstream>
 #include <string>
-#include <iostream>
+//#include <iostream>
 
 using std::string;
 using std::ostringstream;
+using HSAIL_ASM::getRegName;
 
 using namespace Brig;
 using namespace HSAIL_ASM;
 using namespace HSAIL_PROPS;
+
 
 namespace TESTGEN {
 
@@ -24,7 +26,7 @@ static void dumpProp(string propName, string propVal)
 {
     const char* fill = "          ";
     if (propName.length() < strlen(fill)) propName += (fill + propName.length());
-    std::cerr << propName << "= " << propVal << "\n";
+    //std::cerr << propName << "= " << propVal << "\n";
 }
 
 static void dumpProp(unsigned propId, string propVal)
@@ -43,18 +45,21 @@ static string getOperandName(unsigned idx)
     return s.str();
 }
 
-static string operandImmed2str(OperandImmed o)   
+static string operandData2str(OperandData o)   
 { 
     ostringstream s; 
-    s << "IMM(" << (unsigned)o.bytes(0); 
+    SRef data = o.data();
+
+    s << "IMM(" << (unsigned)data[0]; 
     for (unsigned i = 1; i < o.byteCount(); ++i) 
     {
-        s << ", " << (unsigned)o.bytes(i);  s << ")"; 
+        s << ", " << (unsigned)data[i];
     }
+    s << ")"; 
     return s.str(); 
 } 
 
-static string operandVector2str(OperandVector o) 
+static string operandVector2str(OperandOperandList o) 
 { 
     ostringstream s; 
     
@@ -62,9 +67,10 @@ static string operandVector2str(OperandVector o)
     for (unsigned i = 0; i < o.elementCount(); ++i) 
     { 
         if (i > 0) s << ", "; 
-        if      (OperandReg r = o.operand(i))     s << r.reg(); 
-        else if (OperandImmed imm = o.operand(i)) s << operandImmed2str(imm);
-        else                                      s << "*UNKNOWN*";
+        if      (OperandReg r = o.elements(i))    s << getRegName(r); 
+        else if (OperandData imm = o.elements(i)) s << operandData2str(imm);
+        else if (OperandWavesize(o.elements(i)))  s <<  "wavesize";
+        else                                      s << "***UNKNOWN***";
     } 
     s << ")"; 
     
@@ -82,8 +88,7 @@ static string operandAddress2str(OperandAddress o)
     return s.str();
 }
 
-template <class T>
-static string operandList2str(T o) 
+static string operandList2str(OperandCodeList o) 
 {
     ostringstream s;
 
@@ -97,25 +102,37 @@ static string operandList2str(T o)
     return s.str();
 }
 
+static string operandCodeRef2str(OperandCodeRef ref)
+{
+    assert(ref);
+
+    ostringstream s;
+    Directive d = ref.ref();
+
+    if      (DirectiveLabel             o = d) { s << o.name(); }
+    else if (DirectiveFunction          o = d) { s << o.name(); }
+    else if (DirectiveIndirectFunction  o = d) { s << o.name(); }
+    else if (DirectiveSignature         o = d) { s << o.name(); }
+    else if (DirectiveFbarrier          o = d) { s << o.name(); }
+    else if (DirectiveKernel            o = d) { s << o.name(); }
+    else s << "***UNKNOWN***";
+
+    return s.str();
+}
+
 static void dumpOperand(unsigned idx, Operand opr)
 {
     ostringstream s;
 
     if      (!opr)                            { s << "NULL";  }
-    else if (OperandReg              o = opr) { s << o.reg(); }
-    else if (OperandVector           o = opr) { s << operandVector2str(o); }
-    else if (OperandAddress          o = opr) { s << operandAddress2str(o); } 
-    else if (OperandWavesize         o = opr) { s << "wavesize"; }
-    else if (OperandLabelRef         o = opr) { s << DirectiveLabel(o.ref()).name(); }
-    else if (OperandFunctionRef      o = opr) { s << DirectiveFunction(o.ref()).name(); }
-    else if (OperandSignatureRef     o = opr) { s << DirectiveSignature(o.ref()).name(); }
-    else if (OperandFbarrierRef      o = opr) { s << DirectiveFbarrier(o.ref()).name(); }
-    else if (OperandLabelTargetsRef  o = opr) { s << DirectiveLabelTargets(o.ref()).name(); }
-    else if (OperandLabelVariableRef o = opr) { s << DirectiveVariable(o.ref()).name(); }
-    else if (OperandArgumentList     o = opr) { s << operandList2str(o); }
-    else if (OperandFunctionList     o = opr) { s << operandList2str(o); }
-    else if (OperandImmed            o = opr) { s << operandImmed2str(o); }
-    else                                      { s << "*UNKNOWN*, kind = " << opr.kind(); }
+    else if (OperandReg         o = opr) { s << getRegName(o); }
+    else if (OperandOperandList o = opr) { s << operandVector2str(o); }
+    else if (OperandAddress     o = opr) { s << operandAddress2str(o); } 
+    else if (OperandWavesize    o = opr) { s << "wavesize"; }
+    else if (OperandCodeRef     o = opr) { s << operandCodeRef2str(o); }
+    else if (OperandCodeList    o = opr) { s << operandList2str(o); }
+    else if (OperandData        o = opr) { s << operandData2str(o); }
+    else                                 { s << "*UNKNOWN*, kind = " << opr.kind(); }
 
     dumpProp(getOperandName(idx), s.str());
 }
@@ -147,11 +164,14 @@ static void visitProp(Inst inst, unsigned propId, unsigned propVal)
 
 void dumpTestInst(Inst inst)
 {
-    std::cerr << "==========================================\n";
+    //std::cerr << "==========================================\n";
 
     visitBrigProps(inst);
 
-    for (unsigned i = 0; i < 5; ++i) dumpOperand(i, inst.operand(i));
+    for (int i = 0; i < inst.operands().size(); ++i) 
+    {
+        dumpOperand(i, inst.operand(i));
+    }
 }
 
 }; // namespace TESTGEN

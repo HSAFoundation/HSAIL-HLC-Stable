@@ -64,7 +64,7 @@
 %token <token> INT_TOKEN
 %token <str> STR_TOKEN
 /* Metadata tokens */
-%token <str> MD_VALUE MD_SAMPLER MD_MEMORY MD_COUNTER MD_INT MD_INTLIST
+%token <str> MD_VALUE MD_SAMPLER MD_MEMORY MD_COUNTER MD_INT MD_INTLIST MD_QUEUE
 %token <str> MD_POINTER MD_IMAGE MD_PRINTF MD_STRING MD_LGS MD_SEMAPHORE MD_REFLECTION MD_CONSTARG MD_ERRWAR
 %token <str> ARG_START ARG_END
 /* IL tokens */
@@ -687,6 +687,22 @@ MDStmt
         flagNode->Flag_ = true;
         $$ = flagNode;
         delete $1;
+    }
+	| MD_QUEUE ':' CompoundToken ':' CompoundToken ':' INT_TOKEN ':' INT_TOKEN ':' INT_TOKEN ':' STR_TOKEN
+    {
+        MATCH(MDStmt/MD_QUEUE ':' CompoundToken ':' CompoundToken ':' INT_TOKEN ':' INT_TOKEN ':' INT_TOKEN ':' STR_TOKEN);
+        MDQueue* queueNode = new MDQueue(*$1);
+        queueNode->Arg_ = *$3;
+	queueNode->Type_ = *$5;
+        queueNode->Size_ = $7;
+        queueNode->CBNum_ = $9;
+        queueNode->CBOffset_ = $11;
+        queueNode->MemType_ = *$13;
+        $$ = queueNode;
+        delete $1;
+        delete $3;
+        delete $5;
+        delete $13;
     }
     ;
 

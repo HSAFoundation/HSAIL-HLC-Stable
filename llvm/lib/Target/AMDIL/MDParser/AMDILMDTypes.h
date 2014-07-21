@@ -78,6 +78,7 @@ namespace llvm
   class MDValue;
   class MDPointer;
   class raw_ostream;
+  class MDQueue;
 
   enum MDTypes {
     MDStringsTy  = 0,
@@ -97,6 +98,7 @@ namespace llvm
     MDSemaphoreTy = 14,
     MDReflectionTy = 15,
     MDConstArgTy = 16,
+    MDQueueTy = 17,
     MDLastTy
   };
   //===--------------------- Metadata Node Types ---------------------------===//
@@ -158,6 +160,8 @@ namespace llvm
     virtual MDValue* getMDValue() { return NULL; }
     // Get the type as MDPointer
     virtual MDPointer* getMDPointer() { return NULL; }
+	// Get the type as MDQueue
+    virtual MDQueue* getMDQueue() { return NULL; }
     // Dump the current node
     virtual void dump();
     // Holds the name of the current node
@@ -452,6 +456,22 @@ namespace llvm
     private:
     MDPointer();
   }; // MDPointer
+
+  class MDQueue : public MDArg {
+    friend raw_ostream& operator<<(raw_ostream&, MDQueue&);
+    public:
+    MDQueue(std::string name);
+    ~MDQueue();
+    MDQueue* getMDQueue() { return this; }
+    virtual void dump() LLVM_OVERRIDE;
+    uint32_t Size_;
+    unsigned CBNum_;
+    unsigned CBOffset_;
+    std::string MemType_;
+    std::string Type_;
+    private:
+    MDQueue();
+  }; // MDQueue
 
   //===---------------- Component Node Types -----------------------------===//
   // The component node is the parent node of all the compilation unit node

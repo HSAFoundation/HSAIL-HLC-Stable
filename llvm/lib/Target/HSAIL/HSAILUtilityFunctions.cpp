@@ -538,6 +538,7 @@ HSAILgetTypeName(Type *ptr, const char *symTab,
         case C64:           return "counter64";
         case ReserveId:     return "reserveId";
         case CLKEventT:     return "clk_event_t";
+        case QueueT:        return "queue_t";
         case UnknownOpaque: return "opaque";
       }
     }
@@ -834,42 +835,42 @@ bool hasParametrizedAtomicNoRetVersion(const llvm::MachineInstr *MI, SDNode *Nod
 }
 
 static SDValue generateFenceIntrinsicHelper(SDValue Chain, DebugLoc dl,
-                unsigned brigMemFenceSegmentVal, SDValue brigMemoryOrder,
-                SDValue brigMemoryScope, SelectionDAG &CurDAG) {
-  unsigned fenceOp = HSAILIntrinsic::HSAIL_atomic_memfence;
-  SmallVector<SDValue, 5> Ops;
+                unsigned brigMemoryOrder,
+                unsigned brigGlobalMemoryScope, 
+                unsigned brigGroupMemoryScope, 
+                unsigned brigImageMemoryScope, 
+                SelectionDAG &CurDAG) 
+{
+  unsigned fenceOp = HSAILIntrinsic::HSAIL_memfence;
+  SmallVector<SDValue, 7> Ops;
 
-  SDValue brigMemFenceSegment =
-      CurDAG.getConstant(brigMemFenceSegmentVal, MVT::getIntegerVT(32));
   Ops.push_back(Chain);
   Ops.push_back(CurDAG.getTargetConstant(fenceOp, MVT::i64));
-  Ops.push_back(brigMemFenceSegment);
-  Ops.push_back(brigMemoryOrder);
-  Ops.push_back(brigMemoryScope);
+  Ops.push_back(CurDAG.getConstant(brigMemoryOrder, MVT::getIntegerVT(32)));
+  Ops.push_back(CurDAG.getConstant(brigGlobalMemoryScope, MVT::getIntegerVT(32)));
+  Ops.push_back(CurDAG.getConstant(brigGroupMemoryScope, MVT::getIntegerVT(32)));
+  Ops.push_back(CurDAG.getConstant(brigImageMemoryScope, MVT::getIntegerVT(32)));
   return CurDAG.getNode(ISD::INTRINSIC_VOID, dl, MVT::Other, Ops.data(),
           Ops.size());
 }
 
 SDValue generateFenceIntrinsic(SDValue Chain, DebugLoc dl, unsigned memSeg,
-        SDValue brigMemoryOrder, SDValue brigMemoryScope, SelectionDAG &CurDAG) {
+        unsigned brigMemoryOrder, unsigned brigMemoryScope, SelectionDAG &CurDAG) {
   switch(memSeg) {
     case llvm::HSAILAS::GLOBAL_ADDRESS:
-        return generateFenceIntrinsicHelper(Chain, dl,
-                Brig::BRIG_MEMORY_FENCE_GLOBAL, brigMemoryOrder, brigMemoryScope,
-                CurDAG);
+        return generateFenceIntrinsicHelper(Chain, dl, brigMemoryOrder, 
+          brigMemoryScope, Brig::BRIG_MEMORY_SCOPE_NONE, 
+          Brig::BRIG_MEMORY_SCOPE_NONE, CurDAG);
+
     case llvm::HSAILAS::GROUP_ADDRESS:
-        return generateFenceIntrinsicHelper(Chain, dl,
-                Brig::BRIG_MEMORY_FENCE_GROUP, brigMemoryOrder, brigMemoryScope,
-                CurDAG);
-    case llvm::HSAILAS::FLAT_ADDRESS: {
-        SDValue ResNode = generateFenceIntrinsicHelper(Chain, dl,
-                Brig::BRIG_MEMORY_FENCE_GLOBAL, brigMemoryOrder, brigMemoryScope,
-                CurDAG);
-        return generateFenceIntrinsicHelper(ResNode, dl,
-                Brig::BRIG_MEMORY_FENCE_GROUP, brigMemoryOrder,
-                CurDAG.getConstant(Brig::BRIG_MEMORY_SCOPE_WORKGROUP,
-                MVT::getIntegerVT(32)), CurDAG);
-    }
+        return generateFenceIntrinsicHelper(Chain, dl, brigMemoryOrder, 
+            Brig::BRIG_MEMORY_SCOPE_NONE, brigMemoryScope, 
+            Brig::BRIG_MEMORY_SCOPE_NONE, CurDAG);
+
+    case llvm::HSAILAS::FLAT_ADDRESS:
+        return generateFenceIntrinsicHelper(Chain, dl, brigMemoryOrder, 
+            brigMemoryScope, Brig::BRIG_MEMORY_SCOPE_WORKGROUP, 
+            Brig::BRIG_MEMORY_SCOPE_NONE, CurDAG);
     default: llvm_unreachable("unexpected memory segment ");
   }
 }

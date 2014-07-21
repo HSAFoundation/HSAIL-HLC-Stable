@@ -44,58 +44,58 @@ let isImageInst=1 in {
 
 // read image 1d
 
-def rd_imgf_1d_s32 : ReadImage1D<"rdimage_v4_1d_f32_rwimg_s32">;
-def rd_imgf_1d_f32 : ReadImage1D<"rdimage_v4_1d_f32_rwimg_f32">;
-def rd_imgi_1d_s32 : ReadImage1D<"rdimage_v4_1d_s32_rwimg_s32">;
-def rd_imgi_1d_f32 : ReadImage1D<"rdimage_v4_1d_s32_rwimg_f32">;
-def rd_imgui_1d_s32 : ReadImage1D<"rdimage_v4_1d_u32_rwimg_s32">;
-def rd_imgui_1d_f32 : ReadImage1D<"rdimage_v4_1d_u32_rwimg_f32">;
+def rd_imgf_1d_s32 : ReadImage1D<"rdimage_v4_1d_f32_roimg_s32">;
+def rd_imgf_1d_f32 : ReadImage1D<"rdimage_v4_1d_f32_roimg_f32">;
+def rd_imgi_1d_s32 : ReadImage1D<"rdimage_v4_1d_s32_roimg_s32">;
+def rd_imgi_1d_f32 : ReadImage1D<"rdimage_v4_1d_s32_roimg_f32">;
+def rd_imgui_1d_s32 : ReadImage1D<"rdimage_v4_1d_u32_roimg_s32">;
+def rd_imgui_1d_f32 : ReadImage1D<"rdimage_v4_1d_u32_roimg_f32">;
 
 // read image 1da
 
-def rd_imgf_1da_s32 : ReadImage2D<"rdimage_v4_1da_f32_rwimg_s32">;
-def rd_imgf_1da_f32 : ReadImage2D<"rdimage_v4_1da_f32_rwimg_f32">;
-def rd_imgi_1da_s32 : ReadImage2D<"rdimage_v4_1da_s32_rwimg_s32">;
-def rd_imgi_1da_f32 : ReadImage2D<"rdimage_v4_1da_s32_rwimg_f32">;
-def rd_imgui_1da_s32 : ReadImage2D<"rdimage_v4_1da_u32_rwimg_s32">;
-def rd_imgui_1da_f32 : ReadImage2D<"rdimage_v4_1da_u32_rwimg_f32">;
+def rd_imgf_1da_s32 : ReadImage2D<"rdimage_v4_1da_f32_roimg_s32">;
+def rd_imgf_1da_f32 : ReadImage2D<"rdimage_v4_1da_f32_roimg_f32">;
+def rd_imgi_1da_s32 : ReadImage2D<"rdimage_v4_1da_s32_roimg_s32">;
+def rd_imgi_1da_f32 : ReadImage2D<"rdimage_v4_1da_s32_roimg_f32">;
+def rd_imgui_1da_s32 : ReadImage2D<"rdimage_v4_1da_u32_roimg_s32">;
+def rd_imgui_1da_f32 : ReadImage2D<"rdimage_v4_1da_u32_roimg_f32">;
 
 // read image 2d
 
-def rd_imgf_2d_s32 : ReadImage2D<"rdimage_v4_2d_f32_rwimg_s32">;
-def rd_imgf_2d_f32 : ReadImage2D<"rdimage_v4_2d_f32_rwimg_f32">;
-def rd_imgi_2d_s32 : ReadImage2D<"rdimage_v4_2d_s32_rwimg_s32">;
-def rd_imgi_2d_f32 : ReadImage2D<"rdimage_v4_2d_s32_rwimg_f32">;
-def rd_imgui_2d_s32 : ReadImage2D<"rdimage_v4_2d_u32_rwimg_s32">;
-def rd_imgui_2d_f32 : ReadImage2D<"rdimage_v4_2d_u32_rwimg_f32">;
+def rd_imgf_2d_s32 : ReadImage2D<"rdimage_v4_2d_f32_roimg_s32">;
+def rd_imgf_2d_f32 : ReadImage2D<"rdimage_v4_2d_f32_roimg_f32">;
+def rd_imgi_2d_s32 : ReadImage2D<"rdimage_v4_2d_s32_roimg_s32">;
+def rd_imgi_2d_f32 : ReadImage2D<"rdimage_v4_2d_s32_roimg_f32">;
+def rd_imgui_2d_s32 : ReadImage2D<"rdimage_v4_2d_u32_roimg_s32">;
+def rd_imgui_2d_f32 : ReadImage2D<"rdimage_v4_2d_u32_roimg_f32">;
 
 // read image 2da
 
-def rd_imgf_2da_s32 : ReadImage3D<"rdimage_v4_2da_f32_rwimg_s32">;
-def rd_imgf_2da_f32 : ReadImage3D<"rdimage_v4_2da_f32_rwimg_f32">;
-def rd_imgi_2da_s32 : ReadImage3D<"rdimage_v4_2da_s32_rwimg_s32">;
-def rd_imgi_2da_f32 : ReadImage3D<"rdimage_v4_2da_s32_rwimg_f32">;
-def rd_imgui_2da_s32 : ReadImage3D<"rdimage_v4_2da_u32_rwimg_s32">;
-def rd_imgui_2da_f32 : ReadImage3D<"rdimage_v4_2da_u32_rwimg_f32">;
+def rd_imgf_2da_s32 : ReadImage3D<"rdimage_v4_2da_f32_roimg_s32">;
+def rd_imgf_2da_f32 : ReadImage3D<"rdimage_v4_2da_f32_roimg_f32">;
+def rd_imgi_2da_s32 : ReadImage3D<"rdimage_v4_2da_s32_roimg_s32">;
+def rd_imgi_2da_f32 : ReadImage3D<"rdimage_v4_2da_s32_roimg_f32">;
+def rd_imgui_2da_s32 : ReadImage3D<"rdimage_v4_2da_u32_roimg_s32">;
+def rd_imgui_2da_f32 : ReadImage3D<"rdimage_v4_2da_u32_roimg_f32">;
 
 // read image 3d
 
-def rd_imgf_3d_s32 : ReadImage3D<"rdimage_v4_3d_f32_rwimg_s32">;
-def rd_imgf_3d_f32 : ReadImage3D<"rdimage_v4_3d_f32_rwimg_f32">;
-def rd_imgi_3d_s32 : ReadImage3D<"rdimage_v4_3d_s32_rwimg_s32">;
-def rd_imgi_3d_f32 : ReadImage3D<"rdimage_v4_3d_s32_rwimg_f32">;
-def rd_imgui_3d_s32 : ReadImage3D<"rdimage_v4_3d_u32_rwimg_s32">;
-def rd_imgui_3d_f32 : ReadImage3D<"rdimage_v4_3d_u32_rwimg_f32">;
+def rd_imgf_3d_s32 : ReadImage3D<"rdimage_v4_3d_f32_roimg_s32">;
+def rd_imgf_3d_f32 : ReadImage3D<"rdimage_v4_3d_f32_roimg_f32">;
+def rd_imgi_3d_s32 : ReadImage3D<"rdimage_v4_3d_s32_roimg_s32">;
+def rd_imgi_3d_f32 : ReadImage3D<"rdimage_v4_3d_s32_roimg_f32">;
+def rd_imgui_3d_s32 : ReadImage3D<"rdimage_v4_3d_u32_roimg_s32">;
+def rd_imgui_3d_f32 : ReadImage3D<"rdimage_v4_3d_u32_roimg_f32">;
 
 // OpenCL 2.0 rd2ddepth
 
-def rd_imgf_2ddepth_s32 : ReadImage2DDepth<"rdimage_2ddepth_f32_rwimg_s32">;
-def rd_imgf_2ddepth_f32 : ReadImage2DDepth<"rdimage_2ddepth_f32_rwimg_f32">;
+def rd_imgf_2ddepth_s32 : ReadImage2DDepth<"rdimage_2ddepth_f32_roimg_s32">;
+def rd_imgf_2ddepth_f32 : ReadImage2DDepth<"rdimage_2ddepth_f32_roimg_f32">;
 
 // OpenCL 2.0 rd2dadepth
 
-def rd_imgf_2dadepth_s32 : ReadImage2DArrayDepth<"rdimage_2dadepth_f32_rwimg_s32">;
-def rd_imgf_2dadepth_f32 : ReadImage2DArrayDepth<"rdimage_2dadepth_f32_rwimg_f32">;
+def rd_imgf_2dadepth_s32 : ReadImage2DArrayDepth<"rdimage_2dadepth_f32_roimg_s32">;
+def rd_imgf_2dadepth_f32 : ReadImage2DArrayDepth<"rdimage_2dadepth_f32_roimg_f32">;
 
 }
 
@@ -140,59 +140,59 @@ let isImageInst=1 in {
 
 // read image 1d
 
-def rd_imgf_1d_s32_095 : ReadImage1D_095<"rdimage_v4_1d_f32_rwimg_s32">;
-def rd_imgf_1d_f32_095 : ReadImage1D_095<"rdimage_v4_1d_f32_rwimg_f32">;
-def rd_imgi_1d_s32_095 : ReadImage1D_095<"rdimage_v4_1d_s32_rwimg_s32">;
-def rd_imgi_1d_f32_095 : ReadImage1D_095<"rdimage_v4_1d_s32_rwimg_f32">;
-def rd_imgui_1d_s32_095 : ReadImage1D_095<"rdimage_v4_1d_u32_rwimg_s32">;
-def rd_imgui_1d_f32_095 : ReadImage1D_095<"rdimage_v4_1d_u32_rwimg_f32">;
+def rd_imgf_1d_s32_095 : ReadImage1D_095<"rdimage_v4_1d_f32_roimg_s32">;
+def rd_imgf_1d_f32_095 : ReadImage1D_095<"rdimage_v4_1d_f32_roimg_f32">;
+def rd_imgi_1d_s32_095 : ReadImage1D_095<"rdimage_v4_1d_s32_roimg_s32">;
+def rd_imgi_1d_f32_095 : ReadImage1D_095<"rdimage_v4_1d_s32_roimg_f32">;
+def rd_imgui_1d_s32_095 : ReadImage1D_095<"rdimage_v4_1d_u32_roimg_s32">;
+def rd_imgui_1d_f32_095 : ReadImage1D_095<"rdimage_v4_1d_u32_roimg_f32">;
 
 // read image 1da
 
-def rd_imgf_1da_s32_095 : ReadImage2D_095<"rdimage_v4_1da_f32_rwimg_s32">;
-def rd_imgf_1da_f32_095 : ReadImage2D_095<"rdimage_v4_1da_f32_rwimg_f32">;
-def rd_imgi_1da_s32_095 : ReadImage2D_095<"rdimage_v4_1da_s32_rwimg_s32">;
-def rd_imgi_1da_f32_095 : ReadImage2D_095<"rdimage_v4_1da_s32_rwimg_f32">;
-def rd_imgui_1da_s32_095 : ReadImage2D_095<"rdimage_v4_1da_u32_rwimg_s32">;
-def rd_imgui_1da_f32_095 : ReadImage2D_095<"rdimage_v4_1da_u32_rwimg_f32">;
+def rd_imgf_1da_s32_095 : ReadImage2D_095<"rdimage_v4_1da_f32_roimg_s32">;
+def rd_imgf_1da_f32_095 : ReadImage2D_095<"rdimage_v4_1da_f32_roimg_f32">;
+def rd_imgi_1da_s32_095 : ReadImage2D_095<"rdimage_v4_1da_s32_roimg_s32">;
+def rd_imgi_1da_f32_095 : ReadImage2D_095<"rdimage_v4_1da_s32_roimg_f32">;
+def rd_imgui_1da_s32_095 : ReadImage2D_095<"rdimage_v4_1da_u32_roimg_s32">;
+def rd_imgui_1da_f32_095 : ReadImage2D_095<"rdimage_v4_1da_u32_roimg_f32">;
 
 // read image 2d
 
-def rd_imgf_2d_s32_095 : ReadImage2D_095<"rdimage_v4_2d_f32_rwimg_s32">;
-def rd_imgf_2d_f32_095 : ReadImage2D_095<"rdimage_v4_2d_f32_rwimg_f32">;
-def rd_imgi_2d_s32_095 : ReadImage2D_095<"rdimage_v4_2d_s32_rwimg_s32">;
-def rd_imgi_2d_f32_095 : ReadImage2D_095<"rdimage_v4_2d_s32_rwimg_f32">;
-def rd_imgui_2d_s32_095 : ReadImage2D_095<"rdimage_v4_2d_u32_rwimg_s32">;
-def rd_imgui_2d_f32_095 : ReadImage2D_095<"rdimage_v4_2d_u32_rwimg_f32">;
+def rd_imgf_2d_s32_095 : ReadImage2D_095<"rdimage_v4_2d_f32_roimg_s32">;
+def rd_imgf_2d_f32_095 : ReadImage2D_095<"rdimage_v4_2d_f32_roimg_f32">;
+def rd_imgi_2d_s32_095 : ReadImage2D_095<"rdimage_v4_2d_s32_roimg_s32">;
+def rd_imgi_2d_f32_095 : ReadImage2D_095<"rdimage_v4_2d_s32_roimg_f32">;
+def rd_imgui_2d_s32_095 : ReadImage2D_095<"rdimage_v4_2d_u32_roimg_s32">;
+def rd_imgui_2d_f32_095 : ReadImage2D_095<"rdimage_v4_2d_u32_roimg_f32">;
 
 
 // read image 2da
 
-def rd_imgf_2da_s32_095 : ReadImage3D_095<"rdimage_v4_2da_f32_rwimg_s32">;
-def rd_imgf_2da_f32_095 : ReadImage3D_095<"rdimage_v4_2da_f32_rwimg_f32">;
-def rd_imgi_2da_s32_095 : ReadImage3D_095<"rdimage_v4_2da_s32_rwimg_s32">;
-def rd_imgi_2da_f32_095 : ReadImage3D_095<"rdimage_v4_2da_s32_rwimg_f32">;
-def rd_imgui_2da_s32_095 : ReadImage3D_095<"rdimage_v4_2da_u32_rwimg_s32">;
-def rd_imgui_2da_f32_095 : ReadImage3D_095<"rdimage_v4_2da_u32_rwimg_f32">;
+def rd_imgf_2da_s32_095 : ReadImage3D_095<"rdimage_v4_2da_f32_roimg_s32">;
+def rd_imgf_2da_f32_095 : ReadImage3D_095<"rdimage_v4_2da_f32_roimg_f32">;
+def rd_imgi_2da_s32_095 : ReadImage3D_095<"rdimage_v4_2da_s32_roimg_s32">;
+def rd_imgi_2da_f32_095 : ReadImage3D_095<"rdimage_v4_2da_s32_roimg_f32">;
+def rd_imgui_2da_s32_095 : ReadImage3D_095<"rdimage_v4_2da_u32_roimg_s32">;
+def rd_imgui_2da_f32_095 : ReadImage3D_095<"rdimage_v4_2da_u32_roimg_f32">;
 
 // read image 3d
 
-def rd_imgf_3d_s32_095 : ReadImage3D_095<"rdimage_v4_3d_f32_rwimg_s32">;
-def rd_imgf_3d_f32_095 : ReadImage3D_095<"rdimage_v4_3d_f32_rwimg_f32">;
-def rd_imgi_3d_s32_095 : ReadImage3D_095<"rdimage_v4_3d_s32_rwimg_s32">;
-def rd_imgi_3d_f32_095 : ReadImage3D_095<"rdimage_v4_3d_s32_rwimg_f32">;
-def rd_imgui_3d_s32_095 : ReadImage3D_095<"rdimage_v4_3d_u32_rwimg_s32">;
-def rd_imgui_3d_f32_095 : ReadImage3D_095<"rdimage_v4_3d_u32_rwimg_f32">;
+def rd_imgf_3d_s32_095 : ReadImage3D_095<"rdimage_v4_3d_f32_roimg_s32">;
+def rd_imgf_3d_f32_095 : ReadImage3D_095<"rdimage_v4_3d_f32_roimg_f32">;
+def rd_imgi_3d_s32_095 : ReadImage3D_095<"rdimage_v4_3d_s32_roimg_s32">;
+def rd_imgi_3d_f32_095 : ReadImage3D_095<"rdimage_v4_3d_s32_roimg_f32">;
+def rd_imgui_3d_s32_095 : ReadImage3D_095<"rdimage_v4_3d_u32_roimg_s32">;
+def rd_imgui_3d_f32_095 : ReadImage3D_095<"rdimage_v4_3d_u32_roimg_f32">;
 
 // OpenCL 2.0 rd2ddepth
 
-def rd_imgf_2ddepth_s32_095 : ReadImage2DDepth_095<"rdimage_2ddepth_f32_rwimg_s32">;
-def rd_imgf_2ddepth_f32_095 : ReadImage2DDepth_095<"rdimage_2ddepth_f32_rwimg_f32">;
+def rd_imgf_2ddepth_s32_095 : ReadImage2DDepth_095<"rdimage_2ddepth_f32_roimg_s32">;
+def rd_imgf_2ddepth_f32_095 : ReadImage2DDepth_095<"rdimage_2ddepth_f32_roimg_f32">;
 
 // OpenCL 2.0 rd2dadepth
 
-def rd_imgf_2dadepth_s32_095 : ReadImage2DArrayDepth_095<"rdimage_2dadepth_f32_rwimg_s32">;
-def rd_imgf_2dadepth_f32_095 : ReadImage2DArrayDepth_095<"rdimage_2dadepth_f32_rwimg_f32">;
+def rd_imgf_2dadepth_s32_095 : ReadImage2DArrayDepth_095<"rdimage_2dadepth_f32_roimg_s32">;
+def rd_imgf_2dadepth_f32_095 : ReadImage2DArrayDepth_095<"rdimage_2dadepth_f32_roimg_f32">;
 
 }
 

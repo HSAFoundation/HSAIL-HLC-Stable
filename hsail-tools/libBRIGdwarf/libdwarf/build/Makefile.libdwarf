@@ -1,6 +1,7 @@
 # -*- mode: makefile; -*-
-ASM_DEPTH = $(COMPONENT_DEPTH)/../..
-include $(COMPONENT_DEPTH)/libdwarfdefs
+HT_DEPTH = $(COMPONENT_DEPTH)/../..
+
+include $(HT_DEPTH)/htdefs
 
 #
 ## Targets
@@ -13,15 +14,19 @@ CFILES := $(notdir $(wildcard $(COMPONENT_DEPTH)/src/*.c))
 
 
 LCINCS += $(INCSWITCH) "$(COMPONENT_DEPTH)/src" \
-          $(INCSWITCH) "$(OPENCL_DEPTH)/compiler/lib/loaders/elf/utils/libelf" \
-          $(INCSWITCH) "$(OPENCL_DEPTH)/compiler/lib/loaders/elf/utils/common"
+          $(LIBBRIGDWARF_LIBELF_INCS)
 
 ifdef ATI_OS_WINDOWS
 LCINCS += $(INCSWITCH) "$(OPENCL_DEPTH)/compiler/lib/loaders/elf/utils/common/win32"
+
+SUPPRESSED_WARNINGS = -wd4244 -wd4018 -wd4101 -wd4267
+GCOPTS += $(SUPPRESSED_WARNINGS)
+GCXXOPTS += $(SUPPRESSED_WARNINGS)
 endif
 
 ifdef ATI_OS_LINUX
 GCOPTS := $(filter-out -Werror,$(GCOPTS))
 endif
 
-include $(OPENCL_DEPTH)/openclrules
+include $(HT_DEPTH)/htrules
+

@@ -239,6 +239,19 @@ struct BrigTypePacked : BrigTypeAnyPacked {
     typedef MySmallArray<typename ElementType::CType,N> CType;
 };
 
+template <> struct BrigType<Brig::BRIG_TYPE_SIG32>   : BrigTypeAny {
+    static const Brig::BrigTypeX value = Brig::BRIG_TYPE_SIG32;
+    typedef uint64_t CType;
+    typedef BrigType<Brig::BRIG_TYPE_B64>  asBitType;
+};
+
+template <> struct BrigType<Brig::BRIG_TYPE_SIG64>   : BrigTypeAny {
+    static const Brig::BrigTypeX value = Brig::BRIG_TYPE_SIG64;
+    typedef uint64_t CType;
+    typedef BrigType<Brig::BRIG_TYPE_B64>  asBitType;
+};
+
+
 // bitstrings
 template <> struct BrigType<Brig::BRIG_TYPE_B1>   : BrigTypeB {
     static const Brig::BrigTypeX value = Brig::BRIG_TYPE_B1;

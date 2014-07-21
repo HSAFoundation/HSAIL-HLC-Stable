@@ -10,7 +10,7 @@ else
 _GCC = 1
 endif
 
-LIBS := curses
+LIBS := $(_LIBS)
 LIBPATHS :=
 ARFLAGS =
 
@@ -32,7 +32,7 @@ else # !_WINDOWS
 MKDIR = mkdir -p $(@D)
 CLEAN_BUILD_DIR = rm -rf $(BUILD_DIR)
 WITH_LIBBRIGDWARF=1
-override CXXFLAGS += -fPIC -fno-rtti
+override CXXFLAGS += -fPIC -fno-rtti -std=c++11
 LIBS +=  dl pthread
 CONFIG := linux
 EXE_SUFFIX :=
@@ -64,11 +64,17 @@ else
 LLVM_SUBDIR = Debug
 endif
 
+ifdef _STATIC
+VCRT := -MT
+else
+VCRT := -MD
+endif
+
 ifdef _DBG
 CONFIG := $(CONFIG)_dbg
-override CXXFLAGS += -Z7 -Od -D_DEBUG -MDd
+override CXXFLAGS += -Z7 -Od -D_DEBUG $(VCRT)d
 else
-override CXXFLAGS += -MD
+override CXXFLAGS += $(VCRT)
 endif
 
 ifdef _M64
@@ -159,7 +165,7 @@ endif
 LLVM_LIBDIR = $(LLVM_BUILD)/lib
 
 #CXXFLAGS +=  -Wall -Wno-reorder -Wno-unused -Wno-deprecated -Werror -pipe  -fmerge-all-constants -fno-tree-vectorize -fno-strict-aliasing
-override CXXFLAGS +=  -Wno-reorder -Wno-unused -Wno-deprecated -fno-strict-aliasing -fexceptions
+override CXXFLAGS +=  -Wno-reorder -Wno-unused -Wno-deprecated -fno-strict-aliasing
 
 CXX ?= g++
 override CXXFLAGS += -fno-rtti -c -o $@
@@ -220,7 +226,9 @@ LIBHSAIL_LIB  = $(BUILD_DIR)/$(LIB_PREFIX)hsail$(LIB_SUFFIX)
 LIBHSAIL_SRCS = $(wildcard $(LIBHSAIL_DIR)/*.cpp)
 LIBHSAIL_OBJS = $(LIBHSAIL_SRCS:%.cpp=$(BUILD_DIR)/o_%$(OBJ_SUFFIX))
 
+ifdef _GCC
 -include $(LIBHSAIL_SRCS:%.cpp=$(BUILD_DIR)/o_%.d)
+endif
 
 $(LIBHSAIL_OBJS) : | $(BUILD_DIR)/o_$(LIBHSAIL_DIR)/.dummy
 
@@ -258,7 +266,9 @@ LIBBRIGDWARF_LIB  = $(BUILD_DIR)/$(LIB_PREFIX)brigdwarf$(LIB_SUFFIX)
 LIBBRIGDWARF_SRCS = $(wildcard $(LIBBRIGDWARF_DIR)/*.cpp)
 LIBBRIGDWARF_OBJS = $(LIBBRIGDWARF_SRCS:%.cpp=$(BUILD_DIR)/o_%$(OBJ_SUFFIX))
 
+ifdef _GCC
 -include $(LIBBRIGDWARF_SRCS:%.cpp=$(BUILD_DIR)/o_%.d)
+endif
 
 $(LIBBRIGDWARF_OBJS) : | $(BUILD_DIR)/o_$(LIBBRIGDWARF_DIR)/.dummy
 
@@ -278,7 +288,9 @@ HSAILASM_EXE  = $(BUILD_DIR)/hsailasm$(EXE_SUFFIX)
 HSAILASM_SRCS = $(wildcard $(HSAILASM_DIR)/*.cpp)
 HSAILASM_OBJS = $(HSAILASM_SRCS:%.cpp=$(BUILD_DIR)/o_%$(OBJ_SUFFIX))
 
+ifdef _GCC
 -include $(HSAILASM_SRCS:%.cpp=$(BUILD_DIR)/o_%.d)
+endif
 
 $(HSAILASM_OBJS) : | $(BUILD_DIR)/o_$(HSAILASM_DIR)/.dummy
 

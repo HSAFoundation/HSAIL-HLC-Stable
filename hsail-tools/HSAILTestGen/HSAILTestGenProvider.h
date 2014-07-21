@@ -115,9 +115,9 @@ private:
 public:
     static TestGen* create(unsigned opcode, bool isBasicFormat = false) 
     { 
-        assert(!isBasicFormat || getFormat(opcode) == Brig::BRIG_INST_MOD);
+        assert(!isBasicFormat || getFormat(opcode) == Brig::BRIG_KIND_INST_MOD);
 
-        unsigned format = isBasicFormat? Brig::BRIG_INST_BASIC : getFormat(opcode);
+        unsigned format = isBasicFormat? Brig::BRIG_KIND_INST_BASIC : getFormat(opcode);
 
         TestGen* test = new TestGen(format, opcode, isBasicFormat);
 
@@ -126,7 +126,7 @@ public:
         return test;
     }
 
-    void dump() { dumpTestInst(positiveSample.getInst()); }
+    void dump() { /*dumpTestInst(positiveSample.getInst());*/ }
 
     static void init();
     static void clean();
@@ -285,7 +285,7 @@ private:
         assert(idx <= prmPropCurrent);
         assert(PropDesc::isValidInst(positiveSample.getInst()));
 
-        negativeSample.copyFrom(positiveSample);
+        negativeSample.copyFrom(positiveSample, false);
         negativeSample.set(propId, val);
         return !PropDesc::validatePrimaryProps(negativeSample.getInst()); 
     }
@@ -299,7 +299,7 @@ private:
 
         assert(PropDesc::isValidInst(positiveSample.getInst()));
 
-        negativeSample.copyFrom(positiveSample);
+        negativeSample.copyFrom(positiveSample, false);
         negativeSample.set(propId, val);
         return !isValidProp(negativeSample.getInst(), propId); 
     }

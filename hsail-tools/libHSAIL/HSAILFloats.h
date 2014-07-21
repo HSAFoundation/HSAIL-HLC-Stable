@@ -106,6 +106,10 @@ public:
       return res;
     }
 
+    f32_t neg() const {
+        return fromRawBits(m_uint32 ^ 0x80000000u);
+    }
+
     float floatValue() const { return m_value; }
 
 private:
@@ -136,6 +140,10 @@ public:
       return res;
     }
 
+    f64_t neg() const {
+        return fromRawBits(m_uint64 ^ 0x8000000000000000ull);
+    }
+
     double floatValue() const { return m_value; }
 
 private:
@@ -162,6 +170,10 @@ public:
         f16_t res;
         res.m_value = v;
         return res;
+    }
+
+    f16_t neg() const {
+        return fromRawBits(m_value ^ 0x8000u);
     }
 
     float floatValue() const { return f32().floatValue(); }

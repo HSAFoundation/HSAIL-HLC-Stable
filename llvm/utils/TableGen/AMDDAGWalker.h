@@ -20,7 +20,6 @@ public:
   DAGWalker(std::ostringstream & O, int vec_size = 1):
       printer(O),
       m_state(PS_START),
-      m_offset(0),
       m_opNum(0),
       m_vec_size(vec_size)
       {
@@ -65,12 +64,6 @@ private:
   //raw_ostream & printer;
   std::ostringstream & printer;
   ParseState m_state;
-
-  // Offset between BRIG operand number and llvm Machine operand number
-  // Now it's always negative. 
-  // For example in case of vector operations it will be negative
-  // And in case of operations with width argument it will be positive
-  int m_offset;
 
   unsigned m_opNum;
 

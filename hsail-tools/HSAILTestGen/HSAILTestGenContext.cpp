@@ -9,8 +9,7 @@ namespace TESTGEN {
 #define IMM_DEFAULT
 
 #ifdef IMM_DEFAULT
-static const uint64_t imm1_x   = 0xFFFFFFFFFFFFFFFFULL;
-static const uint64_t imm8_x   = 0xFFFFFFFFFFFFFFFFULL;
+static const uint64_t imm8_x   = 0x1;
 static const uint64_t imm16_x  = 0xFFFFFFFFFFFFFFFFULL;
 static const uint64_t imm32_x  = 0xFFFFFFFFFFFFFFFFULL;
 static const uint64_t imm64_x  = 0xFFFFFFFFFFFFFFFFULL;
@@ -18,7 +17,6 @@ static const uint64_t imm128_h = 0x0;
 static const uint64_t imm128_l = 7777777777777777777ULL;
 #else
 static const uint64_t imm1_x   = 0x1U;
-static const uint64_t imm8_x   = 0x7FU;
 static const uint64_t imm16_x  = 0x7FFFU;
 static const uint64_t imm32_x  = 0x7FFFFFFFU;
 static const uint64_t imm64_x  = 0x7FFFFFFFFFFFFFFFULL;
@@ -45,12 +43,12 @@ Operand Context::getOperand(unsigned oprId)
     {
     case O_NULL:          opr = Operand(&getContainer(), 0);       break; // FIXME: revise using and creating O_NULL
 
-    case O_CREG:          opr = emitReg(1);               break;
-    case O_SREG:          opr = emitReg(32);              break;
-    case O_DREG:          opr = emitReg(64);              break;
-    case O_QREG:          opr = emitReg(128);             break;
+    case O_CREG:          opr = emitReg(1, 0);            break;
+    case O_SREG:          opr = emitReg(32, 0);           break;
+    case O_DREG:          opr = emitReg(64, 0);           break;
+    case O_QREG:          opr = emitReg(128, 0);          break;
                                                          
-    case O_IMM1_X:        opr = emitImm(1,   imm1_x );    break;
+//    case O_IMM1_X:        opr = emitImm(1,   imm1_x );    break;
     case O_IMM8_X:        opr = emitImm(8,   imm8_x );    break;
     case O_IMM16_X:       opr = emitImm(16,  imm16_x);    break;
     case O_IMM32_X:       opr = emitImm(32,  imm32_x);    break;
@@ -106,8 +104,8 @@ Operand Context::getOperand(unsigned oprId)
                          
     case O_WAVESIZE:      opr = emitWavesize();              break;
 
-    case O_ADDRESS_FLAT_REG:       opr = emitAddrRef(Directive(), emitReg(machineSize)); break;
-    case O_ADDRESS_FLAT_OFF:       opr = emitAddrRef(Directive());        break;
+    case O_ADDRESS_FLAT_REG: opr = emitAddrRef(DirectiveVariable(), emitReg(machineSize, 0)); break;
+    case O_ADDRESS_FLAT_OFF: opr = emitAddrRef(DirectiveVariable());        break;
 
     case O_ADDRESS_GLOBAL_VAR:     
     case O_ADDRESS_READONLY_VAR:                                                                       
@@ -125,7 +123,10 @@ Operand Context::getOperand(unsigned oprId)
     case O_ADDRESS_READONLY_SIG32: 
     case O_ADDRESS_READONLY_SIG64:                                 
     case O_FUNCTIONREF:            
+    case O_IFUNCTIONREF:            
+    case O_KERNELREF:
     case O_FBARRIERREF:            
+    case O_SIGNATUREREF:
     case O_LABELREF:               opr = emitOperandRef(operandId2SymId(oprId)); break;
 
     case O_JUMPTAB: assert(false); break; // Currently not used
@@ -154,9 +155,27 @@ Directive Context::emitSymbol(unsigned symId)
     }
     else if (symId == SYM_FUNC)
     {
-        Directive fn = emitFuncStart(name, 0, 0); 
-        emitFuncEnd(fn); 
+        DirectiveFunction fn = emitSbrStart<DirectiveFunction>(name, 0, 0); 
+        emitSbrEnd(fn); 
         return fn;
+    }
+    else if (symId == SYM_IFUNC)
+    {
+        DirectiveIndirectFunction fn = emitSbrStart<DirectiveIndirectFunction>(name, 0, 0); 
+        emitSbrEnd(fn); 
+        return fn;
+    }
+    else if (symId == SYM_KERNEL)
+    {
+        DirectiveKernel k = emitSbrStart<DirectiveKernel>(name, 0, 0); 
+        emitSbrEnd(k); 
+        return k;
+    }
+    else if (symId == SYM_SIGNATURE)
+    {
+        DirectiveSignature sig = emitSbrStart<DirectiveSignature>(name, 0, 0); 
+        emitSbrEnd(sig); 
+        return sig;
     }
     else
     {
@@ -185,8 +204,11 @@ Operand Context::emitOperandRef(unsigned symId)
     {
     case SYM_LABEL:                           return emitLabelRef(getSymName(symId));
     case SYM_FUNC:     assert(symTab[symId]); return emitFuncRef(symTab[symId]);
+    case SYM_IFUNC:    assert(symTab[symId]); return emitIFuncRef(symTab[symId]);
+    case SYM_KERNEL:   assert(symTab[symId]); return emitKernelRef(symTab[symId]);
+    case SYM_SIGNATURE:assert(symTab[symId]); return emitSignatureRef(symTab[symId]);
     case SYM_FBARRIER: assert(symTab[symId]); return emitFBarrierRef(symTab[symId]);
-    default:           assert(symTab[symId]); return emitAddrRef(symTab[symId]);
+    default:           assert(symTab[symId]); return emitAddrRef(DirectiveVariable(symTab[symId]));
     }
 }
 

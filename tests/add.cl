@@ -1,8 +1,10 @@
-__kernel void test_int_add(__global int *dst, __global int *src)
+static global int a = 999;
+
+__kernel void test_int_add(__global int *dst)
 {
     int tid;
     tid = get_global_id(0);
 
-    dst[tid] = src[tid] + 10;
+    dst[tid] = a;
 }
 

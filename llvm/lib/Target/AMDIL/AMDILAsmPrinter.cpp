@@ -827,11 +827,7 @@ void AMDILAsmPrinter::EmitFunctionBodyStart() {
     StringRef StubName
       = UseMacroForCall ? mMeta->getStubName() : StringRef(mName);
     uint32_t StubID = mAMI->getOrCreateFunctionID(StubName);
-    if (0 && UseMacroForCall) {
-      O << "mcall(" << StubID << ") (), () ; " << StubName << "\n";
-    } else {
-      O << "call " << StubID << " ; " << StubName << "\n";
-    }
+    O << "call " << StubID << " ; " << StubName << "\n";
     mMeta->printWrapperFooter(O);
     mMeta->printMetaData(O, mMeta->getID(), true);
   }

@@ -84,95 +84,6 @@ static cl::opt<unsigned>
 AMDILCallStackSize("amdil-call-stack-size", cl::init(0), cl::Hidden,
   cl::desc("The call stack size for AMDIL"));
 
-//#if 0
-void printRegName(AMDILAsmPrinter *RegNames,
-                  unsigned Reg,
-                  raw_ostream &O,
-                  bool Dst,
-                  bool Dupe = false) {
-  if (isXComponentReg(Reg)) {
-    O << RegNames->getRegisterName(Reg) << ".x";
-  } else if (isYComponentReg(Reg)) {
-    O << RegNames->getRegisterName(Reg) << ".y";
-  } else if (isZComponentReg(Reg)) {
-    O << RegNames->getRegisterName(Reg) << ".z";
-  } else if (isWComponentReg(Reg)) {
-    O << RegNames->getRegisterName(Reg) << ".w";
-  } else if (isXYComponentReg(Reg)) {
-    O << RegNames->getRegisterName(Reg)
-      << (Dst ? ".xy__" : (Dupe ? ".xyxy" : ".xy00"));
-  } else if (isZWComponentReg(Reg)) {
-    O << RegNames->getRegisterName(Reg)
-      << (Dst ? ".__zw" : (Dupe ? ".zwzw" : ".00zw"));
-  } else {
-    O << RegNames->getRegisterName(Reg);
-  }
-}
-
-// For the given register used for formal arguments, return the corresponding
-// register used for actual arguments at call sites.
-// FIXME: Create the wrapper function for kernels before lowering so that
-// setup of kernel arguments are done during lowering instead of being done
-// during AsmPrinter pass.
-unsigned AMDILKernelManager::getActualArgReg(unsigned FormalReg) {
-#if 0
-  if (!mSTM->isSupported(AMDIL::Caps::UseMacroForCall)) {
-    return FormalReg;
-  }
-#endif
-
-  if (isXComponentReg(FormalReg))
-    return FormalReg - AMDIL::INx0 + AMDIL::Rx1;
-  if (isYComponentReg(FormalReg))
-    return FormalReg - AMDIL::INy0 + AMDIL::Ry1;
-  if (isZComponentReg(FormalReg))
-    return FormalReg - AMDIL::INz0 + AMDIL::Rz1;
-  if (isWComponentReg(FormalReg))
-    return FormalReg - AMDIL::INw0 + AMDIL::Rw1;
-  if (isXYComponentReg(FormalReg))
-    return FormalReg - AMDIL::INxy0 + AMDIL::Rxy1;
-  if (isZWComponentReg(FormalReg))
-    return FormalReg - AMDIL::INzw0 + AMDIL::Rzw1;
-  return FormalReg - AMDIL::IN0 + AMDIL::R1;
-}
-
-const char* getFirstComponent(unsigned Reg, unsigned FCall) {
-  if (isXComponentReg(Reg) || isYComponentReg(Reg) ||
-      isZComponentReg(Reg) || isWComponentReg(Reg)) {
-    return ".x";
-  } else if (isXYComponentReg(Reg)) {
-    switch (FCall) {
-      case 1090:
-      case 1091:
-      case 1092:
-        return ".xx";
-      default:
-        return ".xy";
-    }
-  } else if (isZWComponentReg(Reg)) {
-    switch (FCall) {
-      case 1090:
-      case 1091:
-      case 1092:
-        return ".00xx";
-      default:
-        return ".00xy";
-    }
-  } else {
-    switch (FCall) {
-      case 1090:
-      case 1091:
-        return ".xxxx";
-      case 1092:
-      case 1093:
-        return ".xxyy";
-      default:
-        return ".xyzw";
-    }
-  }
-}
-//#endif
-
 static bool errorPrint(const char *Ptr, raw_ostream &O) {
   if (Ptr[0] == 'E') {
     O << ";error:" << Ptr << '\n';
@@ -358,9 +269,7 @@ AMDILKernelManager::AMDILKernelManager(MachineFunction *MF)
 
   mKernelName = MF->getName();
   mName = AMDSymbolNames::undecorateKernelFunctionName(mKernelName);
-  mStubName = (1 || mSTM->isSupported(AMDIL::Caps::UseMacroForCall)) ?
-      AMDSymbolNames::decorateStubFunctionName(mName) : mName;
-
+  mStubName = AMDSymbolNames::decorateStubFunctionName(mName);
 }
 
 AMDILKernelManager::~AMDILKernelManager() {
@@ -938,122 +847,6 @@ void AMDILKernelManager::setName(StringRef Name) {
 bool AMDILKernelManager::wasKernel() {
   return mWasKernel;
 }
-//#if 0
-void AMDILKernelManager::printConstantToRegMapping(
-       AMDILAsmPrinter *RegNames,
-       unsigned &LII,
-       raw_ostream &O,
-       uint32_t &Counter,
-       uint32_t Buffer,
-       uint32_t N,
-       const char *Lit,
-       uint32_t FCall,
-       bool IsImage,
-       bool IsHWCB) {
-  // TODO: This needs to be enabled or SC will never statically index into the
-  // CB when a pointer is used.
-  if (mSTM->usesHardware(AMDIL::Caps::ConstantMem) && IsHWCB) {
-    O << "mov ";
-    printRegName(RegNames, getActualArgReg(mMFI->getArgReg(LII)), O, true);
-    O << ", l5.x\n";
-    ++LII;
-    Counter++;
-    return;
-  }
-
-  for (uint32_t I = 0; I < N; ++I) {
-    uint32_t Reg = getActualArgReg(mMFI->getArgReg(LII));
-    const char *RegName = RegNames->getRegisterName(Reg);
-    O << "mov ";
-    printRegName(RegNames, Reg, O, true);
-    if (IsImage) {
-      O << ", l" << mMFI->getLitIdx(Counter++) << "\n";
-    } else {
-      O << ", cb" <<Buffer<< "[" <<Counter++<< "]"
-        << getFirstComponent(Reg, FCall) << "\n";
-    }
-    switch (FCall) {
-    case 1093:
-    case 1092:
-      O << "ishr ";
-      printRegName(RegNames, Reg, O, true);
-      O << ", ";
-      printRegName(RegNames, Reg, O, false);
-      O << ", l3.0y0y\n";
-      if (!Lit) {
-        O << "ishl " << RegName << ", " << RegName<< ", l3.z\n";
-        O << "ishr " << RegName << ", " << RegName<< ", l3.z\n";
-      }
-      break;
-    case 1091:
-      O << "ishr ";
-      printRegName(RegNames, Reg, O, true);
-      O << ", ";
-      printRegName(RegNames, Reg, O, false);
-      O << ", l3.0zyx\n";
-      if (!Lit) {
-        O << "ishl " << RegName << ", " << RegName<< ", l3.x\n";
-        O << "ishr " << RegName << ", " << RegName<< ", l3.x\n";
-      }
-      break;
-    case 1090:
-      O << "ishr ";
-      printRegName(RegNames, Reg, O, true);
-      O << ", ";
-      printRegName(RegNames, Reg, O, false);
-      O << ", l3.0z0z\n";
-      if (!Lit) {
-        O << "ishl " << RegName << ", " << RegName<< ", l3.x\n";
-        O << "ishr " << RegName << ", " << RegName<< ", l3.x\n";
-      }
-      break;
-    default:
-      break;
-    }
-
-    if (Lit) {
-      O << "ishl " ;
-      printRegName(RegNames, Reg, O, true);
-      O << ", ";
-      printRegName(RegNames, Reg, O, false, true);
-      O << ", " << Lit << "\nishr ";
-      printRegName(RegNames, Reg, O, true);
-      O << ", ";
-      printRegName(RegNames, Reg, O, false, true);
-      O << ", " << Lit << "\n";
-    }
-    ++LII;
-    if (IsImage) {
-      Counter += NUM_EXTRA_SLOTS_PER_IMAGE;
-    }
-  }
-}
-
-void AMDILKernelManager::printCopyStructPrivate(const StructType *ST,
-                                                raw_ostream &O,
-                                                size_t stackSize,
-                                                uint32_t Buffer,
-                                                uint32_t mLitIdx,
-                                                uint32_t &Counter) {
-  size_t n = ((stackSize + 15) & ~15) >> 4;
-  for (size_t x = 0; x < n; ++x) {
-    if (mSTM->usesHardware(AMDIL::Caps::PrivateUAV)) {
-      O << "uav_raw_store_id(" <<
-        mSTM->getResourceID(AMDIL::SCRATCH_ID)
-        << ") mem0, r0.x, cb" << Buffer << "[" << Counter++ << "]\n";
-    } else if (mSTM->usesHardware(AMDIL::Caps::PrivateMem)) {
-      O << "ishr r0.y, r0.x, l5.y\n";
-      O << "mov x" << mSTM->getResourceID(AMDIL::SCRATCH_ID)
-        <<"[r0.y], cb" << Buffer << "[" << Counter++ << "]\n";
-    } else {
-      O << "uav_raw_store_id(" <<
-        mSTM->getResourceID(AMDIL::GLOBAL_ID)
-        << ") mem0, r0.x, cb" << Buffer << "[" << Counter++ << "]\n";
-    }
-    O << "iadd r0.x, r0.x, l" << mLitIdx << ".z\n";
-  }
-}
-//#endif
 
 void AMDILKernelManager::printKernelArgs(raw_ostream &O, bool IsWrapper) {
   std::string Version(";version:");
@@ -1262,15 +1055,6 @@ void AMDILKernelManager::printArgCopies(raw_ostream &O,
     O << "dcl_cb cb1[" << (ArgSize >> 4) << "]\n";
     mMFI->setUsesMem(AMDIL::CONSTANT_ID);
   }
-
-  // Get the stack size.
-  uint32_t StackSize = mMFI->getStackSize();
-  uint32_t PrivateSize = mMFI->getScratchSize();
-  uint32_t StackOffset = PrivateSize;
-  assert(StackSize % 16 == 0 && "Stack should be 16-byte aligned");
-  assert(StackOffset % 16 == 0 && "Stack should be 16-byte aligned");
-
-  uint32_t literalId = uint32_t(-1);
 
   if (mSTM->usesHardware(AMDIL::Caps::PrivateMem) && !mSTM->overridesFlatAS()) {
     // TODO: If the size is too large, we need to fall back to software emulated

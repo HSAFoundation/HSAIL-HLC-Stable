@@ -88,6 +88,7 @@ protected:
 
     void invalidVariant(Inst inst, unsigned prop);
     void invalidVariant(Inst inst, unsigned prop1, unsigned prop2);
+    void invalidVariant(Inst inst, unsigned prop1, unsigned prop2, unsigned prop3);
     void brigPropError(Inst inst, unsigned prop, unsigned value, unsigned* vals, unsigned length);
     void invalidFormat(Inst inst, const char* msg);
 
@@ -96,10 +97,12 @@ protected:
     bool validateTypesize(Inst inst, unsigned prop, unsigned attr, unsigned* vals, unsigned length, bool isAssert = true);
     bool validateStypesize(Inst inst, unsigned prop, unsigned attr, unsigned* vals, unsigned length, bool isAssert = true);
     bool validateEqclass(Inst inst, unsigned prop, unsigned attr, unsigned* vals, unsigned length, bool isAssert = true);
+    bool validateSpecialProp(Inst inst, unsigned prop, unsigned val, unsigned* vals, unsigned length, bool isAssert = true);
+    bool validateFtz(Inst inst, unsigned prop, unsigned val, unsigned* vals, unsigned length, bool isAssert = true);
+    bool validateRound(Inst inst, unsigned prop, unsigned val, unsigned* vals, unsigned length, bool isAssert = true);
 
     //==========================================================================
 public:
-    static unsigned    getOperandIdx(unsigned prop);
     static unsigned    attr2type(Inst inst, unsigned idx, unsigned attr);
     static string      prop2str(unsigned prop);
     static const char* prop2key(unsigned prop);
@@ -149,24 +152,26 @@ private:
     bool checkOperandKind(Inst inst, unsigned idx, unsigned* vals, unsigned length, bool isAssert);
     bool checkAddrSeg(Inst inst, unsigned operandIdx, bool isAssert);
     bool checkAddrTSeg(Inst inst, unsigned operandIdx, bool isAssert);
-    bool isJumpTab(Inst inst, unsigned operandIdx, bool isAssert);
 
     static bool isImage(Operand addr, unsigned type);
     static bool isSampler(Operand addr);
-    static bool isCallTab(Inst inst, unsigned operandIdx, bool isAssert);
-    static bool isImmInRange(OperandImmed imm, unsigned low, unsigned high);
-    static bool eqTypes(unsigned type1, unsigned type2) { return getTypeSize(type1) == getTypeSize(type2); }
+    static bool isVector(Operand opr, unsigned size);
+    static bool isArgList(Operand opr);
+    static bool isCallTab(Operand opr);
+    static bool isJumpTab(Operand opr);
+    static bool isImm(Operand opr);
+    static bool isImmInRange(Operand opr, unsigned low, unsigned high);
+    static bool eqTypes(unsigned type1, unsigned type2) { return getBrigTypeNumBits(type1) == getBrigTypeNumBits(type2); }
     void propError(Inst inst, unsigned prop, string value, unsigned* vals, unsigned length);
 
     //==========================================================================
 private:
-    bool validateDstVector(Inst inst, OperandVector vector, unsigned oprIdx, bool isAssert);
+    bool validateDstVector(Inst inst, OperandOperandList vector, unsigned oprIdx, bool isAssert);
     bool validateOperandType(Inst inst, unsigned oprIdx, bool isDst, unsigned attr, bool isAssert);
     bool validateOperandReg(Inst inst, OperandReg opr, unsigned oprIdx, unsigned type, unsigned attr, bool isAssert);
-    bool validateOperandImmed(Inst inst, OperandImmed opr, unsigned oprIdx, unsigned type, unsigned attr, bool isAssert);
+    bool validateOperandImmed(Inst inst, OperandData opr, unsigned oprIdx, unsigned type, unsigned attr, bool isAssert);
     bool validateOperandWavesize(Inst inst, unsigned oprIdx, unsigned type, unsigned attr, bool isAssert);
-    bool validateOperandVector(Inst inst, OperandVector opr, unsigned oprIdx, unsigned type, unsigned attr, bool isAssert);
-    bool validateOperandTypeSize(Inst inst, unsigned oprIdx, bool isAssert);
+    bool validateOperandVector(Inst inst, OperandOperandList opr, unsigned oprIdx, unsigned type, unsigned attr, bool isAssert);
     bool validateInstTypeSize(Inst inst, unsigned type, const char* typeName, bool isAssert);
     bool validateAtomicTypeSize(Inst inst, bool isAssert);
 

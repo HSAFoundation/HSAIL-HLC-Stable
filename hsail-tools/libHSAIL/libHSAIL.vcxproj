@@ -38,7 +38,9 @@
     <ClCompile Include="HSAILParser.cpp" />
     <ClCompile Include="HSAILScanner.cpp" />
     <ClCompile Include="HSAILUtilities.cpp" />
-    <ClCompile Include="HSAILValidator.cpp" />
+    <ClCompile Include="HSAILValidator.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="HSAILScannerRules.cpp" />
     <ClCompile Include="HSAILValidatorBase.cpp" />
   </ItemGroup>
@@ -66,7 +68,6 @@
     <ClInclude Include="HSAILBrigantine.h" />
     <ClInclude Include="HSAILBrigContainer.h" />
     <ClInclude Include="HSAILBrigObjectFile.h" />
-    <ClInclude Include="HSAILConvertors.h" />
     <ClInclude Include="HSAILDisassembler.h" />
     <ClInclude Include="HSAILDump.h" />
     <ClInclude Include="HSAILFloats.h" />

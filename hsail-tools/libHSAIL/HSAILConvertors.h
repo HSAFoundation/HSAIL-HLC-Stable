@@ -243,11 +243,11 @@ struct ConvertImmediate {
     DstType visit(BrigTypeB*, ...) const { return use<LengthOnlyRuleConvert>(); }
 
     // int or float = int
-    DstType visit(BrigTypeNonPacked*, BrigTypeNF*) const { return use<LosslessConvert>(); }
-    DstType visit(BrigTypeNF*, BrigTypeNF*) const { return use<LosslessConvert>(); }
+    DstType visit(BrigTypeNonPacked*, BrigTypeNF*) const { return use<TruncateRuleConvert>(); }
+    DstType visit(BrigTypeNF*, BrigTypeNF*) const { return use<TruncateRuleConvert>(); }
 
     // special overload to resolve overload conflict with assign(BrigTypeB*, ...)
-    DstType visit(BrigTypeB*, BrigTypeNF*) const { return use<LosslessConvert>(); }
+    DstType visit(BrigTypeB*, BrigTypeNF*) const { return use<TruncateRuleConvert>(); }
 
     // b1 = int
     DstType visit(BrigType<Brig::BRIG_TYPE_B1>*, BrigTypeNF*) const { return src!=0; }

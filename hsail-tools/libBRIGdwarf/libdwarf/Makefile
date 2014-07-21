@@ -1,8 +1,7 @@
-OPENCL_DEPTH = ../../../..
-ASM_DEPTH = ../..
+HT_DEPTH = ../..
 
-include $(ASM_DEPTH)/asmdefs
+include $(HT_DEPTH)/htdefs
 
 SUBDIRS = build
 
-include $(ASM_DEPTH)/asmrules
+include $(HT_DEPTH)/htrules

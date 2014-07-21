@@ -32,7 +32,7 @@ using HSAIL_ASM::Inst;
 using HSAIL_ASM::Operand;
 
 using HSAIL_ASM::isPackedType;
-using HSAIL_ASM::getTypeSize;
+using HSAIL_ASM::getBrigTypeNumBits;
 using HSAIL_ASM::getPackedTypeDim;
 using HSAIL_ASM::packedType2elementType;
 
@@ -92,7 +92,7 @@ public:
     { 
         using namespace Brig;
 
-        assert(idx < 128 / getTypeSize(type));
+        assert(idx < 128 / (unsigned)getBrigTypeNumBits(type));
 
         switch(type)
         {
@@ -120,7 +120,7 @@ public:
     { 
         using namespace Brig;
 
-        assert(idx < 128 / getTypeSize(type));
+        assert(idx < 128 / (unsigned)getBrigTypeNumBits(type));
 
         switch(type)
         {
@@ -454,8 +454,8 @@ public:
 
     unsigned getType()         const { return type; }
     unsigned getElementType()  const { assert(isPackedType(type)); return packedType2elementType(type); }
-    unsigned getElementSize()  const { assert(isPackedType(type)); return getTypeSize(getElementType()); }
-    unsigned getSize()         const { return getTypeSize(getType()); }
+    unsigned getElementSize()  const { assert(isPackedType(type)); return getBrigTypeNumBits(getElementType()); }
+    unsigned getSize()         const { return getBrigTypeNumBits(getType()); }
     bool     isF64()           const { return isFloat() && getSize() == 64; }
     bool     isF32()           const { return isFloat() && getSize() == 32; }
     bool     isF16()           const { return isFloat() && getSize() == 16; }
@@ -556,7 +556,7 @@ private:
 
     //==========================================================================
 private:
-    static unsigned getTypeSize(unsigned t) { return HSAIL_ASM::brigtype_get_length(t); }
+    //static unsigned getTypeSize(unsigned t) { return HSAIL_ASM::getBrigTypeNumBits(t); }
 
 };
 

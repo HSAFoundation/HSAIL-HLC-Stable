@@ -120,27 +120,28 @@ namespace llvm {
      MD_COUNTER = 263,
      MD_INT = 264,
      MD_INTLIST = 265,
-     MD_POINTER = 266,
-     MD_IMAGE = 267,
-     MD_PRINTF = 268,
-     MD_STRING = 269,
-     MD_LGS = 270,
-     MD_SEMAPHORE = 271,
-     MD_REFLECTION = 272,
-     MD_CONSTARG = 273,
-     MD_ERRWAR = 274,
-     ARG_START = 275,
-     ARG_END = 276,
-     IL_VERSION = 277,
-     IL_FUNC = 278,
-     IL_ENDFUNC = 279,
-     IL_ENDMAIN = 280,
-     MACRO_START = 281,
-     MACRO_END = 282,
-     DBG_START = 283,
-     DBG_END = 284,
-     DATA_START = 285,
-     DATA_END = 286
+     MD_QUEUE = 266,
+     MD_POINTER = 267,
+     MD_IMAGE = 268,
+     MD_PRINTF = 269,
+     MD_STRING = 270,
+     MD_LGS = 271,
+     MD_SEMAPHORE = 272,
+     MD_REFLECTION = 273,
+     MD_CONSTARG = 274,
+     MD_ERRWAR = 275,
+     ARG_START = 276,
+     ARG_END = 277,
+     IL_VERSION = 278,
+     IL_FUNC = 279,
+     IL_ENDFUNC = 280,
+     IL_ENDMAIN = 281,
+     MACRO_START = 282,
+     MACRO_END = 283,
+     DBG_START = 284,
+     DBG_END = 285,
+     DATA_START = 286,
+     DATA_END = 287
    };
 
     };
@@ -323,7 +324,7 @@ namespace llvm {
 #line 5 "AMDILMDParser.y"
 } // llvm
 /* Line 33 of lalr1.cc  */
-#line 327 "AMDILMDParser.tab.hpp"
+#line 328 "AMDILMDParser.tab.hpp"
 
 
 

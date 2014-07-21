@@ -29,6 +29,7 @@ namespace llvm {
     Event,
     ReserveId,
     CLKEventT,
+    QueueT,
     UnknownOpaque
   };
 

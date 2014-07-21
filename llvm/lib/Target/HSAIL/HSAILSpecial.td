@@ -87,22 +87,14 @@ let isAsCheapAsAMove = 1 in {
 
   }
 
-  def memfence : HSAILInst<(outs), (ins), "memfence_ar_wg", [(int_HSAIL_memfence)]>;
-
-  def memfence_global : HSAILInst<(outs), (ins), 
-          "memfence_global_ar_wg", [(int_HSAIL_memfence_global)]>;
-
-  def memfence_group : HSAILInst<(outs), (ins), 
-          "memfence_group_ar_wg", [(int_HSAIL_memfence_group)]>;
-
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // SYNC OCL 2.0
 
-def hsail_atomic_memfence : HSAILInst< (outs),
-    (ins i32imm:$seg, i32imm:$order, i32imm:$scope), "",
-    [(int_HSAIL_atomic_memfence (i32 imm:$seg), (i32 imm:$order), (i32 imm:$scope))]>;
+def hsail_memfence : HSAILInst< (outs),
+    (ins i32imm:$order, i32imm:$globalscope, i32imm:$groupscope, i32imm:$imagescope), "",
+    [(int_HSAIL_memfence (i32 imm:$order), (i32 imm:$globalscope), (i32 imm:$groupscope), (i32 imm:$imagescope))]>;
 
 // Cross-Lane Operations
   class CrossLaneV4<string asm>
