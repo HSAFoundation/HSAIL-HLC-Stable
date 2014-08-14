@@ -1,1 +1,0 @@
-/usr/bin/c++  -fPIC  -fPIC -fvisibility-inlines-hidden   -shared -Wl,-soname,BugpointPasses.so -o CMakeFiles/CMakeRelink.dir/BugpointPasses.so CMakeFiles/BugpointPasses.dir/TestPasses.cpp.o -ldl -lpthread 

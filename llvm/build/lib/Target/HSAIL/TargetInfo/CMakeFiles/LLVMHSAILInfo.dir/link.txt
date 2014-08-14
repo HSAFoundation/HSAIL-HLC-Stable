@@ -1,2 +1,0 @@
-/usr/bin/ar cr ../../../libLLVMHSAILInfo.a  CMakeFiles/LLVMHSAILInfo.dir/HSAILTargetInfo.cpp.o
-/usr/bin/ranlib ../../../libLLVMHSAILInfo.a

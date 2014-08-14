@@ -1,1 +1,0 @@
-/usr/bin/gcc   -fPIC    CMakeFiles/count.dir/count.c.o  -o ../../bin/count -rdynamic -ldl -lpthread 

@@ -1,2 +1,0 @@
-/usr/bin/ar cr ../../../libLLVMHSAILAsmPrinter.a  CMakeFiles/LLVMHSAILAsmPrinter.dir/HSAILInstPrinter.cpp.o CMakeFiles/LLVMHSAILAsmPrinter.dir/HSAILInstComments.cpp.o
-/usr/bin/ranlib ../../../libLLVMHSAILAsmPrinter.a

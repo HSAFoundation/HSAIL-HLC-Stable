@@ -1,9 +1,0 @@
-version 1:0:small;
-
-extern function &foo()();
-
-kernel &aaa()
-{
-    { call &foo()(); }
-    ret;
-};

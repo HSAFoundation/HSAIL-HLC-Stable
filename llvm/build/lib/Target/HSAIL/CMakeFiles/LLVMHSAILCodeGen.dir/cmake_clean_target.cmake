@@ -1,3 +1,0 @@
-FILE(REMOVE_RECURSE
-  "../../libLLVMHSAILCodeGen.a"
-)

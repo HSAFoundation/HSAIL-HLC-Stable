@@ -1,4 +1,0 @@
-Error: Incompatible versions of input modules
-Info: Module map:
-      End:64 Begin:4, version 1:0:$full,$small,$nosftz; file: versions_neg_1.brig
-      End:124 Begin:64, version 1:0:$full,$large,$nosftz; file: versions_neg_2.brig

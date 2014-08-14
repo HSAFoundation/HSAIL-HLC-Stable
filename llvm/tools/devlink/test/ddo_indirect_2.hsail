@@ -1,6 +1,0 @@
-version 1:0:small;
-
-function &foo()()
-{
-	ld_global_u32 $s0,[$s1+1248];
-};

@@ -1,1 +1,0 @@
-/usr/bin/c++    -fPIC -fvisibility-inlines-hidden    CMakeFiles/llvm-bcanalyzer.dir/llvm-bcanalyzer.cpp.o  -o CMakeFiles/CMakeRelink.dir/llvm-bcanalyzer -rdynamic ../../lib/libLLVMBitReader.a ../../lib/libLLVMCore.a ../../lib/libLLVMSupport.a -ldl -lpthread 

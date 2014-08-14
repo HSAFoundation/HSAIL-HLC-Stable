@@ -1,8 +1,0 @@
-version 1:0:small,full;
-
-extern function &foo_1()();
-
-kernel &kernel_1()
-{
-	{ call	&foo_1 () (); }
-};

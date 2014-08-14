@@ -1,8 +1,0 @@
-Error: Unresolved '&foo_1', function of type '()()' declared in 'mult_defs_01neg_1.brig' due to name conflict between:
-...'&foo_1', function of type '()()' defined in 'mult_defs_01neg_2.brig'.
-...'&foo_1', kernel of type '()' defined in 'mult_defs_01neg_3.brig'.
-...'&foo_1', symbol of type 'global_s32' defined in 'mult_defs_01neg_4.brig'.
-Error: Multiple definitions with conflicting names found:
-...'&foo_2', function of type '()()' defined in 'mult_defs_01neg_2.brig'.
-...'&foo_2', kernel of type '()' defined in 'mult_defs_01neg_3.brig'.
-...'&foo_2', symbol of type 'global_s32' defined in 'mult_defs_01neg_4.brig'.

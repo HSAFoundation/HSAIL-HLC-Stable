@@ -1,1 +1,0 @@
-/usr/bin/c++    -fPIC -fvisibility-inlines-hidden    CMakeFiles/llvm-mcmarkup.dir/llvm-mcmarkup.cpp.o  -o CMakeFiles/CMakeRelink.dir/llvm-mcmarkup -rdynamic ../../lib/libLLVMSupport.a -ldl -lpthread 

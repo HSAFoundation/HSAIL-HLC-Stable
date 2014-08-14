@@ -1,2 +1,0 @@
-/usr/bin/ar cr ../../libLLVMSPIR.a  CMakeFiles/LLVMSPIR.dir/AMDSPIRLoader.cpp.o CMakeFiles/LLVMSPIR.dir/AMDSPIRUtils.cpp.o CMakeFiles/LLVMSPIR.dir/SPIRVerifier.cpp.o CMakeFiles/LLVMSPIR.dir/AMDSPIRMutator.cpp.o CMakeFiles/LLVMSPIR.dir/cxa_demangle.cpp.o CMakeFiles/LLVMSPIR.dir/khrext.cpp.o
-/usr/bin/ranlib ../../libLLVMSPIR.a

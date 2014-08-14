@@ -1,2 +1,0 @@
-/usr/bin/ar cr ../../../libLLVMAMDILInfo.a  CMakeFiles/LLVMAMDILInfo.dir/AMDILTargetInfo.cpp.o
-/usr/bin/ranlib ../../../libLLVMAMDILInfo.a
