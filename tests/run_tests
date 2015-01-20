@@ -1,0 +1,29 @@
+#!/bin/bash
+ROOT=$HOME/GitObsidian/HSAIL-HLC-Stable
+PATH=$ROOT/bin:$PATH
+echo "path  $PATH"
+#echo "`which llc`"
+for  oclf in pa_*.cl
+do
+fname=`echo "$oclf" | cut -d'.' -f1`
+echo " Compiling $fname "
+#clc  --support_all_extension --opencl=1.2 -o results/$fname.fe.ll $oclf
+clc2 -cl-std=CL2.0 $oclf
+cp $fname.bc results/$fname.fe.bc
+llvm-dis  -o results/$fname.fe.ll results/$fname.fe.bc
+echo "FE complete"
+#llvm-as  -o results/$fname.bc results/$fname.fe.ll
+#cp results/$fname.bc results/$fname.linked.bc
+llvm-link  -prelink-opt -o results/$fname.linked.bc results/$fname.fe.bc  -l $ROOT/bin/builtins-hsail.bc
+echo "llvm-link completed!"
+llvm-dis  -o results/$fname.linked.ll results/$fname.linked.bc
+opt  -O3 -gpu -whole -verify results/$fname.linked.bc -o results/$fname.opt.bc
+echo "opt complete!"
+llvm-dis  -o results/$fname.opt.ll results/$fname.opt.bc
+llc  -O2 -march=hsail-64 -filetype=obj -o results/$fname.brig  results/$fname.opt.bc
+echo "llc complete"
+hsailasm  -disassemble -o results/$fname.hsail  results/$fname.brig
+echo "HSAIL generated!"
+echo ""
+#Dev  -int_disassembler -ns -Q -Bonaire -d -brig  results/$fname.brig 
+done
